@@ -2,12 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from scipy.optimize import fsolve
+from matplotlib.patches import Wedge
 
 # Parámetros de la simulación
 L1 = 1
 L2 = 0.2
 m = 0.5
-b = 0.2
+b = 0.5
 
 def restriccion(angulo2, angulo1, L1, L2, m, b):
     x = L1 * np.cos(angulo1) + L2 * np.cos(angulo1 + angulo2)
@@ -41,10 +42,17 @@ def angulo2_obtener(m, b, L1, L2, angulo1_array):
     
     return angulo1_filtrado, soluciones_reales
 
-def crear_animacion_brazo():
+def crear_animacion_brazo_con_conos(n):
     # Obtener soluciones
-    angulo1_array = angulo1_generar(360)
+    angulo1_array = angulo1_generar(n)
     angulo1_filtrado, angulo2_reales = angulo2_obtener(m, b, L1, L2, angulo1_array)
+    
+    # Convertir a grados para análisis
+    angulos_grados = np.rad2deg(angulo1_filtrado)
+    
+    # Encontrar los rangos de ángulos para cada cuadrante
+    primer_cuadrante = [ang for ang in angulos_grados if ang < 90]
+    tercer_cuadrante = [ang for ang in angulos_grados if ang > 180]
     
     # Crear figura y ejes
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -53,10 +61,25 @@ def crear_animacion_brazo():
     ax.grid(True)
     ax.set_aspect('equal')
     
+    # Agregar los conos (wedges)
+    if primer_cuadrante:
+        min_ang1 = min(primer_cuadrante)
+        max_ang1 = max(primer_cuadrante)
+        wedge1 = Wedge((0, 0), L1 + L2, min_ang1, max_ang1, 
+                       alpha=0.2, color='green', label='Rango θ1 (1er cuadrante)')
+        ax.add_patch(wedge1)
+    
+    if tercer_cuadrante:
+        min_ang2 = min(tercer_cuadrante)
+        max_ang2 = max(tercer_cuadrante)
+        wedge2 = Wedge((0, 0), L1 + L2, min_ang2, max_ang2,
+                       alpha=0.2, color='blue', label='Rango θ1 (3er cuadrante)')
+        ax.add_patch(wedge2)
+    
     # Graficar la línea de restricción
     x_recta = np.linspace(-1.5, 1.5, 100)
     y_recta = m * x_recta + b
-    ax.plot(x_recta, y_recta, 'b--', label=f'y = {m}x + {b}')
+    ax.plot(x_recta, y_recta, 'r--', label=f'y = {m}x + {b}')
     
     # Crear líneas para los eslabones
     line1, = ax.plot([], [], 'r-', linewidth=3, label='Eslabón 1')
@@ -69,7 +92,6 @@ def crear_animacion_brazo():
         for angulo2 in angulo2_reales[i]:
             frames.append((angulo1_filtrado[i], angulo2))
     
-    # Función de inicialización
     def init():
         line1.set_data([], [])
         line2.set_data([], [])
@@ -77,7 +99,6 @@ def crear_animacion_brazo():
         ax.legend()
         return line1, line2, punto_final
 
-    # Función de actualización para cada frame
     def update(frame):
         angulo1, angulo2 = frame
         
@@ -98,10 +119,10 @@ def crear_animacion_brazo():
     # Crear la animación
     anim = FuncAnimation(fig, update, frames=frames,
                         init_func=init, blit=True,
-                        interval=50, repeat=True)
+                        interval=(n/20 if int(n/20)>0 else n), repeat=True)
     
     plt.show()
     return anim
 
 # Ejecutar la animación
-anim = crear_animacion_brazo()
+anim = crear_animacion_brazo_con_conos(360)
