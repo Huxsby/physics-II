@@ -8,11 +8,12 @@ Holonomicas: g(01,02) = 0 ; y - mx -b = 0
 02 => g(01,02) = 0, puede dar dos soluciones para cada angulo de 01
 Arrays de 01 y 02 a representar en un grafico
 """
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from scipy.optimize import fsolve
-from matplotlib.patches import Wedge
+import numpy as np                              # Para cálculos numéricos
+import matplotlib.pyplot as plt                 # Para graficar
+from matplotlib.animation import FuncAnimation  # Para animaciones
+from scipy.optimize import fsolve               # Para resolver ecuaciones no lineales
+from matplotlib.patches import Wedge            # Para dibujar conos
+import time                                     # Para medir el tiempo de cálculo
 
 # Funcion de restriccion
 def restriccion(angulo2, angulo1, L1, L2, m, b):
@@ -191,8 +192,8 @@ def graficar_brazo(angulo1, angulo2, L1, L2, m, b):
     plt.plot(x_recta, m * x_recta + b, 'b--', label=f'Restricción: y = {m}x + {b}')
     
     # Configuración del gráfico
-    plt.xlim(-1.5, 1.5)
-    plt.ylim(-1.5, 1.5)
+    # plt.xlim(-1.5, 1.5)
+    # plt.ylim(-1.5, 1.5)
     plt.grid(True)
     plt.axis('equal')
     plt.xlabel('X')
@@ -201,7 +202,7 @@ def graficar_brazo(angulo1, angulo2, L1, L2, m, b):
     plt.legend()
     plt.show()
 
-# Graficar los resultados
+# Graficar los resultados hlo
 def graficar_resultados(angulo1_filtrado, angulo2_reales):
     """Grafica los ángulos obtenidos"""
     # Expandir los arrays para que coincidan
@@ -228,21 +229,151 @@ def graficar_resultados(angulo1_filtrado, angulo2_reales):
     plt.legend(['Solución real'])
     
     # Preguntar si desea guardar el gráfico
-    guardar = input("¿Desea guardar el gráfico? (s/n): ")
-    if guardar.lower() == 's':
+    if input("¿Desea guardar el gráfico? (s/n): ").strip().lower() == 's':
         plt.savefig('holonomica_opt.png')
     
     plt.show()
+
+# Función para guardar la animación
+def guardar_animacion(anim, filename="animacion.gif"):
+    """Guarda la animación en un archivo GIF en caso de que FFmpeg no esté disponible."""
+    if input("¿Desea guardar el gráfico? (s/n): ").strip().lower() == 's':
+        anim.save(filename, writer='pillow', fps=30)
+        print(f"Animación guardada como {filename}")
+
+# Funciones para restricciones Pfaffianas
+def calcular_coeficientes_pfaffiana(theta1, theta2, L1, L2, m):
+    """
+    Calcula los coeficientes de la restricción pfaffiana para una configuración dada.
+    Esta función implementa la relación ẏ = mẋ en términos de las velocidades angulares.
     
+    Retorna:
+        a, b: coeficientes de la ecuación a*θ̇1 + b*θ̇2 = 0
+    """
+    # Coeficiente para θ̇1
+    a = L1*np.cos(theta1) + L2*np.cos(theta1 + theta2) + \
+        m*(L1*np.sin(theta1) + L2*np.sin(theta1 + theta2))
+    
+    # Coeficiente para θ̇2
+    b = L2*np.cos(theta1 + theta2) + m*L2*np.sin(theta1 + theta2)
+    
+    return a, b
+
+# Función para graficar las restricciones Pfaffianas
+def graficar_resultados_pfaffianos(angulo1_filtrado, angulo2_reales, L1, L2, m):
+    """
+    Grafica las restricciones pfaffianas en el espacio de velocidades θ̇1 vs θ̇2.
+    Sigue el mismo estilo que la función graficar_resultados() original.
+    """
+    plt.figure(figsize=(10, 8))
+    
+    # Rango de velocidades a considerar
+    theta_dot1 = np.linspace(-5, 5, 100)
+    
+    # Crear un mapa de colores para diferentes configuraciones
+    colors = plt.cm.viridis(np.linspace(0, 1, len(angulo1_filtrado)))
+    
+    # Para cada configuración válida
+    for i, (theta1, theta2_list) in enumerate(zip(angulo1_filtrado, angulo2_reales)):
+        for theta2 in theta2_list:
+            # Calcular coeficientes
+            a, b = calcular_coeficientes_pfaffiana(theta1, theta2, L1, L2, m)
+            
+            # Calcular θ̇2 para cada θ̇1
+            theta_dot2 = -(a/b) * theta_dot1
+            
+            # Graficar la línea de restricción
+            plt.plot(theta_dot1, theta_dot2, 
+                    label=f'θ1={np.degrees(theta1):.1f}°, θ2={np.degrees(theta2):.1f}°',
+                    color=colors[i])
+    
+    plt.xlabel('Velocidad angular θ̇1 (rad/s)')
+    plt.ylabel('Velocidad angular θ̇2 (rad/s)')
+    plt.title('Restricciones Pfaffianas: Espacio de Velocidades')
+    plt.grid(True)
+    plt.axhline(y=0, color='k', linestyle=':')
+    plt.axvline(x=0, color='k', linestyle=':')
+    
+    # Agregar leyenda
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    
+    # Preguntar si desea guardar el gráfico (manteniendo la funcionalidad original)
+    if input("¿Desea guardar el gráfico? (s/n): ").strip().lower() == 's':
+        plt.savefig('pfaffiana_opt.png')
+    
+    plt.show()
+
+# Función para graficar el brazo con velocidades permitidas
+def graficar_brazo_con_velocidades(angulo1, angulo2, L1, L2, m, b, escala_velocidad=0.2):
+    """
+    Grafica el brazo robótico y añade un vector que indica la dirección de las velocidades permitidas.
+    
+    Parámetros adicionales:
+        escala_velocidad: factor para ajustar el tamaño del vector de velocidad
+    """
+    plt.figure(figsize=(10, 8))
+    
+    # Calcular posiciones de las articulaciones (igual que antes)
+    x1, y1 = L1 * np.cos(angulo1), L1 * np.sin(angulo1)
+    x2, y2 = x1 + L2 * np.cos(angulo1 + angulo2), y1 + L2 * np.sin(angulo1 + angulo2)
+    
+    # Graficar brazo (igual que antes)
+    plt.plot([0, x1, x2], [0, y1, y2], 'ro-', linewidth=3, markersize=8, label='Brazo')
+    
+    # Graficar restricción (recta)
+    x_recta = np.linspace(-1.5, 1.5, 100)
+    plt.plot(x_recta, m * x_recta + b, 'b--', label=f'Restricción: y = {m}x + {b}')
+    
+    # Calcular y graficar las velocidades permitidas
+    a, b_coef = calcular_coeficientes_pfaffiana(angulo1, angulo2, L1, L2, m)
+    
+    # Elegir una velocidad θ̇1 de referencia
+    theta_dot1 = 1.0
+    # Calcular θ̇2 correspondiente
+    theta_dot2 = -(a/b_coef) * theta_dot1
+    
+    # Calcular las velocidades cartesianas del end-effector
+    v_x = -L1*np.sin(angulo1)*theta_dot1 - L2*np.sin(angulo1 + angulo2)*(theta_dot1 + theta_dot2)
+    v_y = L1*np.cos(angulo1)*theta_dot1 + L2*np.cos(angulo1 + angulo2)*(theta_dot1 + theta_dot2)
+    
+    # Normalizar y escalar el vector de velocidad
+    magnitude = np.sqrt(v_x**2 + v_y**2)
+    v_x = v_x/magnitude * escala_velocidad
+    v_y = v_y/magnitude * escala_velocidad
+    
+    # Graficar el vector de velocidad
+    plt.arrow(x2, y2, v_x, v_y, 
+             head_width=0.05, head_length=0.05, 
+             fc='g', ec='g', 
+             label='Dirección de velocidad permitida')
+    
+    # Configuración del gráfico
+    plt.grid(True)
+    plt.axis('equal')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title(f'Brazo Robótico con Velocidades Permitidas\nθ1 = {np.degrees(angulo1):.1f}°, θ2 = {np.degrees(angulo2):.1f}°')
+    plt.legend()
+    plt.show()
+
+# Menú interactivo
 def menu():
     """Menú interactivo para seleccionar acciones."""
     while True:
-        print("\nMenú de Opciones:")
-        print("Nota: El número de ángulos a generar no se corresponde con el número final de ángulos encontrados (sols en i / inexistentes).")
-        print("1. Visualizar los 2 primeros angulos encontrados")
-        print("2. Crear animación del brazo con conos automáticamente")
-        print("3. Ver lista de soluciones")
+        print("\n" + "="*80)
+        print(" "*25 + "MENÚ DE OPCIONES" + " "*25)
+        print("="*80)
+        print("Nota: El número de ángulos a generar no se corresponde con el número final")
+        print("      de ángulos encontrados (soluciones existentes / inexistentes).")
+        print("-"*80)
+        print("1. Visualizar los 2 primeros ángulos encontrados (con vector de velocidad)")
+        print("2. Crear animación del brazo con conos (versión clásica)")
+        print("3. Ver lista de soluciones holonómicas")
+        print("4. Ver restricciones Pfaffianas")
         print("0. Salir")
+        print("-"*80)
+
         opcion = input("\nSeleccione una opción: ")
         
         if opcion == "1":
@@ -253,7 +384,7 @@ def menu():
             count = 0
             for i in range(len(angulo1_filtrado)):
                 for angulo2 in angulo2_reales[i]:
-                    graficar_brazo(angulo1_filtrado[i], angulo2, L1, L2, m, b)
+                    graficar_brazo_con_velocidades(angulo1_filtrado[i], angulo2, L1, L2, m, b)
                     count += 1
                     if count >= 2:  # Break after showing 2 angles
                         return
@@ -261,14 +392,13 @@ def menu():
         elif opcion == "2":
             n = int(input("Ingrese el número de ángulos a generar: "))
             anim = crear_animacion_brazo_con_conos_automatico(n)
+            guardar_animacion(anim)
             print("Iniciando animación...")
-       
+                
         elif opcion == "3":
             n = int(input("Ingrese el número de ángulos a generar: "))
             angulo1_array = angulo1_generar(n)
             print("Buscando soluciones...")
-            
-            import time
             start_time = time.time()
             
             angulo1_filtrado, angulo2_reales = angulo2_obtener(m, b, L1, L2, angulo1_array)
@@ -281,6 +411,18 @@ def menu():
             
             graficar_resultados(angulo1_filtrado, angulo2_reales)
         
+        if opcion == "4":  # Nueva opción para pfaffianas
+            n = int(input("Ingrese el número de ángulos a generar: "))
+            angulo1_array = angulo1_generar(n)
+            print("Buscando soluciones...")
+            start_time = time.time()
+            
+            angulo1_filtrado, angulo2_reales = angulo2_obtener(m, b, L1, L2, angulo1_array)
+            
+            print(f"Cálculo completado en {time.time() - start_time:.2f} segundos")
+            print("Cuando graficamos θ̇1 vs θ̇2, cada línea representa todas las posibles combinaciones de velocidades que mantienen el end-effector moviéndose sobre la línea restricción para una configuración específica.")
+            graficar_resultados_pfaffianos(angulo1_filtrado, angulo2_reales, L1, L2, m)
+
         elif opcion == "0":
             print("Saliendo...")
             break
