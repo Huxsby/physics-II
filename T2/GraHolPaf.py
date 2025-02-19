@@ -111,8 +111,6 @@ def crear_animacion_brazo_con_conos_automatico(n):
     
     # Crear figura y ejes
     fig, ax = plt.subplots(figsize=(10, 8))
-    # ax.set_xlim(-1.5, 1.5)
-    # ax.set_ylim(-1.5, 1.5)
     ax.grid(True)
     ax.set_aspect('equal')
     
@@ -124,7 +122,7 @@ def crear_animacion_brazo_con_conos_automatico(n):
         color = colores[i % len(colores)]
         wedge = Wedge((0, 0), L1 + L2, min_ang, max_ang, 
                       alpha=0.2, color=color, 
-                      label=f'Rango θ1 ({min_ang:.1f}° a {max_ang:.1f}°)')
+                      label=f'Rango θ1 ({min_ang:06.1f}° a {max_ang:06.1f}°)')
         ax.add_patch(wedge)
     
     # Graficar la línea de restricción
@@ -133,9 +131,23 @@ def crear_animacion_brazo_con_conos_automatico(n):
     ax.plot(x_recta, y_recta, 'r--', label=f'y = {m}x + {b}')
     
     # Crear líneas para los eslabones
-    line1, = ax.plot([], [], 'r-', linewidth=3, label='Eslabón 1')
-    line2, = ax.plot([], [], 'b-', linewidth=3, label='Eslabón 2')
+    line1, = ax.plot([], [], 'r-', linewidth=3, label=f'Eslabón 1 {L1} u')
+    line2, = ax.plot([], [], 'b-', linewidth=3, label=f'Eslabón 2 {L2} u')
     punto_final, = ax.plot([], [], 'ro', markersize=8)
+    
+    # Añadir leyenda
+    ax.legend()
+    
+    # Crear texto para mostrar ángulos (fuera del loop de animación para evitar parpadeo)
+    text_angulos = ax.text(0.02, 0.95, '', transform=ax.transAxes, 
+                          bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Título fijo (para evitar parpadeo)
+    ax.set_title('Brazo Robótico con Restricciones Holonómicas')
+    
+    # Ajustar límites (para evitar cambios durante animación)
+    ax.set_xlim(-1.5*(L1+L2), 1.5*(L1+L2))
+    ax.set_ylim(-1.5*(L1+L2), 1.5*(L1+L2))
     
     # Preparar los datos para la animación
     frames = []
@@ -143,13 +155,6 @@ def crear_animacion_brazo_con_conos_automatico(n):
         for angulo2 in angulo2_reales[i]:
             frames.append((angulo1_filtrado[i], angulo2))
     
-    def init():
-        line1.set_data([], [])
-        line2.set_data([], [])
-        punto_final.set_data([], [])
-        ax.legend()
-        return line1, line2, punto_final
-
     def update(frame):
         angulo1, angulo2 = frame
         
@@ -162,16 +167,19 @@ def crear_animacion_brazo_con_conos_automatico(n):
         # Actualizar posiciones
         line1.set_data([0, x1], [0, y1])
         line2.set_data([x1, x2], [y1, y2])
-        punto_final.set_data([x2], [y2])  # Solo el punto final
+        punto_final.set_data([x2], [y2])
         
-        ax.set_title(f'Brazo Robótico: θ1 = {np.rad2deg(angulo1):.1f}°, θ2 = {np.rad2deg(angulo2):.1f}°')
-        return line1, line2, punto_final
-
-    # Crear la animación
-    anim = FuncAnimation(fig, update, frames=frames,
-                        init_func=init, blit=True,
-                        interval=(n//20 if n//20 > 0 else n), repeat=True)
+        # Actualizar texto de ángulos (sin cambiar título)
+        text_angulos.set_text(f'θ1 = {np.rad2deg(angulo1):.1f}°\nθ2 = {np.rad2deg(angulo2):.1f}°')
+        
+        return line1, line2, punto_final, text_angulos
     
+    # Configuración de la animación con blitting para mejor rendimiento
+    anim = FuncAnimation(fig, update, frames=frames,
+                        interval=(n//20 if n//20 > 0 else n), 
+                        repeat=True, blit=True)
+    
+    plt.tight_layout()
     plt.show()
     return anim
 
@@ -373,6 +381,8 @@ def menu():
         print("4. Ver restricciones Pfaffianas")
         print("0. Salir")
         print("-"*80)
+        print(f"Parámetros actuales: L1={L1:.2f}, L2={L2:.2f}, m={m:.2f}, b={b:.2f}")
+        print("-"*80)
 
         opcion = input("\nSeleccione una opción: ")
         
@@ -411,7 +421,7 @@ def menu():
             
             graficar_resultados(angulo1_filtrado, angulo2_reales)
         
-        if opcion == "4":  # Nueva opción para pfaffianas
+        elif opcion == "4":
             n = int(input("Ingrese el número de ángulos a generar: "))
             angulo1_array = angulo1_generar(n)
             print("Buscando soluciones...")
