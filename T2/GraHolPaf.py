@@ -174,9 +174,11 @@ def crear_animacion_brazo_con_conos_automatico(n):
         
         return line1, line2, punto_final, text_angulos
     
-    # Configuración de la animación con blitting para mejor rendimiento
+     # Configurar la animación con un intervalo adaptativo
+    
+    intervalo = min(100, max(30, (n//20 if n//20 > 0 else n)))
     anim = FuncAnimation(fig, update, frames=frames,
-                        interval=(n//20 if n//20 > 0 else n), 
+                        interval=intervalo, 
                         repeat=True, blit=True)
     
     plt.tight_layout()
@@ -365,6 +367,146 @@ def graficar_brazo_con_velocidades(angulo1, angulo2, L1, L2, m, b, escala_veloci
     plt.legend()
     plt.show()
 
+def ordenar_frames_por_rangos(angulo1_filtrado, angulo2_reales):
+    """
+    Ordena los frames de animación por rangos de θ1 y θ2 para crear un movimiento más fluido.
+    
+    Args:
+        angulo1_filtrado: Lista de ángulos θ1 que cumplen la restricción
+        angulo2_reales: Lista de listas con soluciones θ2 para cada θ1
+        
+    Returns:
+        frames_ordenados: Lista de tuplas (θ1, θ2) ordenadas para una animación fluida
+    """
+    # Paso 1: Recopilar todos los frames y agruparlos por rangos de θ1
+    frames_por_rango = {}
+    angulos_grados = np.rad2deg(angulo1_filtrado)
+    
+    # Identificar rangos de θ1
+    rangos_theta1 = []
+    inicio_rango = angulos_grados[0]
+    angulo_anterior = angulos_grados[0]
+    
+    for i in range(1, len(angulos_grados)):
+        if abs(angulos_grados[i] - angulo_anterior) > 20:  # Umbral de discontinuidad
+            rangos_theta1.append((inicio_rango, angulo_anterior))
+            inicio_rango = angulos_grados[i]
+        angulo_anterior = angulos_grados[i]
+    rangos_theta1.append((inicio_rango, angulo_anterior))
+    
+    # Agrupar frames por rango de θ1
+    for rango in rangos_theta1:
+        frames_rango = []
+        for i, theta1 in enumerate(angulo1_filtrado):
+            if rango[0] <= np.rad2deg(theta1) <= rango[1]:
+                for theta2 in angulo2_reales[i]:
+                    frames_rango.append((theta1, theta2))
+        if frames_rango:
+            frames_por_rango[rango] = frames_rango
+    
+    # Paso 2: Ordenar frames dentro de cada rango por θ2
+    frames_ordenados = []
+    for rango, frames in frames_por_rango.items():
+        # Ordenar por θ2
+        frames_ordenados_rango = sorted(frames, key=lambda x: x[1])
+        
+        # Crear patrón de ida y vuelta dentro del rango
+        if len(frames_ordenados_rango) > 2:
+            frames_inversos = frames_ordenados_rango[-2:0:-1]
+            frames_ordenados_rango.extend(frames_inversos)
+        
+        frames_ordenados.extend(frames_ordenados_rango)
+        
+        # Agregar una pequeña pausa (repitiendo el último frame)
+        if frames_ordenados_rango:
+            frames_ordenados.extend([frames_ordenados_rango[-1]] * 5)  # 5 frames de pausa
+    
+    return frames_ordenados
+
+def crear_animacion_mejorada(n):
+    """
+    Crea una animación más fluida usando el nuevo sistema de ordenamiento por rangos.
+    
+    Args:
+        n: Número de ángulos a generar
+    """
+    # Obtener soluciones
+    angulo1_array = angulo1_generar(n)
+    angulo1_filtrado, angulo2_reales = angulo2_obtener(m, b, L1, L2, angulo1_array)
+    
+    # Ordenar los frames usando el nuevo sistema
+    frames_ordenados = ordenar_frames_por_rangos(angulo1_filtrado, angulo2_reales)
+    
+    # Configurar la figura
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.grid(True)
+    ax.set_aspect('equal')
+    
+    # Identificar y graficar los rangos de θ1
+    angulos_grados = np.rad2deg([f[0] for f in frames_ordenados])
+    rangos_angulos = identificar_rangos_angulos(angulos_grados)
+    
+    # Colores para los diferentes rangos
+    colores = ['green', 'blue', 'purple', 'orange', 'cyan']
+    
+    # Agregar los conos (wedges) para cada rango
+    for i, (min_ang, max_ang) in enumerate(rangos_angulos):
+        color = colores[i % len(colores)]
+        wedge = Wedge((0, 0), L1 + L2, min_ang, max_ang, 
+                      alpha=0.2, color=color, 
+                      label=f'Rango θ1 ({min_ang:06.1f}° a {max_ang:06.1f}°)')
+        ax.add_patch(wedge)
+    
+    # Graficar la línea de restricción
+    x_recta = np.linspace(-1.5, 1.5, 100)
+    y_recta = m * x_recta + b
+    ax.plot(x_recta, y_recta, 'r--', label=f'y = {m}x + {b}')
+    
+    # Crear líneas para los eslabones
+    line1, = ax.plot([], [], 'r-', linewidth=3, label=f'Eslabón 1 {L1} u')
+    line2, = ax.plot([], [], 'b-', linewidth=3, label=f'Eslabón 2 {L2} u')
+    punto_final, = ax.plot([], [], 'ro', markersize=8)
+    
+    # Añadir leyenda y configurar gráfico
+    ax.legend()
+    ax.set_title('Brazo Robótico con Restricciones Holonómicas')
+    ax.set_xlim(-1.5*(L1+L2), 1.5*(L1+L2))
+    ax.set_ylim(-1.5*(L1+L2), 1.5*(L1+L2))
+    
+    # Texto para mostrar ángulos
+    text_angulos = ax.text(0.02, 0.95, '', transform=ax.transAxes, 
+                          bbox=dict(facecolor='white', alpha=0.7))
+    
+    def update(frame):
+        angulo1, angulo2 = frame
+        
+        # Calcular posiciones
+        x1 = L1 * np.cos(angulo1)
+        y1 = L1 * np.sin(angulo1)
+        x2 = x1 + L2 * np.cos(angulo1 + angulo2)
+        y2 = y1 + L2 * np.sin(angulo1 + angulo2)
+        
+        # Actualizar posiciones
+        line1.set_data([0, x1], [0, y1])
+        line2.set_data([x1, x2], [y1, y2])
+        punto_final.set_data([x2], [y2])
+        
+        # Actualizar texto de ángulos
+        text_angulos.set_text(f'θ1 = {np.rad2deg(angulo1):.1f}°\nθ2 = {np.rad2deg(angulo2):.1f}°')
+        
+        return line1, line2, punto_final, text_angulos
+    
+    # Configurar la animación con un intervalo adaptativo
+    intervalo = min(100, max(30, (n//20 if n//20 > 0 else n)))
+    
+    anim = FuncAnimation(fig, update, frames=frames_ordenados,
+                        interval=intervalo, 
+                        repeat=True, blit=True)
+    
+    plt.tight_layout()
+    plt.show()
+    return anim
+
 # Menú interactivo
 def menu():
     """Menú interactivo para seleccionar acciones."""
@@ -379,6 +521,7 @@ def menu():
         print("2. Crear animación del brazo con conos (versión clásica)")
         print("3. Ver lista de soluciones holonómicas")
         print("4. Ver restricciones Pfaffianas")
+        print("5. Crear animación mejorada con ordenamiento")
         print("0. Salir")
         print("-"*80)
         print(f"Parámetros actuales: L1={L1:.2f}, L2={L2:.2f}, m={m:.2f}, b={b:.2f}")
@@ -432,6 +575,12 @@ def menu():
             print(f"Cálculo completado en {time.time() - start_time:.2f} segundos")
             print("Cuando graficamos θ̇1 vs θ̇2, cada línea representa todas las posibles combinaciones de velocidades que mantienen el end-effector moviéndose sobre la línea restricción para una configuración específica.")
             graficar_resultados_pfaffianos(angulo1_filtrado, angulo2_reales, L1, L2, m)
+
+        elif opcion == "5":
+            n = int(input("Ingrese el número de ángulos a generar: "))
+            anim = crear_animacion_mejorada(n)
+            guardar_animacion(anim)
+            print("Iniciando animación mejorada...")
 
         elif opcion == "0":
             print("Saliendo...")
