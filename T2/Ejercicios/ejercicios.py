@@ -20,13 +20,16 @@ rotación de un ángulo θ entorno a cualquier eje v.
 el vector que se va a rotar, el eje de rotación y el ángulo a rotar. El output debe
 ser el vector rotado un ángulo θ entorno al eje de rotación especificado.
 
-5 - Comprueba que los resultados sean los mismos del ejercicio anterior cuando se
+[X] 5 - Comprueba que los resultados sean los mismos del ejercicio anterior cuando se
 realizan rotaciones entorno a los ejes cartesianos. Prueba a hacer rotaciones
 entorno a un eje diferente a los ejes cartesianos (recuerda normalizar el vector que
 indica el eje de rotación para poder aplicar la fórmula general).
 
-6 - Comprueba las propiedades no conmutativa y asociativa de rotaciones sucesivas
-utilizando los programas anteriores.
+[X] 6 - Comprueba las propiedades no conmutativa y asociativa de rotaciones sucesivas
+utilizando los programas anteriores. ∀A,B,C ∈SO(n):
+    Propiedad asociativa: (AB)C =A(BC)      Producto interno: El producto AB nos da otro elemento del grupo (otra matriz de
+                                            rotación). Las matrices de SO(3) no verifican la propiedad conmutativa pero las
+                                            de SO(2) sí.      
 """
 
 import numpy as np                              # Para cálculos numéricos
@@ -57,7 +60,7 @@ def Rotz(θ):
 def Rot(w, θ):
     """
     Matriz de rotación de un ángulo θ entorno a un eje genérico w.
-    Parámetros: w (array), θ (float) en radianes
+    Parámetros: w (array) (vector normalizado), θ (float) en radianes
     Retorna: matrix (Matriz de rotación de un eje génerico w)
     """
 
@@ -102,34 +105,26 @@ def menu():
         print(" "*25 + "MENÚ DE OPCIONES" + " "*25)
         print("="*80)
         # Añadir content
-        print("1. Rotar un vector entorno a un eje específico.")
+        print("1. Rotar un vector entorno a un eje específico (x,y,z).")
         print("2. Rotar un vector entorno a un eje genérico.")
         print("0. Salir.")
         print("-"*80)
 
         opcion = input("\nSeleccione una opción: ")
         
-        if opcion == "1":
+        if opcion == "1" or opcion == "2":
             vector = Datos(tipo="vector").valor
-            eje = Datos(tipo="eje").valor
+            if opcion == "1":
+                eje = Datos(tipo="eje").valor
+            else:
+                eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas): ").valor
             angulo = Datos(tipo="angulo").valor
             
             # Rotar el vector
             vector_rotado = RotarVector(vector, eje, angulo)  
             print(f"\nVector original: {vector}")
             print(f"Vector rotado: {vector_rotado}")
-            break
-        
-        elif opcion == "2": 
-            vector = Datos(tipo="vector").valor
-            eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas): ").valor
-            angulo = Datos(tipo="angulo").valor
-            
-            # Rotar el vector
-            vector_rotado = RotarVector(vector, eje, angulo)
-            print(f"\nVector original: {vector}")
-            print(f"Vector rotado: {vector_rotado}")
-            break
+            continue
 
         elif opcion == "0":
             print("Saliendo...")

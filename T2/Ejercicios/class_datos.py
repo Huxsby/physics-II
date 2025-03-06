@@ -16,7 +16,7 @@ class Datos:
         # Mensajes predeterminados según el tipo
         if mensaje is None:
             if tipo == "vector":
-                mensaje = "Ingrese el vector a rotar (separado por comas): "
+                mensaje = "Ingrese el vector a rotar (separado por comas o espacios en blanco): "
             elif tipo == "eje":
                 mensaje = "Ingrese el eje de rotación (x, y o z): "
             elif tipo == "angulo":
@@ -34,12 +34,12 @@ class Datos:
             while True:
                 try:
                     input_vector = input(self.mensaje)
-                    vector = np.array([float(x) for x in input_vector.split(",")])
+                    vector = np.array([float(x) for x in input_vector.replace(',', ' ').split() if x.strip()])
                     if vector.shape != (3,):
                         raise ValueError("El vector debe tener 3 componentes.")
                     return vector
                 except ValueError as e:
-                    print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3).")
+                    print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3 o 1 2 3).")
         
         elif self.tipo == "eje":
             while True:
