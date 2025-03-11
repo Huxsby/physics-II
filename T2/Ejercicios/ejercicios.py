@@ -60,25 +60,22 @@ def Rotz(θ):
                        [0, 0, 1]])
     return matrix
 
-def Visualizar():
-    #Comprueba con el siguiente código cómo rotar un vector entorno al eje Z.
-
-    # Definir el vector original
-    vector_original = np.array([10, 10, 10])
+def Visualizar(vector, eje, θ):
+    """
+    Visualizar la rotación de un vector entorno al eje Z.
+    """
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
     # Dibujar el vector original en rojo
-    ax.quiver(0, 0, 0, vector_original[0], vector_original[1], vector_original[2], color='r', label='Original')
+    ax.quiver(0, 0, 0, vector[0], vector[1], vector[2], color='r', label='Original')
 
     # Rotar el vector en incrementos de 10 grados y dibujar cada vector rotado
     for angulo in range(20, 350, 20):
         angulo_rad = np.radians(angulo)
-        matriz_rotacion = np.array([[np.cos(angulo_rad), -np.sin(angulo_rad), 0],
-                                    [np.sin(angulo_rad), np.cos(angulo_rad), 0],
-                                    [0, 0, 1]])
-        vector_rotado = np.dot(matriz_rotacion, vector_original)
+        vector_rotado = list(RotarVector(vector, eje, angulo_rad))
+        
         # Dibujar el vector rotado
         ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color='b')
 
@@ -172,6 +169,8 @@ def menu():
         print("\n" + "="*80)
         print(" "*25 + "MENÚ DE OPCIONES" + " "*25)
         print("="*80)
+        print("Nota. Los vectores que se tomen como ejes seran convertidos a unitarios automáticamente.")
+        print("="*80)
         # Añadir content
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
@@ -195,7 +194,7 @@ def menu():
             print(f"Vector rotado: {vector_rotado}")
             continue
         
-        elif opcion == "3": Visualizar()
+        elif opcion == "3": Visualizar(Datos(tipo="vector").valor, "z", Datos(tipo="angulo").valor)
 
         elif opcion == "0":
             print("Saliendo...")
