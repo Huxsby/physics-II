@@ -33,12 +33,8 @@ utilizando los programas anteriores. ∀A,B,C ∈SO(n):
 """
 
 import numpy as np                              # Para cálculos numéricos
-from scipy.optimize import fsolve               # Para resolver ecuaciones no lineales
+import matplotlib.pyplot as plt                 # Para visualización
 import time                                     # Para medir el tiempo de ejecución
-import matplotlib.pyplot as plt
-
-
-
 from class_datos import Datos                   # Clase para organizar la toma de datos
 
 # Funciones de rotación
@@ -60,35 +56,7 @@ def Rotz(θ):
                        [0, 0, 1]])
     return matrix
 
-def Visualizar(vector, eje, θ):
-    """
-    Visualizar la rotación de un vector entorno al eje Z.
-    """
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Dibujar el vector original en rojo
-    ax.quiver(0, 0, 0, vector[0], vector[1], vector[2], color='r', label='Original')
-
-    # Rotar el vector en incrementos de 10 grados y dibujar cada vector rotado
-    for angulo in range(20, 350, 20):
-        angulo_rad = np.radians(angulo)
-        vector_rotado = list(RotarVector(vector, eje, angulo_rad))
-        
-        # Dibujar el vector rotado
-        ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color='b')
-
-    # Establecer los límites de la gráfica
-    ax.set_xlim([-10, 10])
-    ax.set_ylim([-10, 10])
-    ax.set_zlim([0, 8])
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
-
+# Función de rotación genérica
 def Rot(w, θ):
     """
     Matriz de rotación de un ángulo θ entorno a un eje genérico w.
@@ -108,7 +76,7 @@ def Rot(w, θ):
     print(f"Tiempo de ejecución de Rot(w, θ) {time.time() - start} segundos")
     return matrix
 
-# Podemos usar la fórmula de Rodrigues para obtener la matriz de rotación de un vector w y un ángulo θ.
+# Función de rotación con Rodrigues
 def RotRodrigues(w, θ):
     """
     Calcula la matriz de rotación de un ángulo θ entorno a un eje w utilizando la fórmula de Rodrigues.
@@ -130,33 +98,98 @@ def RotRodrigues(w, θ):
     Note:
         - El vector w debe estar normalizado (tener módulo 1).
         - La implementación incluye medición del tiempo de ejecución.
-        - En esta implementación, W^2 se calcula como el producto tensorial de w consigo mismo,
-          lo que es una simplificación válida para vectores normalizados.
+        - W es la matriz antisimétrica del vector w, y W^2 es el producto matricial de W consigo misma.
     """
     start = time.time()
-    matrix = np.eye(3) + np.sin(θ)*w + (1 - np.cos(θ))*np.dot(w, w)
+    
+    # Crear la matriz antisimétrica W
+    W = antisimetrica(w)
+    
+    # Calcular W^2 (producto matricial)
+    W2 = np.dot(W, W)
+    
+    # Aplicar la fórmula de Rodrigues
+    I = np.eye(3)
+    matrix = I + np.sin(θ) * W + (1 - np.cos(θ)) * W2
+    
     print(f"Tiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
     return matrix
 
+# Matriz antisimétrica
+def antisimetrica(w):
+    """ Matriz antisimétrica asociada a un vector w. """
+    return np.array([[0, -w[2], w[1]],
+                    [w[2], 0, -w[0]],
+                    [-w[1], w[0], 0]])
+
+# Visualización de rotación
+def Visualizar(vector, eje):
+    """
+    Visualizar la rotación de un vector entorno a un eje especificado.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Dibujar el vector original en rojo
+    ax.quiver(0, 0, 0, vector[0], vector[1], vector[2], color='r', label='Original')
+
+    # Visualizar el eje de rotación con una línea verde
+    if isinstance(eje, np.ndarray) or isinstance(eje, list):
+        eje_norm = np.array(eje) / np.linalg.norm(eje)
+        ax.quiver(0, 0, 0, eje_norm[0]*5, eje_norm[1]*5, eje_norm[2]*5,  color='g', label='Eje de rotación')
+    elif eje in ["x", "y", "z"]:
+        if eje == "x":
+            ax.quiver(0, 0, 0, 5, 0, 0, color='g', label='Eje X')
+        elif eje == "y":
+            ax.quiver(0, 0, 0, 0, 5, 0, color='g', label='Eje Y')
+        elif eje == "z":
+            ax.quiver(0, 0, 0, 0, 0, 5, color='g', label='Eje Z')
+
+    # Rotar el vector en incrementos de 5 grados y dibujar cada vector rotado con gradiente de color
+    total_steps = 360 // 5
+    cmap = plt.cm.rainbow  # Use rainbow for a full color cycle
+    
+    for i, angulo in enumerate(range(0, 360, 5)):
+        angulo_rad = np.radians(angulo)
+        vector_rotado = RotarVector(vector, eje, angulo_rad)
+        
+        # Calculate color based on progress through rotation (0 to 1)
+        color = cmap(i / total_steps)
+        
+        # Dibujar el vector rotado
+        ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color=color)
+
+    # Establecer los límites de la gráfica
+    ax.set_xlim([-10, 10])
+    ax.set_ylim([-10, 10])
+    ax.set_zlim([0, 8])
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()  # Mostrar leyenda
+    plt.title("Rotación de vector")
+    plt.show()
+
+# Rotar un vector
 def RotarVector(v, eje, θ):
     """
-    Rotar un vector v un ángulo θ entorno a un eje especificado.
-    # Nota: Se decide como rotar el vector según el tipo de dato de eje y su valor.
-    Parámetros: v (array), eje (str) o (array), θ (float) en radianes
-    Retorna: v' (array)
+    Automatiza la rotación de un vector v entorno a un eje específico o genérico.
+    \nNota: Se decide como rotar el vector según el tipo de dato de eje y su valor.
+    \nParámetros: v (array), eje (str) o (array), θ (float) en radianes
+    \nRetorna: v' (array)
     """
     if isinstance(eje, np.ndarray) or isinstance(eje, list):
         print("RotarVector: Rotación entorno a un eje genérico.")
-        eje_norm = np.array(eje) / np.linalg.norm(eje)
-        #R = Rot(eje_norm, θ)
-        R = RotRodrigues(eje_norm, θ)
+        eje_norm = np.array(eje) / np.linalg.norm(eje)              # Normalizar el vector
+        #R = Rot(eje_norm, θ)                                       # Cálculo mediante la fórmula general
+        R = RotRodrigues(eje_norm, θ)                               # Cálculo mediante la fórmula de Rodrigues
     elif eje == "x":
         R = Rotx(θ)
     elif eje == "y":
         R = Roty(θ)
     elif eje == "z":
         R = Rotz(θ)
-
     else:
         print("Eje no válido.")
         return None
@@ -166,17 +199,17 @@ def RotarVector(v, eje, θ):
 def menu():
     """Menú interactivo para seleccionar acciones."""
     while True:
-        print("\n" + "="*80)
-        print(" "*25 + "MENÚ DE OPCIONES" + " "*25)
-        print("="*80)
-        print("Nota. Los vectores que se tomen como ejes seran convertidos a unitarios automáticamente.")
-        print("="*80)
+        print("\n" + "="*90)
+        print(" "*30 + "MENÚ DE OPCIONES" + " "*30)
+        print("="*90)
+        print("Nota. Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
+        print("="*90)
         # Añadir content
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
-        print("3. Visualizar rotación de un vector entorno al eje Z.")
+        print("3. Visualizar rotación de un vector entorno a un eje específico.")
         print("0. Salir.")
-        print("-"*80)
+        print("-"*90)
 
         opcion = input("\nSeleccione una opción: ")
         
@@ -194,7 +227,15 @@ def menu():
             print(f"Vector rotado: {vector_rotado}")
             continue
         
-        elif opcion == "3": Visualizar(Datos(tipo="vector").valor, "z", Datos(tipo="angulo").valor)
+        elif opcion == "3":
+            vector = Datos(tipo="vector").valor
+            eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
+            if eje_input in ["x", "y", "z"]:
+                eje = eje_input
+            else:
+                eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor
+            
+            Visualizar(vector, eje)
 
         elif opcion == "0":
             print("Saliendo...")
