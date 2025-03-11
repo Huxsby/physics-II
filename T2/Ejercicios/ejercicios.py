@@ -57,13 +57,48 @@ def Rotz(θ):
                        [0, 0, 1]])
     return matrix
 
+"""
+#Comprueba con el siguiente código cómo rotar un vector entorno al eje Z.
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Definir el vector original
+vector_original = np.array([10, 10, 10])
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+# Dibujar el vector original en rojo
+ax.quiver(0, 0, 0, vector_original[0], vector_original[1], vector_original[2], color='r', label='Original')
+
+# Rotar el vector en incrementos de 10 grados y dibujar cada vector rotado
+for angulo in range(20, 350, 20):
+    angulo_rad = np.radians(angulo)
+    matriz_rotacion = np.array([[np.cos(angulo_rad), -np.sin(angulo_rad), 0],
+                                [np.sin(angulo_rad), np.cos(angulo_rad), 0],
+                                [0, 0, 1]])
+    vector_rotado = np.dot(matriz_rotacion, vector_original)
+    # Dibujar el vector rotado
+    ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color='b')
+
+# Establecer los límites de la gráfica
+ax.set_xlim([-10, 10])
+ax.set_ylim([-10, 10])
+ax.set_zlim([0, 8])
+
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+plt.show()
+"""
 def Rot(w, θ):
     """
     Matriz de rotación de un ángulo θ entorno a un eje genérico w.
-    Parámetros: w (array) (vector normalizado), θ (float) en radianes
-    Retorna: matrix (Matriz de rotación de un eje génerico w)
+    \nParámetros: w (array) (vector normalizado), θ (float) en radianes
+    \nRetorna: matrix (Matriz de rotación de un eje génerico w)
+    \nNota: Una matriz de rotación cumple con las propiedades de una matriz de rotación si es ortogonal y su determinante es 1.
     """
-
+    start = time.time()
     w1, w2, w3 = w      # Componentes del vector de rotación   # Convertir a radianes
     s = np.sin(θ)       # Seno de θ
     c = np.cos(θ)       # Coseno de θ
@@ -72,6 +107,37 @@ def Rot(w, θ):
     matrix = np.array([[c + w1**2*t, w1*w2*t - w3*s, w1*w3*t + w2*s],
                        [w1*w2*t + w3*s, c + w2**2*t, w2*w3*t - w1*s],
                        [w1*w3*t - w2*s, w2*w3*t + w1*s, c + w3**2*t]])
+    print(f"Tiempo de ejecución de Rot(w, θ) {time.time() - start} segundos")
+    return matrix
+
+# Podemos usar la fórmula de Rodrigues para obtener la matriz de rotación de un vector w y un ángulo θ.
+def RotRodrigues(w, θ):
+    """
+    Calcula la matriz de rotación de un ángulo θ entorno a un eje w utilizando la fórmula de Rodrigues.
+    
+    La fórmula de Rodrigues permite transformar una rotación expresada mediante un eje y un ángulo
+    en una matriz de rotación en 3D. Esta implementación utiliza la forma:
+    Rot(w, θ) = I + sin(θ)W + (1 - cos(θ))W^2
+    donde I es la matriz identidad y W es la matriz antisimétrica asociada al vector w.
+    
+    La matriz resultante pertenece al grupo SO(3) (grupo de rotaciones en 3D).
+    
+    Parameters:
+        w (numpy.ndarray): Vector unitario (normalizado) que representa el eje de rotación.
+        θ (float): Ángulo de rotación en radianes.
+        
+    Returns:
+        numpy.ndarray: Matriz de rotación 3x3 correspondiente a la rotación especificada.
+        
+    Note:
+        - El vector w debe estar normalizado (tener módulo 1).
+        - La implementación incluye medición del tiempo de ejecución.
+        - En esta implementación, W^2 se calcula como el producto tensorial de w consigo mismo,
+          lo que es una simplificación válida para vectores normalizados.
+    """
+    start = time.time()
+    matrix = np.eye(3) + np.sin(θ)*w + (1 - np.cos(θ))*np.dot(w, w)
+    print(f"Tiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
     return matrix
 
 def RotarVector(v, eje, θ):
@@ -84,7 +150,8 @@ def RotarVector(v, eje, θ):
     if isinstance(eje, np.ndarray) or isinstance(eje, list):
         print("RotarVector: Rotación entorno a un eje genérico.")
         eje_norm = np.array(eje) / np.linalg.norm(eje)
-        R = Rot(eje_norm, θ)
+        #R = Rot(eje_norm, θ)
+        R = RotRodrigues(eje_norm, θ)
     elif eje == "x":
         R = Rotx(θ)
     elif eje == "y":
@@ -105,7 +172,7 @@ def menu():
         print(" "*25 + "MENÚ DE OPCIONES" + " "*25)
         print("="*80)
         # Añadir content
-        print("1. Rotar un vector entorno a un eje específico (x,y,z).")
+        print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
         print("0. Salir.")
         print("-"*80)
@@ -117,7 +184,7 @@ def menu():
             if opcion == "1":
                 eje = Datos(tipo="eje").valor
             else:
-                eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas): ").valor
+                eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor
             angulo = Datos(tipo="angulo").valor
             
             # Rotar el vector

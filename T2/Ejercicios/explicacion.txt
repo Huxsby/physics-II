@@ -1,0 +1,33 @@
+Explicación paso a paso la expresión:
+
+`np.eye(3) + np.sin(θ)*w + (1 - np.cos(θ))*np.dot(w, w)`
+
+Esta expresión parece ser parte de la fórmula de Rodrigues para rotaciones en 3D. Vamos a descomponerla:
+
+1. `np.eye(3)`: Esta función de NumPy crea una matriz identidad de 3×3, que se ve así:
+   ```
+   [1 0 0]
+   [0 1 0]
+   [0 0 1]
+   ```
+
+2. `np.sin(θ)*w`: Aquí se multiplica el seno del ángulo θ por el vector w. Si w es un vector de 3 elementos, esto escalará cada componente de w por el seno de θ.
+
+3. `(1 - np.cos(θ))`: Esta es una expresión escalar que calcula 1 menos el coseno del ángulo θ.
+
+4. `np.dot(w, w)`: Esta operación calcula el producto externo del vector w consigo mismo. Si w es un vector columna [wx, wy, wz], entonces np.dot(w, w) produce una matriz 3×3:
+   ```
+   [wx*wx  wx*wy  wx*wz]
+   [wy*wx  wy*wy  wy*wz]
+   [wz*wx  wz*wy  wz*wz]
+   ```
+
+5. `(1 - np.cos(θ))*np.dot(w, w)`: Multiplica cada elemento de la matriz resultante del paso 4 por el escalar calculado en el paso 3.
+
+6. La expresión completa suma las tres partes: la matriz identidad + la matriz del seno + la matriz del coseno.
+
+Esta expresión es parte de la fórmula de rotación de Rodrigues, que permite rotar un vector alrededor de un eje de rotación w por un ángulo θ. La fórmula completa generalmente es:
+
+R = I + sin(θ)[w]× + (1-cos(θ))[w]×²
+
+Donde [w]× es la matriz antisimétrica asociada al vector w, aunque en tu expresión parece que se está utilizando directamente el producto exterior w⊗w en lugar de [w]×².
