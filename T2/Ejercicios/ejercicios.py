@@ -73,7 +73,7 @@ def Rot(w, θ):
     matrix = np.array([[c + w1**2*t, w1*w2*t - w3*s, w1*w3*t + w2*s],
                        [w1*w2*t + w3*s, c + w2**2*t, w2*w3*t - w1*s],
                        [w1*w3*t - w2*s, w2*w3*t + w1*s, c + w3**2*t]])
-    print(f"Tiempo de ejecución de Rot(w, θ) {time.time() - start} segundos")
+    print(f"\tTiempo de ejecución de Rot(w, θ) {time.time() - start} segundos")
     return matrix
 
 # Función de rotación con Rodrigues
@@ -112,7 +112,7 @@ def RotRodrigues(w, θ):
     I = np.eye(3)
     matrix = I + np.sin(θ) * W + (1 - np.cos(θ)) * W2
     
-    print(f"Tiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
+    print(f"\tTiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
     return matrix
 
 # Matriz antisimétrica
@@ -121,6 +121,74 @@ def antisimetrica(w):
     return np.array([[0, -w[2], w[1]],
                     [w[2], 0, -w[0]],
                     [-w[1], w[0], 0]])
+
+# Función de rotación con logaritmica
+def LogRot(R):
+    """
+    Calcula el logaritmo de la matriz de rotación R.
+    
+    Parámetros:
+    - R (array 3x3): Matriz de rotación perteneciente a SO(3).
+    
+    Retorna:
+    - θ (float): Ángulo de rotación en radianes.
+    - log_R (array 3x3): Matriz antisimétrica asociada al eje de rotación escalada por θ.
+    
+    Nota:
+    Se aplican condiciones para robustez numérica:
+    - Si tr(R) >= 3, se asume R = I y θ = 0.
+    - Si tr(R) <= -1, se maneja el caso especial con θ ≈ π.
+    """
+    tr_R = np.trace(R)
+    
+    # Caso: R es la identidad
+    if tr_R >= 3.0:
+        θ = 0.0
+        return θ, np.zeros((3,3))
+    
+    # Caso especial: θ ≈ π
+    elif tr_R <= -1.0:
+        θ = np.pi
+        diag_R = np.diag(R)
+        idx = np.argmax(diag_R)
+        hat_omega = np.zeros(3)
+        hat_omega[idx] = np.sqrt((R[idx, idx] - R[(idx+1) % 3, (idx+1) % 3] +
+                                  R[(idx+2) % 3, (idx+2) % 3] + 1) / 2)
+        
+        # Evitar división por cero
+        if np.abs(hat_omega[idx]) < 1e-6:
+            hat_omega[idx] = 1e-6
+        hat_omega /= np.linalg.norm(hat_omega)
+        
+        # Cálculo del logaritmo de la matriz
+        log_R = (R - R.T) / (2 * np.sin(θ))
+        return θ, log_R
+    
+    # Caso general
+    else:
+        θ = np.arccos((tr_R - 1) / 2)
+        s = np.sin(θ)
+        
+        # Evitar divisiones por valores muy pequeños
+        if np.abs(s) < 1e-6:
+            s = 1e-6
+        
+        log_R = θ*(R - R.T) / (2 * s)
+        return θ, log_R
+
+# Funciones de visualización y comparación
+def imprimir_matriz(M, nombre="Matriz"):
+    """
+    Imprime la matriz M redondeada a 3 decimales con un encabezado.
+    """
+    print(f"\n{nombre} =\n{np.round(M, 3)}\n")
+
+def comparar_rotaciones(w , θ):
+    w = np.array(w) / np.linalg.norm(w) # Normalizar el vector
+    R1 = Rot(w , θ)
+    R2 = RotRodrigues(w , θ)
+    diferencia = np.linalg.norm(R1 - R2)
+    return R1 , R2 , diferencia
 
 # Visualización de rotación
 def Visualizar(vector, eje):
@@ -207,7 +275,9 @@ def menu():
         # Añadir content
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
-        print("3. Visualizar rotación de un vector entorno a un eje específico.")
+        print("3. Comparar rotaciones con fórmula generar vs Rodrigues.")
+        print("4. Visualizar rotación de un vector entorno a un eje específico.")
+        print("5. Calcular logaritmo de una matriz de rotación.")
         print("0. Salir.")
         print("-"*90)
 
@@ -228,6 +298,12 @@ def menu():
             continue
         
         elif opcion == "3":
+            R1 , R2 , diff = comparar_rotaciones(Datos(tipo="vector").valor, Datos(tipo="angulo").valor)
+            imprimir_matriz(R1 , "R (Definición Explícita)")
+            imprimir_matriz(R2 , "R (Rodrigues)")
+            print("Diferencia entre métodos:", round(diff , 4))
+            
+        elif opcion == "4":
             vector = Datos(tipo="vector").valor
             eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
             if eje_input in ["x", "y", "z"]:
@@ -236,6 +312,33 @@ def menu():
                 eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor
             
             Visualizar(vector, eje)
+
+        elif opcion == "5":
+            # Get rotation matrix for logarithm calculation
+            eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
+            
+            # Convert string axis to unit vector or normalize generic axis
+            if eje_input == "x":
+                eje = np.array([1, 0, 0])  # Unit vector along x-axis
+            elif eje_input == "y":
+                eje = np.array([0, 1, 0])  # Unit vector along y-axis
+            elif eje_input == "z":
+                eje = np.array([0, 0, 1])  # Unit vector along z-axis
+            else:
+                # Get vector from user and normalize it
+                eje = np.array(Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor)
+                eje = eje / np.linalg.norm(eje)  # Normalize to unit vector
+            
+            angulo = Datos(tipo="angulo").valor
+            R = RotRodrigues(eje, angulo)
+            
+            # Calculate logarithm of rotation matrix
+            angulo_result, log_R = LogRot(R)
+            
+            print(f"\nÁngulo original (rads): {round(angulo, 3)}")
+            print(f"Ángulo recuperado (rads): {round(angulo_result, 3)}")
+            imprimir_matriz(log_R, "Matriz logaritmo:")
+            imprimir_matriz(R, "Matriz de rotación: ")
 
         elif opcion == "0":
             print("Saliendo...")
