@@ -39,22 +39,19 @@ from class_datos import Datos                   # Clase para organizar la toma d
 
 # Funciones de rotación
 def Rotx(θ):
-    matrix = np.array([[1, 0, 0],
-                        [0, np.cos(θ), -np.sin(θ)],
-                        [0, np.sin(θ), np.cos(θ)]])
-    return matrix
+    return np.array([[1, 0, 0],
+                     [0, np.cos(θ), -np.sin(θ)],
+                     [0, np.sin(θ), np.cos(θ)]])
 
 def Roty(θ):
-    matrix = np.array([[np.cos(θ), 0, np.sin(θ)],
-                        [0, 1, 0],
-                        [-np.sin(θ), 0, np.cos(θ)]])
-    return matrix
+    return np.array([[np.cos(θ), 0, np.sin(θ)],
+                     [0, 1, 0],
+                     [-np.sin(θ), 0, np.cos(θ)]])
 
 def Rotz(θ):
-    matrix = np.array([[np.cos(θ), -np.sin(θ), 0],
-                       [np.sin(θ), np.cos(θ), 0],
-                       [0, 0, 1]])
-    return matrix
+    return np.array([[np.cos(θ), -np.sin(θ), 0],
+                     [np.sin(θ), np.cos(θ), 0],
+                     [0, 0, 1]])
 
 # Función de rotación genérica
 def Rot(w, θ):
@@ -139,11 +136,13 @@ def LogRot(R):
     - Si tr(R) >= 3, se asume R = I y θ = 0.
     - Si tr(R) <= -1, se maneja el caso especial con θ ≈ π.
     """
+    t = time.time()
     tr_R = np.trace(R)
     
     # Caso: R es la identidad
     if tr_R >= 3.0:
         θ = 0.0
+        print(f"\tTiempo de ejecución de LogRot(R) [Caso: R es la identidad] {time.time() - t} segundos")
         return θ, np.zeros((3,3))
     
     # Caso especial: θ ≈ π
@@ -162,6 +161,7 @@ def LogRot(R):
         
         # Cálculo del logaritmo de la matriz
         log_R = (R - R.T) / (2 * np.sin(θ))
+        print(f"\tTiempo de ejecución de LogRot(R) [Caso especial: θ ≈ π] {time.time() - t} segundos")
         return θ, log_R
     
     # Caso general
@@ -174,6 +174,7 @@ def LogRot(R):
             s = 1e-6
         
         log_R = θ*(R - R.T) / (2 * s)
+        print(f"\tTiempo de ejecución de LogRot(R) [Caso general] {time.time() - t} segundos")
         return θ, log_R
 
 # Funciones de visualización y comparación
@@ -283,11 +284,11 @@ def menu():
 
         opcion = input("\nSeleccione una opción: ")
         
-        if opcion == "1" or opcion == "2":
+        if opcion == "1" or opcion == "2":              # Rotar un vector
             vector = Datos(tipo="vector").valor
-            if opcion == "1":
+            if opcion == "1":                           # 1. Rotar entorno a un eje específico
                 eje = Datos(tipo="eje").valor
-            else:
+            else:                                       # 2. Rotar entorno a un eje genérico
                 eje = Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor
             angulo = Datos(tipo="angulo").valor
             
@@ -297,13 +298,13 @@ def menu():
             print(f"Vector rotado: {vector_rotado}")
             continue
         
-        elif opcion == "3":
+        elif opcion == "3":                             # 3. Comparar rotaciones
             R1 , R2 , diff = comparar_rotaciones(Datos(tipo="vector").valor, Datos(tipo="angulo").valor)
             imprimir_matriz(R1 , "R (Definición Explícita)")
             imprimir_matriz(R2 , "R (Rodrigues)")
             print("Diferencia entre métodos:", round(diff , 4))
             
-        elif opcion == "4":
+        elif opcion == "4":                             # 4. Visualizar rotación
             vector = Datos(tipo="vector").valor
             eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
             if eje_input in ["x", "y", "z"]:
@@ -313,26 +314,26 @@ def menu():
             
             Visualizar(vector, eje)
 
-        elif opcion == "5":
-            # Get rotation matrix for logarithm calculation
+        elif opcion == "5":                             # 5. Calcular logaritmo de una matriz de rotación
+            # Obtener matriz de rotación para cálculo del logaritmo
             eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
             
-            # Convert string axis to unit vector or normalize generic axis
+            # Convertir eje de tipo string a vector unitario o normalizar eje genérico
             if eje_input == "x":
-                eje = np.array([1, 0, 0])  # Unit vector along x-axis
+                eje = np.array([1, 0, 0])
             elif eje_input == "y":
-                eje = np.array([0, 1, 0])  # Unit vector along y-axis
+                eje = np.array([0, 1, 0])
             elif eje_input == "z":
-                eje = np.array([0, 0, 1])  # Unit vector along z-axis
+                eje = np.array([0, 0, 1])
             else:
-                # Get vector from user and normalize it
+                # Obtener vector del usuario y normalizarlo
                 eje = np.array(Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor)
-                eje = eje / np.linalg.norm(eje)  # Normalize to unit vector
+                eje = eje / np.linalg.norm(eje)  # Normalizar a vector unitario
             
             angulo = Datos(tipo="angulo").valor
             R = RotRodrigues(eje, angulo)
             
-            # Calculate logarithm of rotation matrix
+            # Calcular logaritmo de la matriz de rotación
             angulo_result, log_R = LogRot(R)
             
             print(f"\nÁngulo original (rads): {round(angulo, 3)}")
