@@ -1,6 +1,11 @@
 # Contenido previo de
 """ Matrices de transformación homogénea y rotaciones en 3D.    
 """
+"""
+ - Importar las funciones en el archivo SEM3_1_Rotaciones.py (ejercicios.py)
+ - Mejorar LogRot para manejar tanto SO(2) como SE(3). (Implementar SO(2) y SE(3) por separado y llamar a la función correspondiente)
+ - 
+"""
 
 import numpy as np                              # Para cálculos numéricos
 import matplotlib.pyplot as plt                 # Para visualización
