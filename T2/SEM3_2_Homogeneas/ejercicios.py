@@ -3,7 +3,6 @@
 """
 """
  - Importar las funciones en el archivo SEM3_1_Rotaciones.py (ejercicios.py)
- - Mejorar LogRot para manejar tanto SO(2) como SE(3). (Implementar SO(2) y SE(3) por separado y llamar a la función correspondiente)
  - 
 """
 
@@ -29,7 +28,7 @@ def Rotz(θ):
                      [0, 0, 1]])
 
 # Función de rotación genérica
-def Rot(w, θ):
+def RotGen(w, θ):
     """
     Matriz de rotación de un ángulo θ entorno a un eje genérico w.
     \nParámetros: w (array) (vector normalizado), θ (float) en radianes
@@ -87,6 +86,30 @@ def RotRodrigues(w, θ):
     print(f"\tTiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
     return matrix
 
+# Rotar un vector selecion automática
+def RotarVector(v, eje, θ):
+    """
+    Automatiza la rotación de un vector v entorno a un eje específico o genérico.
+    \nNota: Se decide como rotar el vector según el tipo de dato de eje y su valor.
+    \nParámetros: v (array), eje (str) o (array), θ (float) en radianes
+    \nRetorna: v' (array)
+    """
+    if isinstance(eje, np.ndarray) or isinstance(eje, list):
+        print("RotarVector: Rotación entorno a un eje genérico.")
+        eje_norm = np.array(eje) / np.linalg.norm(eje)              # Normalizar el vector
+        #R = RotGen(eje_norm, θ)                                       # Cálculo mediante la fórmula general
+        R = RotRodrigues(eje_norm, θ)                               # Cálculo mediante la fórmula de Rodrigues
+    elif eje == "x":
+        R = Rotx(θ)
+    elif eje == "y":
+        R = Roty(θ)
+    elif eje == "z":
+        R = Rotz(θ)
+    else:
+        print("Eje no válido.")
+        return None
+    return np.dot(R, v) # Producto punto, rotación de v: v'=Rv
+
 # Matriz antisimétrica
 def antisimetrica(w):
     """ Matriz antisimétrica asociada a un vector w. """
@@ -94,63 +117,60 @@ def antisimetrica(w):
                     [w[2], 0, -w[0]],
                     [-w[1], w[0], 0]])
 
+# Vector antisimétrico
+def antisimetrica_vector(W):
+    """ Vector asociado a una matriz antisimétrica W. """
+    return np.array([W[2,1], W[0,2], W[1,0]])
+
 # Función de rotación con logaritmica
 def LogRot(R):
     """
     Calcula el logaritmo de la matriz de rotación R.
-    
     Parámetros:
-    - R (array 3x3): Matriz de rotación perteneciente a SO(3).
-    
+    R : matriz de rotación 3x3 (R SO(3))
     Retorna:
-    - θ (float): Ángulo de rotación en radianes.
-    - log_R (array 3x3): Matriz antisimétrica asociada al eje de rotación escalada por θ.
-    
-    Nota:
-    Se aplican condiciones para robustez numérica:
-    - Si tr(R) >= 3, se asume R = I y θ = 0.
-    - Si tr(R) <= -1, se maneja el caso especial con θ ≈ π.
+    theta : ángulo de rotación en radianes.
+    log_R : matriz antisimétrica [hat_omega ]*theta que representa el logaritmo de R.
+    Se aplican las siguientes condiciones para robustez numérica:
+    - Si trace(R) >= 3, se asume R I y theta = 0.
+    - Si trace(R) <= -1, se maneja el caso especial con theta = .
     """
-    t = time.time()
-    tr_R = np.trace(R)
+    tr = np.trace(R)
     
-    # Caso: R es la identidad
-    if tr_R >= 3.0:
-        θ = 0.0
-        print(f"\tTiempo de ejecución de LogRot(R) [Caso: R es la identidad] {time.time() - t} segundos")
-        return θ, np.zeros((3,3))
-    
-    # Caso especial: θ ≈ π
-    elif tr_R <= -1.0:
-        θ = np.pi
-        diag_R = np.diag(R)
-        idx = np.argmax(diag_R)
-        hat_omega = np.zeros(3)
-        hat_omega[idx] = np.sqrt((R[idx, idx] - R[(idx+1) % 3, (idx+1) % 3] +
-                                  R[(idx+2) % 3, (idx+2) % 3] + 1) / 2)
+    # Caso: R casi es la identidad
+    if tr >= 3.0:
+        theta = 0.0
+        return theta, np.zeros(3)
+   
+    # Caso especial: theta cercano a
+    elif tr <= -1.0:
+        theta = np.pi
+        # Se selecciona el índice con mayor valor diagonal para evitar indeterminaciones
+        diag = np.diag(R)           # Diagonal de R
+        idx = np.argmax(diag)       # Índice con mayor valor diagonal
+        hat_omega = np.zeros(3)     # Vector de rotación, le asignamos el valor inicial de 0
+        
+        # Cálculo de la componente correspondiente al índice con mayor valor diagonal
+        hat_omega[idx] = np.sqrt((R[idx , idx] - R[(idx+1) %3, (idx+1) %3] + R[(idx +2) %3, (idx +2) %3] + 1) / 2) 
         
         # Evitar división por cero
         if np.abs(hat_omega[idx]) < 1e-6:
             hat_omega[idx] = 1e-6
-        hat_omega /= np.linalg.norm(hat_omega)
-        
-        # Cálculo del logaritmo de la matriz
-        log_R = (R - R.T) / (2 * np.sin(θ))
-        print(f"\tTiempo de ejecución de LogRot(R) [Caso especial: θ ≈ π] {time.time() - t} segundos")
-        return θ, log_R
+        hat_omega = hat_omega / np.linalg.norm(hat_omega)
+        # Usar la fórmula general; aunque en este caso , s_theta 0,
+        # la expresión (R - R.T)/(2* sin(theta)) es válida para theta = .
+        log_R = (R - R.T) / (2 * np.sin(theta))
+        return theta, antisimetrica_vector(log_R)
     
     # Caso general
     else:
-        θ = np.arccos((tr_R - 1) / 2)
-        s = np.sin(θ)
-        
-        # Evitar divisiones por valores muy pequeños
-        if np.abs(s) < 1e-6:
-            s = 1e-6
-        
-        log_R = θ*(R - R.T) / (2 * s)
-        print(f"\tTiempo de ejecución de LogRot(R) [Caso general] {time.time() - t} segundos")
-        return θ, log_R
+        theta = np.arccos((tr - 1) / 2)
+        s_theta = np.sin(theta)
+        # Filtrar posibles divisiones por cero
+        if np.abs(s_theta) < 1e-6:
+            s_theta = 1e-6
+        log_R = (R - R.T) / (2 * s_theta)
+        return theta, antisimetrica_vector(log_R)
 
 # Funciones de visualización y comparación
 def imprimir_matriz(M, nombre="Matriz"):
@@ -158,13 +178,6 @@ def imprimir_matriz(M, nombre="Matriz"):
     Imprime la matriz M redondeada a 3 decimales con un encabezado.
     """
     print(f"\n{nombre} =\n{np.round(M, 3)}\n")
-
-def comparar_rotaciones(w , θ):
-    w = np.array(w) / np.linalg.norm(w) # Normalizar el vector
-    R1 = Rot(w , θ)
-    R2 = RotRodrigues(w , θ)
-    diferencia = np.linalg.norm(R1 - R2)
-    return R1 , R2 , diferencia
 
 # Visualización de rotación
 def Visualizar(vector, eje):
@@ -215,29 +228,116 @@ def Visualizar(vector, eje):
     plt.title("Rotación de vector")
     plt.show()
 
-# Rotar un vector
-def RotarVector(v, eje, θ):
+# Comparar rotaciones
+def comparar_rotaciones(w , θ):
+    w = np.array(w) / np.linalg.norm(w) # Normalizar el vector
+    R1 = RotGen(w , θ)
+    R2 = RotRodrigues(w , θ)
+    diferencia = np.linalg.norm(R1 - R2)
+    return R1 , R2 , diferencia
+
+# Validación de rotaciones
+def validar_rotaciones():
     """
-    Automatiza la rotación de un vector v entorno a un eje específico o genérico.
-    \nNota: Se decide como rotar el vector según el tipo de dato de eje y su valor.
-    \nParámetros: v (array), eje (str) o (array), θ (float) en radianes
-    \nRetorna: v' (array)
+    Función para validar rotaciones usando diferentes métodos:
+    1. Rodrigues vs Rot
+    2. LogRot para recuperar ángulo y eje de rotación
+    3. Rotaciones inversas
+    4. Casos predefinidos con diferentes ejes y ángulos
     """
-    if isinstance(eje, np.ndarray) or isinstance(eje, list):
-        print("RotarVector: Rotación entorno a un eje genérico.")
-        eje_norm = np.array(eje) / np.linalg.norm(eje)              # Normalizar el vector
-        #R = Rot(eje_norm, θ)                                       # Cálculo mediante la fórmula general
-        R = RotRodrigues(eje_norm, θ)                               # Cálculo mediante la fórmula de Rodrigues
-    elif eje == "x":
-        R = Rotx(θ)
-    elif eje == "y":
-        R = Roty(θ)
-    elif eje == "z":
-        R = Rotz(θ)
-    else:
-        print("Eje no válido.")
-        return None
-    return np.dot(R, v) # Producto punto, rotación de v: v'=Rv
+    print("\n" + "="*80)
+    print("VALIDACIÓN DETALLADA DE ROTACIONES")
+    print("="*80)
+    
+    # Casos de prueba predefinidos
+    casos_prueba = [
+        # [vector, eje, ángulo]
+        [[1, 0, 0], [1, 0, 0], np.pi/2],      # 90° rotación alrededor de eje X
+        [[0, 1, 0], [0, 1, 0], np.pi/4],      # 45° rotación alrededor de eje Y
+        [[0, 0, 1], [0, 0, 1], np.pi/3],      # 60° rotación alrededor de eje Z
+        [[1, 1, 1], [1, 1, 1], np.pi/6],      # 30° rotación alrededor de eje genérico diagonal
+        [[1, 2, 3], [0, 1, 0], np.pi/2]       # 90° rotación alrededor de eje Y
+    ]
+    
+    for i, (vector, eje, angulo) in enumerate(casos_prueba, 1):
+        print(f"\n{'='*50}")
+        print(f"CASO {i}:")
+        print(f"{'='*50}")
+        
+        # Información inicial
+        print(f"Vector original: {vector}")
+        print(f"Eje de rotación: {eje}")
+        print(f"Ángulo de rotación: {np.degrees(angulo):.2f}°")
+        
+        # Normalizar eje de rotación
+        eje_norm = np.array(eje) / np.linalg.norm(eje)
+        print(f"Eje de rotación normalizado: {eje_norm}")
+        
+        # Método 1: Comparar Rot vs RotRodrigues
+        print("\n1. Comparación de métodos de rotación:")
+        R1 = RotGen(eje_norm, angulo)
+        R2 = RotRodrigues(eje_norm, angulo)
+        
+        print("\nMatriz de rotación (Método Explícito - Rot):")
+        imprimir_matriz(R1, "R1")
+        
+        print("\nMatriz de rotación (Método Rodrigues - RotRodrigues):")
+        imprimir_matriz(R2, "R2")
+        
+        diff_metodos = np.linalg.norm(R1 - R2)
+        print(f"Diferencia entre matrices de rotación: {diff_metodos:.2e}")
+        
+        # Método 2: Rotar vector y verificar
+        print("\n2. Rotación de vector:")
+        vector_np = np.array(vector)
+        vector_rotado1 = np.dot(R1, vector_np)
+        vector_rotado2 = np.dot(R2, vector_np)
+        
+        print(f"Vector original:      {vector_np}")
+        print(f"Vector rotado (R1):   {vector_rotado1}")
+        print(f"Vector rotado (R2):   {vector_rotado2}")
+        
+        diff_vectores = np.linalg.norm(vector_rotado1 - vector_rotado2)
+        print(f"Diferencia entre vectores rotados: {diff_vectores:.2e}")
+        
+        # Método 3: Recuperar ángulo con LogRot
+        print("\n3. Recuperación de logaritmo de rotación:")
+        angulo_recuperado, eje_recuperado = LogRot(R1)
+        
+        print(f"Ángulo original:     {np.degrees(angulo):.2f}°")
+        print(f"Ángulo recuperado:   {np.degrees(angulo_recuperado):.2f}°")
+        
+        print(f"\nVector original):  {eje_norm}")
+        print(f"Vector recuperado: {eje_recuperado}")
+        
+        # Método 4: Aplicar rotación inversa para verificar simetría
+        print("\n4. Verificación de rotación inversa:")
+        R_inversa = R1.T  # Matriz transpuesta = inversa en matrices de rotación
+        vector_recuperado = np.dot(R_inversa, vector_rotado1)
+        
+        print(f"Vector original:      {vector_np}")
+        print(f"Vector rotado:        {vector_rotado1}")
+        print(f"Vector recuperado:    {vector_recuperado}")
+        
+        diff_recuperado = np.linalg.norm(vector_np - vector_recuperado)
+        print(f"Diferencia al recuperar vector original: {diff_recuperado:.2e}")
+        
+        print("\n5. Verificación de propiedades de rotación:")
+        # Verificar propiedades de matrices de rotación
+        print("Determinante de R1:  {:.2f}".format(np.linalg.det(R1)))
+        print("Transpuesta de R1 == Inversa de R1: {}".format(np.allclose(R1.T, np.linalg.inv(R1))))
+        
+        print("\n" + "-"*50)
+        
+        # Criterios de validación
+        assert diff_metodos < 1e-10, f"Error: Diferencia significativa entre métodos de rotación en Caso {i}"
+        assert diff_vectores < 1e-10, f"Error: Diferencia significativa en vectores rotados en Caso {i}"
+        assert np.abs(angulo - angulo_recuperado) < 1e-10, f"Error: Ángulo no recuperado correctamente en Caso {i}"
+        assert diff_recuperado < 1e-10, f"Error: Vector no recuperado correctamente en Caso {i}"
+    
+    print("\n" + "="*50)
+    print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
+    print("="*50)
 
 # Menú interactivo
 def menu():
@@ -253,13 +353,14 @@ def menu():
         print("2. Rotar un vector entorno a un eje genérico.")
         print("3. Comparar rotaciones con fórmula generar vs Rodrigues.")
         print("4. Visualizar rotación de un vector entorno a un eje específico.")
-        print("5. Calcular logaritmo de una matriz de rotación.")
+        print("5. Aplicar logaritmo de una matriz de rotación.")
+        print("6. Validar rotaciones y funciones (casos predefinidos).")
         print("0. Salir.")
         print("-"*90)
 
         opcion = input("\nSeleccione una opción: ")
         
-        if opcion == "1" or opcion == "2":              # Rotar un vector
+        if opcion == "1" or opcion == "2":              # 1. y 2. Rotar un vector
             vector = Datos(tipo="vector").valor
             if opcion == "1":                           # 1. Rotar entorno a un eje específico
                 eje = Datos(tipo="eje").valor
@@ -309,12 +410,15 @@ def menu():
             R = RotRodrigues(eje, angulo)
             
             # Calcular logaritmo de la matriz de rotación
-            angulo_result, log_R = LogRot(R)
+            angulo_result, eje_resultado = LogRot(R)
             
             print(f"\nÁngulo original (rads): {round(angulo, 3)}")
             print(f"Ángulo recuperado (rads): {round(angulo_result, 3)}")
-            imprimir_matriz(log_R, "Matriz logaritmo:")
-            imprimir_matriz(R, "Matriz de rotación: ")
+            print(f"Eje de rotación original: {eje}")
+            print(f"Eje de rotación recuperado: {eje_resultado}")                                 
+
+        elif opcion == "6":                             # 6. Validación del sistema de calculo
+            validar_rotaciones()
 
         elif opcion == "0":
             print("Saliendo...")
@@ -333,19 +437,6 @@ def AdT(T):
     R = T[:3, :3]  # Extracción de la matriz de rotación
     p = T[:3, 3]   # Extracción del vector de traslación
     
-    AdT = np.zeros((6, 6))
-    AdT[:3, :3] = R
-    AdT[3:, 3:] = R
-    AdT[:3, 3:] = np.dot(antisimetrica(p), R)
-    
-    return AdT
-
-def AdT(R, p):
-    """
-    Calcula la matriz AdT asociada a una matriz de rotación R y un vector de traslación p.
-    
-    La matriz AdT se utiliza para transformar el producto de dos matrices de transformación homogénea"
-    """
     AdT = np.zeros((6, 6))
     AdT[:3, :3] = R
     AdT[3:, 3:] = R
