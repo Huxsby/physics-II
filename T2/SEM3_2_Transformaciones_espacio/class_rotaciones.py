@@ -5,7 +5,8 @@ Clase para la creación de matrices de rotación en 3D utilizando diferentes mé
 import numpy as np                              # Para operaciones matemáticas
 import matplotlib.pyplot as plt                 # Para visualización
 import time                                     # Para medir el tiempo de ejecución
-from class_matrices import *                    # Importar funciones de matrices
+
+""" Funciones de rotación en torno a los ejes de coordenadas """
 
 # Funciones de rotación en torno a los ejes de coordenadas
 def Rotx(θ):
@@ -89,22 +90,22 @@ def LogRot(R):
     Parámetros:
     R : matriz de rotación 3x3 (R SO(3))
     Retorna:
-    theta : ángulo de rotación en radianes.
-    log_R : matriz antisimétrica [hat_omega ]*theta que representa el logaritmo de R.
+    θ : ángulo de rotación en radianes.
+    log_R : matriz antisimétrica [hat_omega ]*θ que representa el logaritmo de R.
     Se aplican las siguientes condiciones para robustez numérica:
-    - Si trace(R) >= 3, se asume R I y theta = 0.
-    - Si trace(R) <= -1, se maneja el caso especial con theta = .
+    - Si trace(R) >= 3, se asume R I y θ = 0.
+    - Si trace(R) <= -1, se maneja el caso especial con θ = .
     """
     tr = np.trace(R)
     
     # Caso: R casi es la identidad
     if tr >= 3.0:
-        theta = 0.0
-        return theta, np.zeros(3)
+        θ = 0.0
+        return θ, np.zeros(3)
    
-    # Caso especial: theta cercano a
+    # Caso especial: θ cercano a
     elif tr <= -1.0:
-        theta = np.pi
+        θ = np.pi
         # Se selecciona el índice con mayor valor diagonal para evitar indeterminaciones
         diag = np.diag(R)           # Diagonal de R
         idx = np.argmax(diag)       # Índice con mayor valor diagonal
@@ -117,20 +118,20 @@ def LogRot(R):
         if np.abs(hat_omega[idx]) < 1e-6:
             hat_omega[idx] = 1e-6
         hat_omega = hat_omega / np.linalg.norm(hat_omega)
-        # Usar la fórmula general; aunque en este caso , s_theta 0,
-        # la expresión (R - R.T)/(2* sin(theta)) es válida para theta = .
-        log_R = (R - R.T) / (2 * np.sin(theta))
-        return theta, antisimetrica_vector(log_R)
+        # Usar la fórmula general; aunque en este caso , s_θ 0,
+        # la expresión (R - R.T)/(2* sin(θ)) es válida para θ = .
+        log_R = (R - R.T) / (2 * np.sin(θ))
+        return θ, antisimetrica_vector(log_R)
     
     # Caso general
     else:
-        theta = np.arccos((tr - 1) / 2)
-        s_theta = np.sin(theta)
+        θ = np.arccos((tr - 1) / 2)
+        s_θ = np.sin(θ)
         # Filtrar posibles divisiones por cero
-        if np.abs(s_theta) < 1e-6:
-            s_theta = 1e-6
-        log_R = (R - R.T) / (2 * s_theta)
-        return theta, antisimetrica_vector(log_R)
+        if np.abs(s_θ) < 1e-6:
+            s_θ = 1e-6
+        log_R = (R - R.T) / (2 * s_θ)
+        return θ, antisimetrica_vector(log_R)
 
 # Rotar un vector selecion automática
 def RotarVector(v, eje, θ):
@@ -204,3 +205,133 @@ def Visualizar_Rotacion(vector, eje):
         ax.legend()  # Mostrar leyenda
         plt.title("Rotación de vector")
         plt.show()
+
+""" Funciones de matrices generales """
+
+# Matriz antisimétrica
+def antisimetrica(w):
+    """ Matriz antisimétrica asociada a un vector w de 3 o 6 elementos. """
+    shape = w.shape
+    if shape == (3,):
+        return np.array([[0, -w[2], w[1]],
+                         [w[2], 0, -w[0]],
+                         [-w[1], w[0], 0]])
+    if w.shape == (6,):
+        return np.array([[  0, -w[0], -w[1], -w[2]],
+                         [ w[0],   0, -w[3], -w[4]],
+                         [ w[1],  w[3],   0, -w[5]],
+                         [ w[2],  w[4],  w[5],   0]])
+    else:
+        raise ValueError("El vector debe tener dimensión 3 o 6.")
+    
+# Vector antisimétrico
+def antisimetrica_vector(W):
+    """ Vector asociado a una matriz antisimétrica W. """
+    shape = W.shape
+    if shape == (3, 3):
+        return np.array([W[2,1], W[0,2], W[1,0]])
+    if shape == (4, 4):
+        return np.array([W[2,1], W[0,2], W[1,0], W[3,0]])
+    if shape != ((3, 3) or (4,4)):
+        raise ValueError("Matriz de dimensiones incorrectas. {W.shape}")
+
+# Funciones de visualización y comparación
+def imprimir_matriz(M, nombre="Matriz"):
+    """ Imprime la matriz M redondeada a 3 decimales con un encabezado. """
+    print(f"\n{nombre} =\n{np.round(M, 3)}\n")
+
+""" Funciones de transformación homogénea """
+
+# Función para convertir un vector de 6 elementos en una matriz de transformación homogénea
+def Exp2Trans(S, θ):
+    """
+    Convierte un vector de 6 elementos en una matriz de transformación homogénea 6x6.
+    (La matriz exponencial del vector S corresponde con la de transformación homogénea).
+    """
+    if S.shape != (6,):
+        raise ValueError("El vector S debe tener tamaño 6.")
+    
+    # Extraer la parte angular y la parte de traslación del vector
+    w = S[:3]  # w Parte angular (vector de rotación)
+    v = S[3:]  # v Parte de traslación (vector de posición)
+    modulo_w = np.linalg.norm(w)
+    # 
+    if modulo_w == 0 and np.linalg.norm(v) == 1: # Articulación prísmaticas
+        # Si el vector de rotación es cero y el vector de traslación es unitario:
+        # Se aplica la fórmula de Rodriguest
+        T = np.eye(4)
+        T[:3, 3] = v * θ    # Asignar la traslación
+        return T
+        """
+        return np.array([[1, 0, 0, v[0]]*θ,
+                         [0, 1, 0, v[1]]*θ,
+                         [0, 0, 1, v[2]]*θ,
+                         [0, 0, 0, 1]])
+        """
+    elif modulo_w == 1 and θ.imag == 0:
+        # Si el vector de rotación es unitario y el ángulo es real, se aplica la fórmula de Rodrigues
+        R = RotRodrigues(w, θ)
+        T = np.eye(4)
+        T[:3, :3] = R       # Asignar la rotación (Se sobrescribe la matriz identidad)
+        T[:3, 3] = v * θ    # Asignar la traslación
+        return T
+
+# Función para convertir una matriz de rotación y un vector de traslación en una matriz de transformación homogénea
+def Rp2Trans(R, p):
+    """ Convierte una matriz de rotación R y un vector de traslación p en una matriz de transformación homogénea 4x4. """
+    if R.shape != (3, 3) or p.shape != (3,):
+        raise ValueError("La matriz de rotación debe ser de tamaño 3x3 y el vector de traslación debe ser de tamaño 3.")
+    
+    T = np.eye(4)  # Matriz identidad 4x4
+    T[:3, :3] = R  # Asignar la rotación
+    T[:3, 3] = p   # Asignar la traslación
+    
+    return T
+
+# Función para convertir una matriz de transformación homogénea en una matriz de rotación y un vector de traslación
+def Trans2Rp(T):
+    """ Convierte una matriz de transformación homogénea T en una matriz de rotación R y un vector de traslación p. """
+    if T.shape != (4, 4):
+        raise ValueError("La matriz de transformación debe ser de tamaño 4x4.")
+    return T[:3, :3], T[:3, 3]
+
+# Función para calcular el logaritmo de una matriz de transformación homogénea devolviendo S = (w, p)
+def LogTrans(T):
+    """ Calcula el logaritmo de una matriz de transformación homogénea T. """
+    if T.shape != (4, 4):
+        raise ValueError("La matriz de transformación debe ser de tamaño 4x4.")
+    
+    R = T[:3, :3]  # Extraer la matriz de rotación
+    p = T[:3, 3]   # Extraer el vector de traslación
+    
+    θ, w = LogRot(R)  # Calcular el logaritmo de la matriz de rotación
+    return np.concatenate((w, p))  # Concatenar el vector de rotación y el vector de traslación
+
+# Función para calcular la inversa de una matriz de transformación homogénea
+def TransInv(Tr):
+    """ Calcula la inversa de una matriz de transformación homogénea T. """
+    if Tr.shape != (4, 4):
+        raise ValueError("La matriz de transformación debe ser de tamaño 4x4.")
+    Inv = np.eye(4)  # Matriz identidad 4x4
+    Inv[:3, :3] = Tr[:3, :3].T  # Transponer la matriz de rotación
+    Inv[:3, 3] = -np.dot(Tr[:3, :3].T, Tr[:3, 3])  # Calcular la traslación inversa
+    return 
+
+# Función para calcular la matriz adjunta de una matriz de transformación homogénea
+def TransAdj(T):
+    """
+    Calcula la matriz AdjT asociada a una matriz de transformación homogénea T. 
+    La matriz AdjT se utiliza para transformar el producto de dos matrices de transformación homogénea"
+    """
+    if T.shape != (4, 4):
+        raise ValueError("La matriz de transformación debe ser de tamaño 4x4.")
+    
+    R = T[:3, :3]  # Extracción de la matriz de rotación
+    p = T[:3, 3]   # Extracción del vector de traslación
+    
+    AdT = np.zeros((6, 6))
+    AdT[:3, :3] = R
+    AdT[3:, 3:] = R
+    AdT[:3, 3:] = np.dot(antisimetrica(p), R)
+    
+    return AdT

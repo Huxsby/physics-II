@@ -88,7 +88,7 @@ def validar_rotaciones():
         print(f"Ángulo original:     {np.degrees(angulo):.2f}°")
         print(f"Ángulo recuperado:   {np.degrees(angulo_recuperado):.2f}°")
         
-        print(f"\nVector original):  {eje_norm}")
+        print(f"\nVector original:  {eje_norm}")
         print(f"Vector recuperado: {eje_recuperado}")
         
         # Método 4: Aplicar rotación inversa para verificar simetría
@@ -136,6 +136,7 @@ def menu():
         print("4. Visualizar rotación de un vector entorno a un eje específico.")
         print("5. Aplicar logaritmo de una matriz de rotación.")
         print("6. Validar rotaciones y funciones (casos predefinidos).")
+        print("7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
         print("0. Salir.")
         print("-"*90)
 
@@ -201,6 +202,12 @@ def menu():
 
         elif opcion == "6":                             # 6. Validación del sistema de calculo
             validar_rotaciones()
+            break
+
+        elif opcion == "7":                             # 7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4
+            print("Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
+            print("Esta opción está en desarrollo.")
+            # Continuar
 
         elif opcion == "0":
             print("Saliendo...")

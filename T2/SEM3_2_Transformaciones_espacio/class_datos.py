@@ -9,7 +9,7 @@ class Datos:
         Constructor de la clase Datos.
 
         Parámetros:
-        - tipo (str): Tipo de dato a solicitar ("vector", "eje", "angulo").
+        - tipo (str): Tipo de dato a solicitar ("vector", "eje", "angulo", "cordenadas_exponenciales").
         - mensaje (str, opcional): Mensaje personalizado para solicitar el dato.
             Si no se proporciona, se usa un mensaje predeterminado según el tipo.
         """
@@ -21,6 +21,8 @@ class Datos:
                 mensaje = "Ingrese el eje de rotación (x, y o z): "
             elif tipo == "angulo":
                 mensaje = "Ingrese el ángulo de rotación (º): "
+            elif tipo == "cordenadas_exponenciales":
+                mensaje = "Ingrese las coordenadas exponenciales (separadas por comas o espacios): "
             else:
                 mensaje = "Ingrese el dato: "
         
@@ -56,6 +58,17 @@ class Datos:
                     return input_θ
                 except ValueError:
                     print("Ángulo no válido. Debe ser un número.")
+        
+        elif self.tipo == "cordenadas_exponenciales":
+            while True:
+                try:
+                    input_vector = input(self.mensaje)
+                    vector = np.array([float(x) for x in input_vector.replace(',', ' ').split() if x.strip()])
+                    if vector.shape != (6,):
+                        raise ValueError("El vector debe tener 6 componentes.")
+                    return vector
+                except ValueError as e:
+                    print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3,4,5,6 o 1 2 3 4 5 6).")
         
         else:
             print("Tipo de dato no válido.")
