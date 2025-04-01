@@ -30,6 +30,18 @@ class Datos:
         self.mensaje = mensaje
         self.valor = self.tomar_dato()
 
+    def __str__(self):
+        """ Método para representar el objeto como una cadena. """
+        return str(self.valor)
+    
+    def obtener_valor(self):
+        """ Devuelve el valor almacenado. """
+        return self.valor
+    
+    def obtener_tipo(self):
+        """ Devuelve el tipo de dato. """
+        return self.tipo
+
     def tomar_dato(self):
         """ Toma el dato según el tipo especificado. """
         if self.tipo == "vector":

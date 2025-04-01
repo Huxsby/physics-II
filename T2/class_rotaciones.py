@@ -10,16 +10,19 @@ import time                                     # Para medir el tiempo de ejecuc
 
 # Funciones de rotación en torno a los ejes de coordenadas
 def Rotx(θ):
+    """ Matriz de rotación en torno al eje X """
     return np.array([[1, 0, 0],
                     [0, np.cos(θ), -np.sin(θ)],
                     [0, np.sin(θ), np.cos(θ)]])
 
 def Roty(θ):
+    """ Matriz de rotación en torno al eje Y """
     return np.array([[np.cos(θ), 0, np.sin(θ)],
                     [0, 1, 0],
                     [-np.sin(θ), 0, np.cos(θ)]])
 
 def Rotz(θ):
+    """ Matriz de rotación en torno al eje Z """
     return np.array([[np.cos(θ), -np.sin(θ), 0],
                     [np.sin(θ), np.cos(θ), 0],
                     [0, 0, 1]])
