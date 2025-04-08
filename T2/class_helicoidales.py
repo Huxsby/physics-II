@@ -231,19 +231,40 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
     
     return points
 
-def calcular_M(robot):
-    # En posición cero, las articulaciones prismáticas no se desplazan.
-    # Última articulación (prismática) en posición cero: joint_coords = [0, 0, 0.210]
-    # Longitud del eslabón prismático: 0.0415 en dirección x (eje_prismatico = [1,0,0])
-    x = 0.0415  # Longitud del eslabón prismático en posición cero
-    y = 0.0
-    z = 0.210   # joint_coords de la última articulación
-    M = np.array([
-        [1, 0, 0, x],
-        [0, 1, 0, y],
-        [0, 0, 1, z],
-        [0, 0, 0, 1]
-    ])
+def calcular_M_generalizado(robot):
+    """
+    Calcula la matriz M (configuración cero) para cualquier robot,
+    considerando las coordenadas de las articulaciones y las orientaciones de los eslabones.
+    """
+    M = np.eye(4)  # Matriz identidad inicial
+    
+    for link in robot.links:
+        # Obtener parámetros del eslabón
+        joint_coords = link.joint_coords  # Posición de la articulación
+        link_orientation = link.orientation  # Orientación del eslabón (ej. [0,0,1])
+        length = link.length  # Longitud del eslabón
+        
+        # 1. Rotación inicial según link_orientation (si no es [0,0,0])
+        if np.linalg.norm(link_orientation) > 1e-6:
+            axis = link_orientation / np.linalg.norm(link_orientation)
+            R = RotRodrigues(axis, 0)  # Rotación de 0 radianes (solo para orientación inicial)
+        else:
+            R = np.eye(3)
+        
+        # 2. Traslación según joint_coords y longitud del eslabón
+        if link.tipo == "prismatic":
+            # En posición cero, no hay desplazamiento prismático
+            p = joint_coords
+        else:
+            # Traslación en la dirección del eje de la articulación (revolute)
+            p = joint_coords + length * np.array(link.joint_axis)
+        
+        # Crear matriz de transformación homogénea del eslabón
+        T = Rp2Trans(R, p)
+        
+        # Acumular transformación
+        M = M @ T
+    
     return M
 
 def calcular_T(ejes, thetas, M):

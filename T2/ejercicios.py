@@ -135,7 +135,7 @@ def menu():
             ejes_helicoidales = robot.get_ejes_helicoidales()
 
             # Calcular M (posición cero)
-            M = calcular_M(robot)
+            M = calcular_M_generalizado(robot)
 
             # Valores de las articulaciones (θ1, θ2, d3)
             thetas = [0.5, 1.0, 0.02]  # Ejemplo
