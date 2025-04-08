@@ -43,6 +43,7 @@ def menu():
         print("6. Validar rotaciones y funciones (casos predefinidos).")
         print("7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
         print("8. Lectura de archivo YAML (robot.yaml).")
+        print("9. Calcular la matriz de transformación homogénea del robot.")
         print("0. Salir.")
         print("-"*90)
 
@@ -125,6 +126,26 @@ def menu():
             print("Lectura de archivo YAML (robot.yaml)")
             robot = cargar_robot_desde_yaml("robot.yaml")
             print(robot)
+            limpiar_pantalla()
+
+        elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
+            print("Calcular la matriz de transformación homogénea. Del robot.")
+            # Cargar robot y ejes helicoidales
+            robot = cargar_robot_desde_yaml("robot.yaml")
+            ejes_helicoidales = robot.get_ejes_helicoidales()
+
+            # Calcular M (posición cero)
+            M = calcular_M(robot)
+
+            # Valores de las articulaciones (θ1, θ2, d3)
+            thetas = [0.5, 1.0, 0.02]  # Ejemplo
+
+            # Calcular T
+            T = calcular_T(ejes_helicoidales, thetas, M)
+
+            print("Matriz de transformación homogénea T:")
+            imprimir_matriz(T, "T")
+
             limpiar_pantalla()
 
         elif opcion == "0":                             # 0. Salir

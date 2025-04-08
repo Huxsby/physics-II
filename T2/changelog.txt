@@ -1,0 +1,15 @@
+class_datos.py
+    - Terminar implementación del tipo 'cordenadas_exponenciales'.
+
+class_helicoidaes.py
+    - ¿Es necesario usar el nuevo tipo de dato 'cordenadas_exponenciales'?
+
+ejercicio.py
+!   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.
+
+class_tr.py
+    - [Stoped] Viendo si es workfit.
+
+
+T4
+    - Configuraciones singulares.

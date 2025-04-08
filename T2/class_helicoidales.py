@@ -231,6 +231,29 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
     
     return points
 
+def calcular_M(robot):
+    # En posición cero, las articulaciones prismáticas no se desplazan.
+    # Última articulación (prismática) en posición cero: joint_coords = [0, 0, 0.210]
+    # Longitud del eslabón prismático: 0.0415 en dirección x (eje_prismatico = [1,0,0])
+    x = 0.0415  # Longitud del eslabón prismático en posición cero
+    y = 0.0
+    z = 0.210   # joint_coords de la última articulación
+    M = np.array([
+        [1, 0, 0, x],
+        [0, 1, 0, y],
+        [0, 0, 1, z],
+        [0, 0, 0, 1]
+    ])
+    return M
+
+def calcular_T(ejes, thetas, M):
+    T = np.eye(4)
+    for S, theta in zip(ejes, thetas):
+        T_i = matriz_exponencial_helicoidal(S, theta)
+        T = T @ T_i  # Multiplicación en orden: e^[S1θ1] * e^[S2θ2] * e^[S3θ3]
+    T = T @ M  # Multiplicar por M al final
+    return T
+
 # Función de validación
 def validar_transformaciones_helicoidales():
     """
