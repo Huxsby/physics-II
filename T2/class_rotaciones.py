@@ -219,13 +219,13 @@ def antisimetrica(w):
         return np.array([[0, -w[2], w[1]],
                          [w[2], 0, -w[0]],
                          [-w[1], w[0], 0]])
-    if w.shape == (6,):
+    if shape == (6,):
         return np.array([[  0, -w[0], -w[1], -w[2]],
                          [ w[0],   0, -w[3], -w[4]],
                          [ w[1],  w[3],   0, -w[5]],
                          [ w[2],  w[4],  w[5],   0]])
     else:
-        raise ValueError("El vector debe tener dimensión 3 o 6.")
+        raise ValueError(f"El vector debe tener dimensión 3 o 6. Dimension ({shape}) incorrecta.")
     
 # Vector antisimétrico
 def antisimetrica_vector(W):
@@ -235,8 +235,8 @@ def antisimetrica_vector(W):
         return np.array([W[2,1], W[0,2], W[1,0]])
     if shape == (4, 4):
         return np.array([W[2,1], W[0,2], W[1,0], W[3,0]])
-    if shape != ((3, 3) or (4,4)):
-        raise ValueError("Matriz de dimensiones incorrectas. {W.shape}")
+    else:
+        raise ValueError(f"Matriz de dimensiones incorrectas ({shape}). Debe ser 3x3 o 4x4.")
 
 # Funciones de visualización y comparación
 def imprimir_matriz(M, nombre="Matriz"):
@@ -258,26 +258,27 @@ def Exp2Trans(S, θ):
     w = S[:3]  # w Parte angular (vector de rotación)
     v = S[3:]  # v Parte de traslación (vector de posición)
     modulo_w = np.linalg.norm(w)
-    # 
+    
     if modulo_w == 0 and np.linalg.norm(v) == 1: # Articulación prísmaticas
         # Si el vector de rotación es cero y el vector de traslación es unitario:
-        # Se aplica la fórmula de Rodriguest
         T = np.eye(4)
         T[:3, 3] = v * θ    # Asignar la traslación
         return T
         """
         return np.array([[1, 0, 0, v[0]]*θ,
-                         [0, 1, 0, v[1]]*θ,
-                         [0, 0, 1, v[2]]*θ,
-                         [0, 0, 0, 1]])
+                        [0, 1, 0, v[1]]*θ,
+                        [0, 0, 1, v[2]]*θ,
+                        [0, 0, 0, 1]])
         """
-    elif modulo_w == 1 and θ.imag == 0:
+    elif modulo_w == 1 and θ.imag == 0:          # Articulación rotativa
         # Si el vector de rotación es unitario y el ángulo es real, se aplica la fórmula de Rodrigues
         R = RotRodrigues(w, θ)
         T = np.eye(4)
         T[:3, :3] = R       # Asignar la rotación (Se sobrescribe la matriz identidad)
         T[:3, 3] = v * θ    # Asignar la traslación
         return T
+    else:
+        raise ValueError("El vector S no es válido para la transformación homogénea.")
 
 # Función para convertir una matriz de rotación y un vector de traslación en una matriz de transformación homogénea
 def Rp2Trans(R, p):
@@ -299,16 +300,25 @@ def Trans2Rp(T):
     return T[:3, :3], T[:3, 3]
 
 # Función para calcular el logaritmo de una matriz de transformación homogénea devolviendo S = (w, p)
-def LogTrans(T):
-    """ Calcula el logaritmo de una matriz de transformación homogénea T. """
+def LogTrans(T, mode='rp'):
+    """Calcula el logaritmo de una matriz de transformación homogénea T. 
+        Args:
+            T (np.ndarray): Matriz de transformación homogénea de 4x4.
+            mode (str, optional): Modo de retorno. Si es 'rp', devuelve la matriz de rotación y el vector de traslación por separado. Si es 's', devuelve el vector S = (w,v), que es la concatenación del vector de rotación y del vector de traslación. Defaults to 'rp'.
+        Raises:
+            ValueError: Si la matriz de transformación no es de tamaño 4x4.
+        Returns:
+            tuple or np.ndarray: Dependiendo del modo, devuelve la matriz de rotación y el vector de traslación por separado, o el vector S = (w,v).
+    """
     if T.shape != (4, 4):
         raise ValueError("La matriz de transformación debe ser de tamaño 4x4.")
     
-    R = T[:3, :3]  # Extraer la matriz de rotación
-    p = T[:3, 3]   # Extraer el vector de traslación
+    R = T[:3, :3]       # Extraer la matriz de rotación
+    p = T[:3, 3]        # Extraer el vector de traslación
+    θ, w = LogRot(R)    # Calcular el logaritmo de la matriz de rotación
     
-    θ, w = LogRot(R)  # Calcular el logaritmo de la matriz de rotación
-    return np.concatenate((w, p))  # Concatenar el vector de rotación y el vector de traslación
+    if mode.lower == "rp": return R, p # Devuelve la matriz de rotación y el vector de traslación por separado 
+    elif mode.lower == "s": return np.concatenate((w, p)) # Devuelve el vector S = (w,v), que es la concatenación del vector de rotación y del vector de traslación
 
 # Función para calcular la inversa de una matriz de transformación homogénea
 def TransInv(Tr):
@@ -318,7 +328,7 @@ def TransInv(Tr):
     Inv = np.eye(4)  # Matriz identidad 4x4
     Inv[:3, :3] = Tr[:3, :3].T  # Transponer la matriz de rotación
     Inv[:3, 3] = -np.dot(Tr[:3, :3].T, Tr[:3, 3])  # Calcular la traslación inversa
-    return 
+    return Inv
 
 # Función para calcular la matriz adjunta de una matriz de transformación homogénea
 def TransAdj(T):

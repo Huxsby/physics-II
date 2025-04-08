@@ -5,9 +5,11 @@
 """
 
 import numpy as np                              # Para cálculos numéricos
+import os                                       # (Limpiar pantalla)
 from class_datos import Datos                   # Clase para organizar la toma de datos
 from class_rotaciones import *                  # Funciones de rotación
-from class_matrices import *                    # Funciones de matrices
+
+from class_helicoidales import *                # Funciones de helicoidales y su menu
 
 # Comparar rotaciones
 def comparar_rotaciones(w , θ):
@@ -120,6 +122,7 @@ def validar_rotaciones():
     print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
     print("="*50)
 
+
 # Menú interactivo
 def menu():
     """Menú interactivo para seleccionar acciones."""
@@ -137,6 +140,7 @@ def menu():
         print("5. Aplicar logaritmo de una matriz de rotación.")
         print("6. Validar rotaciones y funciones (casos predefinidos).")
         print("7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
+        print("8. Lectura de archivo YAML (robot.yaml).")
         print("0. Salir.")
         print("-"*90)
 
@@ -205,10 +209,16 @@ def menu():
             break
 
         elif opcion == "7":                             # 7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4
+            os.system('cls' if os.name == 'nt' else 'clear')  # Limpiar pantalla
             print("Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
-            print("Esta opción está en desarrollo.")
-            # Continuar
+            print("NOTA: Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
+            menu_helicoidales()
+            os.system('cls' if os.name == 'nt' else 'clear')
 
+        elif opcion == "8":                             # 8. Pruebas de matrices de 4x4
+            print("Lectura de archivo YAML (robot.yaml)")
+            yaml_fun()
+        
         elif opcion == "0":
             print("Saliendo...")
             break
