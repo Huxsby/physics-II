@@ -14,3 +14,6 @@ class_tr.py
 
 T4
     - Configuraciones singulares.
+
+P1
+    - Crear archivo .yaml para el brazo del laboratorio.
