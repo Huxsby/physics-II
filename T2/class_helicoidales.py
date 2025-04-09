@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from class_datos import Datos
 from class_rotaciones import *
 
@@ -347,6 +348,11 @@ def validar_transformaciones_helicoidales():
 
 # Añadir al menú principal
 def menu_helicoidales():
+    def limpiar_pantalla():
+        """Limpia la pantalla de la consola."""
+        input("\033[93mPresione Enter para continuar...\033[0m")
+        os.system('cls' if os.name == 'nt' else 'clear')
+
     """Menú interactivo para operaciones con ejes helicoidales."""
     while True:
         print("\n" + "="*90)
@@ -382,7 +388,8 @@ def menu_helicoidales():
             
             imprimir_matriz(S_theta, "Matriz [S]θ")
             imprimir_matriz(T, "Matriz de transformación T = e^([S]θ)")
-            
+            limpiar_pantalla()
+
         elif opcion == "2":
             # Calcular logaritmo de una matriz de transformación
             print("\nCálculo del logaritmo de una matriz de transformación:")
@@ -422,7 +429,8 @@ def menu_helicoidales():
             print(f"S = {S}")
             print(f"omega = {S[:3]}")
             print(f"v = {S[3:]}")
-            
+            limpiar_pantalla()
+
         elif opcion == "3":
             # Visualizar eje helicoidal
             print("\nVisualización de eje helicoidal:")
@@ -436,17 +444,21 @@ def menu_helicoidales():
             # Visualizar
             print("Generando visualización...")
             visualizar_eje_helicoidal(S, theta)
-            
+            limpiar_pantalla()
+
         elif opcion == "4":
             # Validar transformaciones helicoidales
             validar_transformaciones_helicoidales()
-            
+            limpiar_pantalla()
+
         elif opcion == "0":
-            print("Volviendo al menú principal...")
+            print("Volviendo al menú principal...", end=" ")
+            limpiar_pantalla()
             break
             
         else:
             print("Opción no válida, intente nuevamente.")
+            limpiar_pantalla()
 
 if __name__ == "__main__":
     menu_helicoidales()

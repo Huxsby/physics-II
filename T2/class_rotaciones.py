@@ -218,9 +218,9 @@ def validar_rotaciones():
     3. Rotaciones inversas
     4. Casos predefinidos con diferentes ejes y ángulos
     """
-    print("\n" + "="*80)
+    print("\n" + "="*90)
     print("VALIDACIÓN DETALLADA DE ROTACIONES")
-    print("="*80)
+    print("="*90)
     
     # Casos de prueba predefinidos
     casos_prueba = [
@@ -233,9 +233,9 @@ def validar_rotaciones():
     ]
     
     for i, (vector, eje, angulo) in enumerate(casos_prueba, 1):
-        print(f"\n{'='*50}")
+        print(f"\n{'='*90}")
         print(f"CASO {i}:")
-        print(f"{'='*50}")
+        print(f"{'='*90}")
         
         # Información inicial
         print(f"Vector original: {vector}")
@@ -300,7 +300,7 @@ def validar_rotaciones():
         print("Determinante de R1:  {:.2f}".format(np.linalg.det(R1)))
         print("Transpuesta de R1 == Inversa de R1: {}".format(np.allclose(R1.T, np.linalg.inv(R1))))
         
-        print("\n" + "-"*50)
+        print("\n" + "-"*90)
         
         # Criterios de validación
         assert diff_metodos < 1e-10, f"Error: Diferencia significativa entre métodos de rotación en Caso {i}"
@@ -308,9 +308,9 @@ def validar_rotaciones():
         assert np.abs(angulo - angulo_recuperado) < 1e-10, f"Error: Ángulo no recuperado correctamente en Caso {i}"
         assert diff_recuperado < 1e-10, f"Error: Vector no recuperado correctamente en Caso {i}"
     
-    print("\n" + "="*50)
+    print("\n" + "="*90)
     print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
-    print("="*50)
+    print("="*90)
 
 """ Funciones de matrices generales """
 

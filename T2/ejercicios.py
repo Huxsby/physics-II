@@ -9,7 +9,7 @@ import os                                       # (Limpiar pantalla)
 from class_datos import Datos                   # Clase para organizar la toma de datos
 from class_rotaciones import *                  # Funciones de rotación
 
-from class_helicoidales import *                # Funciones de helicoidales y su menu
+from class_helicoidales import *                # Funciones de helicoidales y su menu()
 from class_robot_structure import *             # Clase y funciones para leer el archivo robot.yaml
 
 # Comparar rotaciones
@@ -29,11 +29,11 @@ def menu():
 
     """Menú interactivo para seleccionar acciones."""
     while True:
-        print("\n" + "="*90)
-        print(" "*30 + "MENÚ DE OPCIONES" + " "*30)
-        print("="*90)
+        print("\n" + "="*90)    # Separador
+        print(" "*37 + "MENÚ DE OPCIONES")
+        print("="*90)   # Separador
         print("Nota. Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
-        print("="*90)
+        print("="*90)   # Separador
         # Añadir content
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
@@ -41,11 +41,13 @@ def menu():
         print("4. Visualizar rotación de un vector entorno a un eje específico.")
         print("5. Aplicar logaritmo de una matriz de rotación.")
         print("6. Validar rotaciones y funciones (casos predefinidos).")
+        print("-"*90)   # Separador
         print("7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
+        print("-"*90)   # Separador
         print("8. Lectura de archivo YAML (robot.yaml).")
         print("9. Calcular la matriz de transformación homogénea del robot.")
+        print("-"*90)   # Separador
         print("0. Salir.")
-        print("-"*90)
 
         opcion = input("\nSeleccione una opción: ")
         
@@ -96,7 +98,11 @@ def menu():
             else:
                 # Obtener vector del usuario y normalizarlo
                 eje = np.array(Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor)
-                eje = eje / np.linalg.norm(eje)  # Normalizar a vector unitario
+                
+                u_eje = eje / np.linalg.norm(eje)
+                if list(eje) != list(u_eje):
+                    print(f"\tEje no unitario, normalizando {eje} -> {u_eje}")  # Normalizar a vector unitario
+                    eje = u_eje  # Normalizar a vector unitario
             
             angulo = Datos(tipo="angulo").valor
             R = RotRodrigues(eje, angulo)
@@ -113,14 +119,13 @@ def menu():
         elif opcion == "6":                             # 6. Validación del sistema de calculo
             validar_rotaciones()
             limpiar_pantalla()
-            break
 
         elif opcion == "7":                             # 7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4
             os.system('cls' if os.name == 'nt' else 'clear')  # Limpiar pantalla
             print("Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
             print("NOTA: Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
             menu_helicoidales()
-            limpiar_pantalla()
+            #limpiar_pantalla()
 
         elif opcion == "8":                             # 8. Pruebas de matrices de 4x4
             print("Lectura de archivo YAML (robot.yaml)")
@@ -149,7 +154,7 @@ def menu():
             limpiar_pantalla()
 
         elif opcion == "0":                             # 0. Salir
-            print("Saliendo...")
+            print("Saliendo...", end=" ")
             limpiar_pantalla()
             break
         

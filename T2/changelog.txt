@@ -1,5 +1,7 @@
 class_datos.py
     - Terminar implementación del tipo 'cordenadas_exponenciales'.
+    - Normalizar vector eje en la toma general de datos, dar la opcion de elegir entre ['x','y','z','g'] -> 'g' Irse por 'vector'
+        - Cambiar en ejercicios.py
 
 class_helicoidaes.py
     - ¿Es necesario usar el nuevo tipo de dato 'cordenadas_exponenciales'?
@@ -9,7 +11,6 @@ ejercicio.py
 
 class_tr.py
     - [Stoped] Viendo si es workfit.
-
 
 T4
     - Configuraciones singulares.
