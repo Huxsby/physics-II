@@ -5,6 +5,7 @@ class_datos.py
 
 class_helicoidaes.py
     - ¿Es necesario usar el nuevo tipo de dato 'cordenadas_exponenciales'?
+    - Rehacher calcular_T_robot() y calcular_M().
 
 ejercicio.py
 !   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.

@@ -141,12 +141,15 @@ def menu():
 
             # Calcular M (posición cero)
             M = calcular_M_generalizado(robot)
+            print("Matriz M (posición cero):")
+            imprimir_matriz(M, "M")
 
-            # Valores de las articulaciones (θ1, θ2, d3)
-            thetas = [0.5, 1.0, 0.02]  # Ejemplo
+            # Valores de las articulaciones (θ1, θ2)
+            thetas = [np.pi/2, 0]  # θ₁=90°, θ₂=0°
+            print("Valores de las articulaciones (θ1, θ2):", thetas, "\n")
 
             # Calcular T
-            T = calcular_T(ejes_helicoidales, thetas, M)
+            T = calcular_T_robot(ejes_helicoidales, thetas, M)
 
             print("Matriz de transformación homogénea T:")
             imprimir_matriz(T, "T")

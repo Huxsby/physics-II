@@ -234,31 +234,36 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
 
 def calcular_M_generalizado(robot):
     """
-    Calcula la matriz M (configuración cero) para cualquier robot,
-    considerando las coordenadas de las articulaciones y las orientaciones de los eslabones.
+    Calcula la matriz M 4x4 (configuración de referencia) de un robot cuando todas 
+    las articulaciones están en posición cero.
+    
+    Parámetros:
+    - robot: Objeto robot con información de sus eslabones y articulaciones
+    
+    Retorna:
+    - M: Matriz de transformación homogénea 4x4 desde la base hasta el efector final
+         cuando todas las articulaciones están en posición cero
     """
     M = np.eye(4)  # Matriz identidad inicial
     
     for link in robot.links:
         # Obtener parámetros del eslabón
         joint_coords = link.joint_coords  # Posición de la articulación
-        link_orientation = link.orientation  # Orientación del eslabón (ej. [0,0,1])
+        axis = link.joint_axis  # Eje de articulación
         length = link.length  # Longitud del eslabón
         
-        # 1. Rotación inicial según link_orientation (si no es [0,0,0])
-        if np.linalg.norm(link_orientation) > 1e-6:
-            axis = link_orientation / np.linalg.norm(link_orientation)
-            R = RotRodrigues(axis, 0)  # Rotación de 0 radianes (solo para orientación inicial)
-        else:
-            R = np.eye(3)
-        
-        # 2. Traslación según joint_coords y longitud del eslabón
-        if link.tipo == "prismatic":
-            # En posición cero, no hay desplazamiento prismático
-            p = joint_coords
-        else:
-            # Traslación en la dirección del eje de la articulación (revolute)
-            p = joint_coords + length * np.array(link.joint_axis)
+        # Crear matriz de transformación para configuración cero
+        R = np.eye(3)  # Sin rotación para posición de referencia
+        p = joint_coords
+        if hasattr(link, 'end_effector_coords') and link.end_effector_coords is not None:
+            p = link.end_effector_coords
+        elif length > 0:
+            # Si no hay coordenadas del efector final, usar la longitud del eslabón
+            if np.linalg.norm(axis) > 1e-6:
+                axis_norm = axis / np.linalg.norm(axis)
+                p = joint_coords + length * axis_norm
+            else:
+                p = joint_coords
         
         # Crear matriz de transformación homogénea del eslabón
         T = Rp2Trans(R, p)
@@ -268,7 +273,86 @@ def calcular_M_generalizado(robot):
     
     return M
 
-def calcular_T(ejes, thetas, M):
+def calcular_ejes_helicoidales_body_frame(robot, M=None):
+    """
+    Calcula los ejes helicoidales en el sistema de referencia del efector final (body frame)
+    
+    Parámetros:
+    - robot: Objeto robot con información de sus eslabones y articulaciones
+    - M: Matriz de transformación homogénea 4x4 opcional. Si no se proporciona, se calcula.
+    
+    Retorna:
+    - beta: Lista de ejes helicoidales en el sistema de referencia del efector final
+    """
+    if M is None:
+        M = calcular_M_generalizado(robot)
+    
+    beta = []
+    M_inv = np.linalg.inv(M)
+    
+    for link in robot.links:
+        # Crear eje helicoidal S = [ω, v] para cada articulación en el frame base
+        if link.tipo == "revolute":
+            # Articulación de rotación: S = [ω, -ω × q]
+            # donde ω es el eje de rotación y q es un punto en el eje
+            omega = np.array(link.joint_axis)
+            if np.linalg.norm(omega) > 1e-6:
+                omega = omega / np.linalg.norm(omega)
+            q = np.array(link.joint_coords)
+            v = -np.cross(omega, q)
+            S = np.concatenate([omega, v])
+        
+        elif link.tipo == "prismatic":
+            # Articulación prismática: S = [0, v]
+            # donde v es la dirección de traslación
+            v = np.array(link.joint_axis)
+            if np.linalg.norm(v) > 1e-6:
+                v = v / np.linalg.norm(v)
+            S = np.concatenate([np.zeros(3), v])
+        
+        # Transformar S al sistema de referencia del efector final usando la adjunta
+        S_matrix = crear_matriz_helicoidal(S, 1.0)  # Crear matriz asociada al eje
+        # Aplicar transformación adjunta: β = Ad_{M^{-1}}(S)
+        beta_matrix = M_inv @ S_matrix @ M
+        
+        # Extraer eje helicoidal β del resultado
+        omega_beta = np.array([beta_matrix[2, 1], beta_matrix[0, 2], beta_matrix[1, 0]])
+        v_beta = beta_matrix[:3, 3]
+        beta_i = np.concatenate([omega_beta, v_beta])
+        beta.append(beta_i)
+    
+    return beta
+
+def calcular_T_robot_body_frame(robot, thetas):
+    """
+    Calcula la matriz de transformación T usando la fórmula del producto de exponenciales
+    con el sistema de referencia en el efector final.
+    
+    Parámetros:
+    - robot: Objeto robot con información de sus eslabones y articulaciones
+    - thetas: Lista de ángulos/desplazamientos para cada articulación
+    
+    Retorna:
+    - T: Matriz de transformación homogénea 4x4 desde la base hasta el efector final
+    """
+    # Calcular matriz M (configuración de referencia)
+    M = calcular_M_generalizado(robot)
+    
+    # Calcular ejes helicoidales en el sistema de referencia del efector final
+    beta = calcular_ejes_helicoidales_body_frame(robot, M)
+    
+    # Calcular transformación usando la fórmula: T(θ) = M * e^([β1]θ1) * ... * e^([βn]θn)
+    T = M.copy()
+    
+    # Multiplicar por las matrices exponenciales en orden (de la primera a la última articulación)
+    for i, beta_i in enumerate(beta):
+        theta_i = thetas[i]
+        exp_beta_i = matriz_exponencial_helicoidal(beta_i, theta_i)
+        T = T @ exp_beta_i
+    
+    return T
+
+def calcular_T_robot(ejes, thetas, M):
     T = np.eye(4)
     for S, theta in zip(ejes, thetas):
         T_i = matriz_exponencial_helicoidal(S, theta)
