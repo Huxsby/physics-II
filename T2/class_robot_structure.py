@@ -76,9 +76,40 @@ class Link:
         self.joint_coords = np.array(joint_coords)
         self.joint_axis = np.array(joint_axis)
     
+    def obtener_eje_de_giro(self):
+        """
+        Devuelve el eje de giro del eslabón.  El eje de giro se define como el eje de la articulación
+        multiplicado por la longitud del eslabón.  Este método es útil para calcular la posición y
+        orientación del eslabón en el espacio.
+        """
+        eje = self.joint_axis
+        eje_abs = np.abs(eje)
+        
+        print(f"\tEslabón {self.id}:", end=" ")
+
+        if np.array_equal(eje_abs, np.array([1, 0, 0])):
+            eje_str = "X"
+        elif np.array_equal(eje_abs, np.array([0, 1, 0])):
+            eje_str = "Y"
+        elif np.array_equal(eje_abs, np.array([0, 0, 1])):
+            eje_str = "Z"
+        else:
+            eje_str = "fuera de los ejes X, Y, Z"
+
+        if (eje > 0).any():
+            sentido = "sentido positivo ⭢  y horario ↻"
+        elif (eje < 0).any():
+            sentido = "sentido negativo ⭠  y antihorario ↺"
+        else:
+            sentido = "sin sentido"
+        
+        print(f"Eje de giro: {eje_str} ({sentido})")
+        
+        return eje*self.length
+    
     def __str__(self):
         """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
-        return(f"Eslabón '{self.id}', tipo: '{self.tipo}', eje helicoidal: {self.obtener_eje_helicoidal()}, coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
+        return(f"El Eslabón '{self.id}' ({self.tipo}), eje helicoidal: {self.obtener_eje_helicoidal()}, coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
 
     def obtener_eje_helicoidal(self):
         """
@@ -97,10 +128,9 @@ class Link:
         w = self.joint_axis
         q = self.joint_coords
         if self.tipo == "revolute":
-            v = -np.cross(w, q)
+            v = -np.cross(w, q)     # Vector de traslación perpendicular al eje de rotación
         elif self.tipo == "prismatic":
-            v = w
-            w = np.array([0, 0, 0])  # Para prismatic, no hay rotación
+            v = self.joint_axis * self.length  # Vector de traslación en la dirección del eje de la articulación
         else:
             raise ValueError(f"Tipo desconocido: {self.tipo}")
         return np.hstack((w, v))
@@ -157,3 +187,7 @@ if __name__ == "__main__":
     for eje in robot.get_ejes_helicoidales():
         print("\t", eje)
     print(f"\n{robot}")
+
+    print("\nobtener_eje_de_giro")
+    for i in range(len(robot.links)):
+        robot.links[i].obtener_eje_de_giro()
