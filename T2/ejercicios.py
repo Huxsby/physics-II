@@ -3,15 +3,13 @@
  - Importar las funciones en el archivo SEM3_1_Rotaciones.py (ejercicios.py)
  - 
 """
-import sympy as sp                     # Para cálculos simbólicos
-
-import numpy as np                              # Para cálculos numéricos
-import os                                       # (Limpiar pantalla)
-from class_datos import Datos                   # Clase para organizar la toma de datos
-from class_rotaciones import *                  # Funciones de rotación
-
-from class_helicoidales import *                # Funciones de helicoidales y su menu()
-from class_robot_structure import *             # Clase y funciones para leer el archivo robot.yaml
+import sympy as sp                                  # Para cálculos simbólicos
+import numpy as np                                  # Para cálculos numéricos
+import os                                           # (Limpiar pantalla)
+from class_datos import Datos                       # Clase para organizar la toma de datos
+from class_rotaciones import *                      # Funciones de rotación
+from class_helicoidales import *                    # Funciones de helicoidales y su menu()
+import class_robot_structure as robot_structure     # Clase y funciones para leer el archivo robot.yaml
 
 # Comparar rotaciones
 def comparar_rotaciones(w , θ):
@@ -130,14 +128,14 @@ def menu():
 
         elif opcion == "8":                             # 8. Pruebas de matrices de 4x4
             print("Lectura de archivo YAML (robot.yaml)")
-            robot = cargar_robot_desde_yaml("robot.yaml")
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
             print(robot)
             limpiar_pantalla()
 
         elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
-            print("Calcular la matriz de transformación homogénea. Del robot.")
+            print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
-            robot = cargar_robot_desde_yaml("robot.yaml")
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
             ejes_helicoidales = robot.get_ejes_helicoidales()
 
             # Calcular M (posición cero)

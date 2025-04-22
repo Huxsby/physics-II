@@ -295,69 +295,14 @@ def calcular_ejes_helicoidales_body_frame(robot, M=None):
     
     return beta
 
-def calcular_T_robot_body_frame(robot, thetas):
-    """
-    Calcula la matriz de transformación T usando la fórmula del producto de exponenciales
-    con el sistema de referencia en el efector final.
-    
-    Parámetros:
-    - robot: Objeto robot con información de sus eslabones y articulaciones
-    - thetas: Lista de ángulos/desplazamientos para cada articulación
-    
-    Retorna:
-    - T: Matriz de transformación homogénea 4x4 desde la base hasta el efector final
-    """
-    # Calcular matriz M (configuración de referencia)
-    M = calcular_M_generalizado(robot)
-    
-    # Calcular ejes helicoidales en el sistema de referencia del efector final
-    beta = calcular_ejes_helicoidales_body_frame(robot, M)
-    
-    # Calcular transformación usando la fórmula: T(θ) = M * e^([β1]θ1) * ... * e^([βn]θn)
-    T = M.copy()
-    
-    # Multiplicar por las matrices exponenciales en orden (de la primera a la última articulación)
-    for i, beta_i in enumerate(beta):
-        theta_i = thetas[i]
-        exp_beta_i = calcular_expSθ(beta_i, theta_i)
-        T = T @ exp_beta_i
-    
-    return T
-
+# Funcion para calcular la matriz de transformación homogénea del robot
 def calcular_T_robot(ejes, thetas, M):
-    """ Calcula la matriz de transformación homogénea T usando la fórmula del producto de exponenciales. """
+    """ Calcula la matriz de transformación homogénea T con los ejes helicoidales y la matriz de transformación M, usando la fórmula del producto de exponenciales. """
     T = np.eye(4)
     for S, theta in zip(ejes, thetas): # ejes,thetas -> eje,theta
         T_i = calcular_expSθ(S, theta) # e^[Sθ]
         T = T @ T_i  # Multiplicación en orden: e^[S1θ1] * e^[S2θ2] * e^[S3θ3]
     T = T @ M  # Multiplicar por M al final
-    return T
-
-# Función para calcular la matriz de transformación homogénea del robot 
-def calcular_T_met_sit(robot, thetas):
-    """
-    Un método más sistemático de resolver el problema consiste en definir un SR en cada
-    articulación y de esa manera la cinemática directa se resuelve simplemente
-    multiplicando las matrices: T04 =T01T12T23T34.
-    """
-    
-    links = robot.links # Obtener los eslabones del robot
-    ejes_helicoidales = robot.get_ejes_helicoidales() # Obtener los ejes helicoidales del robot en una lista de ejes
-    #thetas = thetas
-
-    # Asegurarse de que el número de ángulos coincide con el número de articulaciones
-    if len(thetas) != len(links):
-        raise ValueError("El número de ángulos debe coincidir con el número de articulaciones.")
-    
-    T = np.eye(4)  # Inicializar la matriz de transformación homogénea
-    for i in range(len(links)):
-        # Obtener el eje helicoidal y el ángulo de la articulación
-        S = ejes_helicoidales[i]
-        theta = thetas[i]
-
-        T = np.dot(T, Exp2Trans(S, theta))  # Calcular la matriz de transformación homogénea
-        imprimir_matriz(T, f"T0_{i+1}")  # Imprimir la matriz de transformación para cada eslabón
-
     return T
 
 # Función de validación
@@ -444,7 +389,7 @@ def menu_helicoidales():
         print("2. Calcular logaritmo de una matriz de transformación")
         print("3. Visualizar eje helicoidal")
         print("4. Validar transformaciones helicoidales")
-        print("5. Calcular T con el método sistemático")
+        print("5. Calcular T del robot.")
         print("0. Volver al menú principal")
         print("-"*90)
         
@@ -535,19 +480,27 @@ def menu_helicoidales():
             limpiar_pantalla()
 
         elif opcion == "5":
-            # Calcular T con el método sistemático
-            print("\nCálculo de T usando el método sistemático:")
-            robot = robot_structure.cargar_robot_desde_yaml()
-            
-            pi = np.pi
-            print("Matriz de transformación T calculada. Configuración nula:")
-            T = calcular_T_met_sit(robot, [0, 0, 0, 0, 0, 0])
-            imprimir_matriz(T)
-            input("Presione Enter para continuar...")
-            print("Matriz de transformación T calculada. Configuración pi:")
-            T2 = calcular_T_met_sit(robot, [pi, pi, pi, pi, pi, pi])
-            imprimir_matriz(T2)
-            input("Presione Enter para continuar...")
+            print("Calcular la matriz de transformación homogénea del robot.")
+            # Cargar robot y ejes helicoidales
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
+            ejes_helicoidales = robot.get_ejes_helicoidales()
+
+            # Calcular M (posición cero)
+            M = calcular_M_generalizado(robot)
+            print("Matriz M (posición cero):")
+            imprimir_matriz(M, "M")
+
+            # Valores de las articulaciones
+            thetas = [0,0,0,0,0,0]
+            print("Valores de las articulaciones:", thetas, "\n")
+
+            # Calcular T
+            T = calcular_T_robot(ejes_helicoidales, thetas, M)
+
+            print("Matriz de transformación homogénea T:")
+            imprimir_matriz(T, "T")
+
+            limpiar_pantalla()
 
         elif opcion == "0":
             print("Volviendo al menú principal...", end=" ")
