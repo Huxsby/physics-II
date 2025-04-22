@@ -3,6 +3,7 @@
  - Importar las funciones en el archivo SEM3_1_Rotaciones.py (ejercicios.py)
  - 
 """
+import sympy as sp                     # Para cálculos simbólicos
 
 import numpy as np                              # Para cálculos numéricos
 import os                                       # (Limpiar pantalla)

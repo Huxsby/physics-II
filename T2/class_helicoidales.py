@@ -4,7 +4,8 @@ from class_datos import Datos
 from class_rotaciones import *
 import class_robot_structure as robot_structure
 
-def crear_matriz_helicoidal(S, theta):
+## Función validada
+def calcular_Sθ(S, theta):
     """
     Crea la matriz [S]θ a partir del eje helicoidal S y el ángulo/distancia θ.
     
@@ -47,9 +48,10 @@ def crear_matriz_helicoidal(S, theta):
     
     return S_theta
 
-def matriz_exponencial_helicoidal(S, theta):
+## Función validada
+def calcular_expSθ(S, theta):
     """
-    Calcula la exponencial de la matriz [S]θ para obtener la transformación homogénea.
+    Calcula la exponencial de la matriz e^([S]θ) para obtener la transformación homogénea. Nota T = e^([S]θ)
     
     Parámetros:
     - S (numpy.ndarray): Vector 6D del eje helicoidal, S = [ω, v]
@@ -92,6 +94,7 @@ def matriz_exponencial_helicoidal(S, theta):
         # Formar la matriz de transformación homogénea
         T[:3, :3] = R
         T[:3, 3] = p
+    
     else:  # Caso de traslación pura
         # Normalizar v si no es unitario
         v_norm = np.linalg.norm(v)
@@ -103,6 +106,7 @@ def matriz_exponencial_helicoidal(S, theta):
     
     return T
 
+## Función validada
 def logaritmo_transformacion(T):
     """
     Calcula el logaritmo de una matriz de transformación homogénea T.
@@ -193,7 +197,7 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
         
         for i, t in enumerate(t_values):
             # Calcular matriz de transformación para ese punto
-            T_t = matriz_exponencial_helicoidal(S, t)
+            T_t = calcular_expSθ(S, t)
             # El origen transformado es el punto en el eje helicoidal
             points[i] = T_t[:3, 3]
         
@@ -235,8 +239,8 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
 
 def calcular_M_generalizado(robot):
     """
-    Calcula la matriz M 4x4 (configuración de referencia) de un robot cuando todas 
-    las articulaciones están en posición cero.
+    Calcula la matriz M 4x4, matriz de transformación correspondiente a la posición y orientación del
+    elemento terminal cuando las coordenadas de todas las articulaciones son nulas (posición “cero” del Robot)
     
     Parámetros:
     - robot: Objeto robot con información de sus eslabones y articulaciones
@@ -248,29 +252,31 @@ def calcular_M_generalizado(robot):
     M = np.eye(4)  # Matriz identidad inicial
     
     for link in robot.links:
-        # Obtener parámetros del eslabón
-        joint_coords = link.joint_coords  # Posición de la articulación
-        axis = link.joint_axis  # Eje de articulación
-        length = link.length  # Longitud del eslabón
+        M[:3, 3] += link.length*link.orientation
+
+        # # Obtener parámetros del eslabón
+        # joint_coords = link.joint_coords  # Posición de la articulación
+        # axis = link.joint_axis  # Eje de articulación
+        # length = link.length  # Longitud del eslabón
         
-        # Crear matriz de transformación para configuración cero
-        R = np.eye(3)  # Sin rotación para posición de referencia
-        p = joint_coords
-        if hasattr(link, 'end_effector_coords') and link.end_effector_coords is not None:
-            p = link.end_effector_coords
-        elif length > 0:
-            # Si no hay coordenadas del efector final, usar la longitud del eslabón
-            if np.linalg.norm(axis) > 1e-6:
-                axis_norm = axis / np.linalg.norm(axis)
-                p = joint_coords + length * axis_norm
-            else:
-                p = joint_coords
+        # # Crear matriz de transformación para configuración cero
+        # R = np.eye(3)  # Sin rotación para posición de referencia
+        # p = joint_coords
+        # if hasattr(link, 'end_effector_coords') and link.end_effector_coords is not None:
+        #     p = link.end_effector_coords
+        # elif length > 0:
+        #     # Si no hay coordenadas del efector final, usar la longitud del eslabón
+        #     if np.linalg.norm(axis) > 1e-6:
+        #         axis_norm = axis / np.linalg.norm(axis)
+        #         p = joint_coords + length * axis_norm
+        #     else:
+        #         p = joint_coords
         
-        # Crear matriz de transformación homogénea del eslabón
-        T = Rp2Trans(R, p)
+        # # Crear matriz de transformación homogénea del eslabón
+        # T = Rp2Trans(R, p)
         
-        # Acumular transformación
-        M = M @ T
+        # # Acumular transformación
+        # M = M @ T
     
     return M
 
@@ -312,7 +318,7 @@ def calcular_ejes_helicoidales_body_frame(robot, M=None):
             S = np.concatenate([np.zeros(3), v])
         
         # Transformar S al sistema de referencia del efector final usando la adjunta
-        S_matrix = crear_matriz_helicoidal(S, 1.0)  # Crear matriz asociada al eje
+        S_matrix = calcular_Sθ(S, 1.0)  # Crear matriz asociada al eje
         # Aplicar transformación adjunta: β = Ad_{M^{-1}}(S)
         beta_matrix = M_inv @ S_matrix @ M
         
@@ -348,15 +354,16 @@ def calcular_T_robot_body_frame(robot, thetas):
     # Multiplicar por las matrices exponenciales en orden (de la primera a la última articulación)
     for i, beta_i in enumerate(beta):
         theta_i = thetas[i]
-        exp_beta_i = matriz_exponencial_helicoidal(beta_i, theta_i)
+        exp_beta_i = calcular_expSθ(beta_i, theta_i)
         T = T @ exp_beta_i
     
     return T
 
 def calcular_T_robot(ejes, thetas, M):
+    """ Calcula la matriz de transformación homogénea T usando la fórmula del producto de exponenciales. """
     T = np.eye(4)
     for S, theta in zip(ejes, thetas): # ejes,thetas -> eje,theta
-        T_i = matriz_exponencial_helicoidal(S, theta) # e^[Sθ]
+        T_i = calcular_expSθ(S, theta) # e^[Sθ]
         T = T @ T_i  # Multiplicación en orden: e^[S1θ1] * e^[S2θ2] * e^[S3θ3]
     T = T @ M  # Multiplicar por M al final
     return T
@@ -390,9 +397,7 @@ def calcular_T_met_sit(robot, thetas):
 
 # Función de validación
 def validar_transformaciones_helicoidales():
-    """
-    Valida las funciones de transformación con ejes helicoidales usando casos de prueba.
-    """
+    """ Valida las funciones de transformación con ejes helicoidales usando casos de prueba. """
     print("\n" + "="*80)
     print("VALIDACIÓN DE TRANSFORMACIONES HELICOIDALES")
     print("="*80)
@@ -419,12 +424,12 @@ def validar_transformaciones_helicoidales():
         
         # 1. Crear matriz helicoidal [S]θ
         print("\n1. Matriz helicoidal [S]θ:")
-        S_theta = crear_matriz_helicoidal(S, theta)
+        S_theta = calcular_Sθ(S, theta)
         imprimir_matriz(S_theta, "Matriz [S]θ")
         
         # 2. Calcular la exponencial para obtener T
         print("\n2. Matriz exponencial e^([S]θ):")
-        T = matriz_exponencial_helicoidal(S, theta)
+        T = calcular_expSθ(S, theta)
         imprimir_matriz(T, "Matriz T = e^([S]θ)")
         
         # 3. Verificar propiedades de T
@@ -447,7 +452,7 @@ def validar_transformaciones_helicoidales():
         
         # 5. Verificar error de reconstrucción
         print("\n5. Error de reconstrucción:")
-        T_reconstructed = matriz_exponencial_helicoidal(S_recovered, theta_recovered)
+        T_reconstructed = calcular_expSθ(S_recovered, theta_recovered)
         error = np.linalg.norm(T - T_reconstructed)
         print(f"Error de reconstrucción: {error:.6e}")
         
@@ -460,12 +465,12 @@ def validar_transformaciones_helicoidales():
 
 # Añadir al menú principal
 def menu_helicoidales():
+    """Menú interactivo para operaciones con ejes helicoidales."""
     def limpiar_pantalla():
         """Limpia la pantalla de la consola."""
         input("\033[93mPresione Enter para continuar...\033[0m")
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    """Menú interactivo para operaciones con ejes helicoidales."""
     while True:
         print("\n" + "="*90)
         print(" "*20 + "MENÚ DE OPERACIONES CON EJES HELICOIDALES" + " "*20)
@@ -491,8 +496,8 @@ def menu_helicoidales():
             S = np.concatenate([omega, v])
             
             # Calcular matriz helicoidal y su exponencial
-            S_theta = crear_matriz_helicoidal(S, theta)
-            T = matriz_exponencial_helicoidal(S, theta)
+            S_theta = calcular_Sθ(S, theta)
+            T = calcular_expSθ(S, theta)
             
             print("\nEje helicoidal S:")
             print(f"omega = {omega}")

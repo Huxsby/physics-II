@@ -2,49 +2,57 @@ robot:
   name: niryo_one
   links:
     # Base (J1)
-    - id: 0
-      length: 0.103  # Altura de la base
+    - id: Base
+      length: 0.103  # Altura de la base (103 mm)
       type: revolute
       link_orientation: [0, 0, 1]  # Eje Z
       joint_coords: [0, 0, 0]
       joint_axis: [0, 0, 1]  # Rotación alrededor de Z
 
-    # Brazo (J2)
-    - id: 1
-      length: 0.080  # Longitud del brazo
+    # Hombro (J2)
+    - id: Hombro
+      length: 0.080  # Altura del hombro (80 mm)
       type: revolute
       link_orientation: [0, 1, 0]  # Eje Y
-      joint_coords: [0, 0, 0.103]  # Posición relativa a la base
-      joint_axis: [0, -1, 0]  # Rotación alrededor de -Y (según PDF)
-
-    # Codo (J3)
-    - id: 2
-      length: 0.210  # Longitud del antebrazo
-      type: revolute
-      link_orientation: [0, 1, 0]  # Eje Y
-      joint_coords: [0, 0, 0.080]  # Posición relativa al brazo
+      joint_coords: [0, 0, 0.103]  # Posición relativa a la base 
       joint_axis: [0, -1, 0]  # Rotación alrededor de -Y
 
-    # Muñeca (J4)
-    - id: 3
-      length: 0.030  # Longitud del segmento de muñeca
+    # Brazo (J3)
+    - id: Brazo
+      length: 0.210  # Longitud del brazo (210 mm)
       type: revolute
       link_orientation: [0, 1, 0]  # Eje Y
-      joint_coords: [0, 0, 0.210]  # Posición relativa al codo
+      joint_coords: [0, 0, 0.080]  # Posición relativa al hombro
       joint_axis: [0, -1, 0]  # Rotación alrededor de -Y
 
-    # Rotación muñeca (J5)
-    - id: 4
-      length: 0.0415  # Distancia hasta la pinza
+    # Codo (J4)
+    - id: Codo
+      length: 0.030  # Longitud del codo (30 mm)
+      type: revolute
+      link_orientation: [0, 1, 0]  # Eje Y
+      joint_coords: [0, 0, 0.210]  # Posición relativa al brazo
+      joint_axis: [0, -1, 0]  # Rotación alrededor de -Y
+
+    # Antebrazo (J5)
+    - id: Antebrazo
+      length: 0.0415  # Longitud del antebrazo (41.5 mm)
       type: revolute
       link_orientation: [1, 0, 0]  # Eje X
-      joint_coords: [0.0415, 0, 0.030]  # Posición relativa a la muñeca
+      joint_coords: [0.0415, 0, 0.030]  # Posición relativa al codo
       joint_axis: [1, 0, 0]  # Rotación alrededor de X
 
-    # Pinza (J6)
-    - id: 5
-      length: 0.180  # Longitud de la pinza
+    # Muñeca (J6)
+    - id: Muneca
+      length: 0.180  # Longitud hasta la pinza (180 mm)
       type: revolute
       link_orientation: [0, 0, 1]  # Eje Z
-      joint_coords: [0.180, 0, -0.0055]  # Posición relativa a la rotación de muñeca
+      joint_coords: [0.180, 0, -0.0055]  # Posición relativa al antebrazo
       joint_axis: [0, 0, 1]  # Rotación alrededor de Z
+
+    # # Pinza-Mano (gripper - no es un joint pero lo añadimos para visualización)
+    # - id: Pinza-Mano
+    #   length: 0.024  # Longitud aproximada de la pinza
+    #   type: revolute  # Mantenemos el tipo aunque realmente es un actuador
+    #   link_orientation: [1, 0, 0]  # Orientación en X
+    #   joint_coords: [0.024, 0, 0]  # Posición relativa a la muñeca
+    #   joint_axis: [0, 0, 0]  # Sin eje de rotación real

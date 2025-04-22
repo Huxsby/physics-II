@@ -41,10 +41,10 @@ robot:
       joint_coords: [0.0415, 0, 0.030]  # Posición relativa a la muñeca
       joint_axis: [1, 0, 0]  # Rotación alrededor de X
 
-    # Pinza (J6)
-    - id: 5
-      length: 0.180  # Longitud de la pinza
-      type: revolute
-      link_orientation: [0, 0, 1]  # Eje Z
-      joint_coords: [0.180, 0, -0.0055]  # Posición relativa a la rotación de muñeca
-      joint_axis: [0, 0, 1]  # Rotación alrededor de Z
+    # # Pinza (J6)
+    # - id: 5
+    #   length: 0.180  # Longitud de la pinza
+    #   type: revolute
+    #   link_orientation: [0, 0, 1]  # Eje Z
+    #   joint_coords: [0.180, 0, -0.0055]  # Posición relativa a la rotación de muñeca
+    #   joint_axis: [0, 0, 1]  # Rotación alrededor de Z

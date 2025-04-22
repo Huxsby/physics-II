@@ -111,6 +111,7 @@ class Link:
         """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
         return(f"El Eslabón '{self.id}' ({self.tipo}), eje helicoidal: {self.obtener_eje_helicoidal()}, coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
 
+    # Función valida
     def obtener_eje_helicoidal(self):
         """
         Calcula y devuelve el eje helicoidal del eslabón.  El eje helicoidal se calcula de manera diferente
