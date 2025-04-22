@@ -129,7 +129,7 @@ class Link:
         w = self.joint_axis
         q = self.joint_coords
         if self.tipo == "revolute":
-            v = -np.cross(w, q)     # Vector de traslación perpendicular al eje de rotación
+            v = np.cross(q, w)     # Vector de traslación perpendicular al eje de rotación, cambiamos el orden: -w x q = q x w
         elif self.tipo == "prismatic":
             v = self.joint_axis * self.length  # Vector de traslación en la dirección del eje de la articulación
         else:
