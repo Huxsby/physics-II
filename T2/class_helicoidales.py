@@ -252,7 +252,10 @@ def calcular_M_generalizado(robot):
     M = np.eye(4)  # Matriz identidad inicial
     
     for link in robot.links:
-        M[:3, 3] += link.length*link.orientation
+        M[:3, 3] += np.dot(link.length,abs(link.joint_axis))
+        print(M[:3, 3])
+
+        #Pofesor: # M = np.array([[1,0,0,L[6]+L[5]+L[4]],[0,1,0,0],[0,0,1,L[0]+L[1]+L[2]+L[3]+L[7]],[0,0,0,1]])
 
         # # Obtener parámetros del eslabón
         # joint_coords = link.joint_coords  # Posición de la articulación

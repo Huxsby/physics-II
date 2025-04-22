@@ -145,9 +145,9 @@ def menu():
             print("Matriz M (posición cero):")
             imprimir_matriz(M, "M")
 
-            # Valores de las articulaciones (θ1, θ2)
-            thetas = [np.pi/2, 0]  # θ₁=90°, θ₂=0°
-            print("Valores de las articulaciones (θ1, θ2):", thetas, "\n")
+            # Valores de las articulaciones
+            thetas = [0,0,0,0,0,0]
+            print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
             T = calcular_T_robot(ejes_helicoidales, thetas, M)
