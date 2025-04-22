@@ -238,49 +238,11 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
     return points
 
 def calcular_M_generalizado(robot):
-    """
-    Calcula la matriz M 4x4, matriz de transformación correspondiente a la posición y orientación del
-    elemento terminal cuando las coordenadas de todas las articulaciones son nulas (posición “cero” del Robot)
-    
-    Parámetros:
-    - robot: Objeto robot con información de sus eslabones y articulaciones
-    
-    Retorna:
-    - M: Matriz de transformación homogénea 4x4 desde la base hasta el efector final
-         cuando todas las articulaciones están en posición cero
-    """
+    """ Calcula la matriz de transformación homogénea M del robot. """
     M = np.eye(4)  # Matriz identidad inicial
-    
     for link in robot.links:
-        M[:3, 3] += np.dot(link.length,abs(link.joint_axis))
-        print(M[:3, 3])
-
-        #Pofesor: # M = np.array([[1,0,0,L[6]+L[5]+L[4]],[0,1,0,0],[0,0,1,L[0]+L[1]+L[2]+L[3]+L[7]],[0,0,0,1]])
-
-        # # Obtener parámetros del eslabón
-        # joint_coords = link.joint_coords  # Posición de la articulación
-        # axis = link.joint_axis  # Eje de articulación
-        # length = link.length  # Longitud del eslabón
+        M[:3, 3] += link.joint_coords  # Sumar la posición de la articulación
         
-        # # Crear matriz de transformación para configuración cero
-        # R = np.eye(3)  # Sin rotación para posición de referencia
-        # p = joint_coords
-        # if hasattr(link, 'end_effector_coords') and link.end_effector_coords is not None:
-        #     p = link.end_effector_coords
-        # elif length > 0:
-        #     # Si no hay coordenadas del efector final, usar la longitud del eslabón
-        #     if np.linalg.norm(axis) > 1e-6:
-        #         axis_norm = axis / np.linalg.norm(axis)
-        #         p = joint_coords + length * axis_norm
-        #     else:
-        #         p = joint_coords
-        
-        # # Crear matriz de transformación homogénea del eslabón
-        # T = Rp2Trans(R, p)
-        
-        # # Acumular transformación
-        # M = M @ T
-    
     return M
 
 def calcular_ejes_helicoidales_body_frame(robot, M=None):
