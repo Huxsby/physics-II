@@ -57,9 +57,9 @@ def main():
     parser.set_defaults(joints='0 0 0 0 0 0')
     options, arguments = parser.parse_args()
     joints=str(options.joints).split()
-    t=[]
+    t=[0.7,0.3,0.3,0.4,0.5,0.8]
 
-    for i in range (0,6,1): t.append(np.deg2rad(np.float64(joints[i])))
+    #for i in range (0,6,1): t.append(np.deg2rad(np.float64(joints[i])))
     #for i in range (0,6,1): t.append((np.float64(joints[i])))
     print("Coordenadas en radianes", np.round(t,5))
     
@@ -93,12 +93,16 @@ def main():
         ws.append(np.array(w[i]))
         qs.append(np.array(q[i])+qs[i-1])
     
+    print(f"\tqs es {qs}\n")
+    
     # Calculamos las velocidades lineales para construir los ejes helicoidales
     vs=[]; Si=[]
     for i in range(0,6,1):
         vs.append(np.cross(qs[i],ws[i]))
         Si.append(np.r_[ws[i],vs[i]])
     
+    print(Si)
+
     M=np.array([[1,0,0,L[6]+L[5]+L[4]],[0,1,0,0],[0,0,1,L[0]+L[1]+L[2]+L[3]+L[7]],[0,0,0,1]])
     print("\nMatriz M: \n", np.round(M, 3))
     
@@ -106,6 +110,7 @@ def main():
     for i in range(0,6,1):
         T=np.dot(T,MatrixExp6(VecTose3(Si[i]*t[i])))
     T=np.dot(T,M)
+
     print("\nMatriz de transformaci ́on homog ́enea: \n", np.round(T, 3))
     print("\nCoordenadas (x,y,z) del TCP: ", np.round(T[0: 3, 3],3))
     R=(np.round(T[0: 3, 0: 3],3))

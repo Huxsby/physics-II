@@ -136,6 +136,21 @@ def LogRot(R):
         log_R = (R - R.T) / (2 * s_θ)
         return θ, antisimetrica_vector(log_R)
 
+# Función para convertir una matriz de rotación en ángulos de Euler
+def R2Euler(R):
+    """ Convierte una matriz de rotación R en ángulos de Euler (roll, pitch, yaw). """
+    sy=np.sqrt(R[0,0]*R[0,0]+R[1,0]*R[1,0])
+    singular=sy<1.e-6
+    if not singular:
+        x=np.arctan2(R[2,1],R[2,2])
+        y=np.arctan2(-R[2,0],sy)
+        z=np.arctan2(R[1,0],R[0,0])
+    else:
+        x=np.arctan2(-R[1,2],R[1,1])
+        y=np.arctan2(-R[2,0],sy)
+        z=0.
+    return np.array([x,y,z])
+
 # Rotar un vector selecion automática
 def RotarVector(v, eje, θ):
     """

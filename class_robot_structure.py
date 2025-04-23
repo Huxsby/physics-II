@@ -50,7 +50,43 @@ class Robot:
 
     def get_ejes_helicoidales(self):
         """ Devuelve una lista de los ejes helicoidales de todos los eslabones del robot. """
-        return [link.obtener_eje_helicoidal() for link in self.links]
+
+        links = self.links
+        ejes_helicoidales = []
+        qs = []
+        for i in range(len(links)):
+            link = links[i]
+            q = link.joint_coords + qs[i-1] if i > 0 else link.joint_coords
+            qs.append(q) # This loop calculating qs seems incorrect for standard screw axis definition and is unused below.
+
+        #print(f"qs {len(qs)}: {qs}") # qs se calcula bien
+
+        # Recalculate based on standard screw axis definition in base frame {0} at zero configuration
+        ejes_helicoidales = []
+        for i, link in enumerate(self.links):
+            w = np.array(link.joint_axis)
+            q = qs[i] # Assuming q is a point on the joint axis in {0}
+
+            if link.tipo == "revolute":
+                # Assuming w is a unit vector representing the axis direction
+                w_norm = np.linalg.norm(w)
+                if np.isclose(w_norm, 0):
+                     raise ValueError(f"Eje de articulación cero para eslabón revoluto {link.id}")
+                w = w / w_norm # Ensure w is unit vector
+                v = -np.cross(w, q) # Standard definition: v = -w x q
+            elif link.tipo == "prismatic":
+                # Assuming joint_axis gives the direction of translation v
+                v_norm = np.linalg.norm(w) # Use w (joint_axis) to calculate norm for v
+                if np.isclose(v_norm, 0):
+                     raise ValueError(f"Eje de articulación cero para eslabón prismático {link.id}")
+                v = w / v_norm # v is the unit vector in the direction of translation
+                w = np.zeros(3) # w is zero for prismatic joints
+            else:
+                raise ValueError(f"Tipo desconocido: {link.tipo} para el eslabón {link.id}")
+
+            ejes_helicoidales.append(np.hstack((w, v)))
+
+        return ejes_helicoidales
 
 class Link:
     """
@@ -110,31 +146,6 @@ class Link:
     def __str__(self):
         """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
         return(f"El Eslabón '{self.id}' ({self.tipo}), eje helicoidal: {self.obtener_eje_helicoidal()}, coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
-
-    # Función valida
-    def obtener_eje_helicoidal(self):
-        """
-        Calcula y devuelve el eje helicoidal del eslabón.  El eje helicoidal se calcula de manera diferente
-        dependiendo del tipo de articulación (revoluta o prismática). Para articulaciones revolutas, el eje
-        helicoidal se define como la combinación del eje de rotación y un vector de traslación perpendicular
-        a este eje. Para articulaciones prismáticas, el eje helicoidal se define como un vector de traslación
-        en la dirección del eje de la articulación.
-        Returns:
-            numpy.ndarray: El eje helicoidal del eslabón, representado como un vector de 6 elementos
-                            (omega, v), donde omega es la componente de rotación y v es la componente
-                            de traslación.
-        Raises:
-            ValueError: Si el tipo de articulación no es "revolute" ni "prismatic".
-        """
-        w = self.joint_axis
-        q = self.joint_coords
-        if self.tipo == "revolute":
-            v = np.cross(q, w)     # Vector de traslación perpendicular al eje de rotación, cambiamos el orden: -w x q = q x w
-        elif self.tipo == "prismatic":
-            v = self.joint_axis * self.length  # Vector de traslación en la dirección del eje de la articulación
-        else:
-            raise ValueError(f"Tipo desconocido: {self.tipo}")
-        return np.hstack((w, v))
 
 def cargar_robot_desde_yaml(path="robot.yaml"):
     """
