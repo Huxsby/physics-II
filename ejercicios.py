@@ -166,12 +166,14 @@ def menu():
             print("Los angulos de Euler (Roll Pitch Yaw) son:", RPY,'\n') 
             limpiar_pantalla()
 
-        elif opcion == "10":
+        elif opcion == "10":                            # 10. Calcular la matriz Jacobiana del robot
             print("Calcular la matriz Jacobiana del robot.")
             # Cargar robot
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
             # Valores de las articulaciones
-            valores = [0.7,0.3,0.3,0.4,0.5,0.8]
+            valores = []
+            for i in range(len(robot.links)):
+                valores.append(Datos(tipo="angulo", mensaje=f"Ingrese el valor de theta{i+1} (º): ").valor)
 
             # Calcular Jacobiana
             Jacobian, thetas = calcular_jacobiana(robot)
@@ -181,6 +183,12 @@ def menu():
 
             # Dar valores a la Jacobiana
             mostrar_jacobiana_resumida(evaluar_jacobiana(Jacobian, thetas, valores))
+
+
+            singularidades = calcular_configuraciones_singulares(Jacobian, valores)
+            print("\n--- Configuraciones singulares ---")
+            print(singularidades)
+
 
             if input("Desea ver mas pruebas? (s/n): ").lower() == "s":
                 prueba_jacobiana()

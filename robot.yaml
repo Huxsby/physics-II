@@ -1,50 +1,18 @@
 robot:
-  name: niryo_one
+  name: planar_2r_robot
   links:
-    # Base (J1)
-    - id: Base
-      length: 0.103
+    # Articulación 1 (J1 - Base)
+    - id: Link1
+      length: 1.0      # L1 (valor por defecto del código)
       type: revolute
-      link_orientation: [0, 0, 1]
-      joint_coords: [0, 0, 0.103]
-      joint_axis: [0, 0, 1]
+      link_orientation: [0, 0, 1]  # Eje Z (plano XY)
+      joint_coords: [0, 0, 0]       # Origen
+      joint_axis: [0, 0, 1]         # Eje de rotación Z
 
-    # Hombro (J2)
-    - id: Hombro
-      length: 0.080
+    # Articulación 2 (J2 - Eslabón final)
+    - id: Link2
+      length: 1.0      # L2 (valor por defecto del código)
       type: revolute
-      link_orientation: [0, 1, 0]
-      joint_coords: [0, 0, 0.080]
-      joint_axis: [0, -1, 0]
-
-    # Brazo (J3)
-    - id: Brazo
-      length: 0.210
-      type: revolute
-      link_orientation: [0, 1, 0]
-      joint_coords: [0, 0, 0.210]
-      joint_axis: [0, -1, 0]
-
-    # Codo (J4) - Corrección de eje
-    - id: Codo
-      length: 0.030
-      type: revolute
-      link_orientation: [0, 1, 0]
-      joint_coords: [0.0415, 0, 0.030]
-      joint_axis: [1, 0, 0]  # Eje X
-
-    # Antebrazo (J5) - Corrección de eje
-    - id: Antebrazo
-      length: 0.0415
-      type: revolute
-      link_orientation: [1, 0, 0]
-      joint_coords: [0.180, 0, 0]
-      joint_axis: [0, -1, 0]  # Eje -Y
-
-    # Muñeca (J6) - Corrección de eje y coordenadas
-    - id: Muneca
-      length: 0.180
-      type: revolute
-      link_orientation: [1, 0, 0]
-      joint_coords: [0.0237, 0, -0.0055]  # Posición corregida
-      joint_axis: [1, 0, 0]  # Eje X
+      link_orientation: [0, 0, 1]  # Eje Z (plano XY)
+      joint_coords: [1.0, 0, 0]     # Extremo del primer eslabón (L1)
+      joint_axis: [0, 0, 1]         # Eje de rotación Z
