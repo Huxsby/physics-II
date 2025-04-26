@@ -466,3 +466,4 @@ def TransAdj(T):
     AdT[:3, 3:] = np.dot(antisimetrica(p), R)
     
     return AdT
+

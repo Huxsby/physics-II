@@ -24,7 +24,7 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
         return np.min(zs)
 
-def visualizar_robot_3d_actualizado(robot, angulos=None):
+def visualizar_robot_3d_actualizado(robot: Robot, angulos=None):
     """
     Visualiza el robot Niryo One en 3D utilizando matplotlib con etiquetas para cada pieza.
     

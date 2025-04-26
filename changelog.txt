@@ -18,3 +18,11 @@ T4
 
 P1
     [X] - Crear archivo .yaml para el brazo del laboratorio.
+
+
+    - Desarrolla un código en Python que genere las gráficas correspondientes a los
+    elipsoides de manipulabilidad y de fuerza para una configuración singular del robot
+    2R plano y para las configuraciones con coordenadas de articulaciones (0,π/4)y
+    (0,3π/4).
+
+        - Cabiar nombre de antisimetrica() -> VecToso3sp o parecido.

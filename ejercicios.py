@@ -10,6 +10,7 @@ from class_datos import Datos                       # Clase para organizar la to
 from class_rotaciones import *                      # Funciones de rotación
 from class_helicoidales import *                    # Funciones de helicoidales y su menu()
 import class_robot_structure as robot_structure     # Clase y funciones para leer el archivo robot.yaml
+from class_jacobian import *                       # Funciones para calcular la Jacobiana
 
 # Comparar rotaciones
 def comparar_rotaciones(w , θ):
@@ -45,6 +46,8 @@ def menu():
         print("-"*90)   # Separador
         print("8. Lectura de archivo YAML (robot.yaml).")
         print("9. Calcular la matriz de transformación homogénea del robot.")
+        print("-"*90)   # Separador
+        print("10. Calcular la matriz Jacobiana del robot).")
         print("-"*90)   # Separador
         print("0. Salir.")
 
@@ -163,6 +166,27 @@ def menu():
             print("Los angulos de Euler (Roll Pitch Yaw) son:", RPY,'\n') 
             limpiar_pantalla()
 
+        elif opcion == "10":
+            print("Calcular la matriz Jacobiana del robot.")
+            # Cargar robot
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
+            # Valores de las articulaciones
+            valores = [0.7,0.3,0.3,0.4,0.5,0.8]
+
+            # Calcular Jacobiana
+            Jacobian, thetas = calcular_jacobiana(robot)
+            
+            # Mostrar Jacobiana
+            mostrar_jacobiana_resumida(Jacobian)
+
+            # Dar valores a la Jacobiana
+            mostrar_jacobiana_resumida(evaluar_jacobiana(Jacobian, thetas, valores))
+
+            if input("Desea ver mas pruebas? (s/n): ").lower() == "s":
+                prueba_jacobiana()
+            
+            limpiar_pantalla()
+            
         elif opcion == "0":                             # 0. Salir
             print("Saliendo...", end=" ")
             limpiar_pantalla()

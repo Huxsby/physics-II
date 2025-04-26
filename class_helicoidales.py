@@ -2,7 +2,7 @@ import numpy as np
 import os
 from class_datos import Datos
 from class_rotaciones import *
-import class_robot_structure as robot_structure
+from class_robot_structure import *
 
 ## Función validada
 def calcular_Sθ(S, theta):
@@ -237,7 +237,7 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
     
     return points
 
-def calcular_M_generalizado(robot):
+def calcular_M_generalizado(robot: Robot):
     """ Calcula la matriz de transformación homogénea M del robot. """
     M = np.eye(4)  # Matriz identidad inicial
     for link in robot.links:
@@ -245,7 +245,7 @@ def calcular_M_generalizado(robot):
         
     return M
 
-def calcular_ejes_helicoidales_body_frame(robot, M=None):
+def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     """
     Calcula los ejes helicoidales en el sistema de referencia del efector final (body frame)
     
@@ -482,7 +482,7 @@ def menu_helicoidales():
         elif opcion == "5":
             print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
-            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
+            robot = cargar_robot_desde_yaml("robot.yaml")
             ejes_helicoidales = robot.get_ejes_helicoidales()
 
             # Calcular M (posición cero)

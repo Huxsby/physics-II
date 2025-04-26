@@ -5,3 +5,11 @@ __pycache__/
 # Ignore Python compiled files
 *.py[cod]
 *$py.class
+
+# Ignore specific test files
+pruebas.py
+prueba.py
+pruebas.hpp
+prueba.hpp
+pruebas.cpp
+prueba.cpp
