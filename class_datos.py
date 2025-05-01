@@ -1,3 +1,36 @@
+"""
+Módulo para la toma y validación de datos específicos para cálculos de física.
+
+Este módulo proporciona la clase `Datos`, diseñada para facilitar la
+solicitud de diferentes tipos de datos al usuario (vectores, ejes, ángulos,
+coordenadas exponenciales) con validación incorporada y mensajes
+personalizables.
+
+Clases Principales:
+    Datos: Clase principal para solicitar y almacenar datos validados.
+
+Ejemplo de uso:
+    >>> # Solicitar un vector de 3 componentes
+    >>> vector_dato = Datos(tipo="vector")
+    Ingrese el vector a rotar (separado por comas o espacios en blanco): 1 2 3
+    >>> print(vector_dato.obtener_valor())
+    [1. 2. 3.]
+    >>> print(vector_dato.obtener_tipo())
+    vector
+
+    >>> # Solicitar un ángulo en grados (se almacena en radianes)
+    >>> angulo_dato = Datos(tipo="angulo", mensaje="Introduce el ángulo deseado (º):")
+    Introduce el ángulo deseado (º): 90
+    >>> print(angulo_dato.obtener_valor())
+    1.5707963267948966
+
+    >>> # Solicitar un eje
+    >>> eje_dato = Datos(tipo="eje")
+    Ingrese el eje de rotación (x, y o z): y
+    >>> print(eje_dato)
+    y
+"""
+
 import numpy as np
 
 class Datos:
