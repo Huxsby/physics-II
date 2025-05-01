@@ -75,6 +75,7 @@ Ejemplo:
 """
 
 import numpy as np
+import time
 import yaml
 
 class Robot:
@@ -88,7 +89,7 @@ class Robot:
 
     def __str__(self):
         """ Retorna una representación en cadena del objeto Robot, incluyendo su nombre y los eslabones."""
-        return f"Robot '{self.name}' con {len(self.links)} eslabones. \n\t" + "\n\t".join([str(link) for link in self.links])
+        return f"\nRobot '{self.name}' con {len(self.links)} eslabones. \n\t" + "\n\t".join([str(link) for link in self.links])
 
     def add_link(self, new_link):
         """ Agrega un nuevo eslabón al robot.  Verifica que el nuevo eslabón no tenga un ID duplicado y que su tipo """
@@ -103,7 +104,7 @@ class Robot:
 
     def get_ejes_helicoidales(self):
         """ Devuelve una lista de los ejes helicoidales de todos los eslabones del robot. """
-
+        tiempo_inicio = time.time() # Para medir el tiempo de ejecución
         links = self.links
         ejes_helicoidales = []
         qs = []
@@ -138,7 +139,7 @@ class Robot:
                 raise ValueError(f"Tipo desconocido: {link.tipo} para el eslabón {link.id}")
 
             ejes_helicoidales.append(np.hstack((w, v)))
-
+        print(f"\t\033[92mTiempo de ejecución de get_ejes_helicoidales: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
         return ejes_helicoidales
 
 class Link:
@@ -174,7 +175,14 @@ class Link:
         eje = self.joint_axis
         eje_abs = np.abs(eje)
         
-        print(f"\tEslabón {self.id}:", end=" ")
+        print(f"\t{f'Eslabón {self.id}:':<20}", end="") # Ajusta el ancho (e.g., 20) según sea necesario
+
+        if (eje > 0).any():
+            signo = "\033[92m+"
+        elif (eje < 0).any():
+            signo = "\033[91m-"
+        else:
+            signo = " "
 
         if np.array_equal(eje_abs, np.array([1, 0, 0])):
             eje_str = "X"
@@ -186,13 +194,13 @@ class Link:
             eje_str = "fuera de los ejes X, Y, Z"
 
         if (eje > 0).any():
-            sentido = "sentido positivo ⭢  y horario ↻"
+            sentido = "\033[92msentido positivo ⭢  == horario ↻"
         elif (eje < 0).any():
-            sentido = "sentido negativo ⭠  y antihorario ↺"
+            sentido = "\033[91msentido negativo ⭠  == antihorario ↺"
         else:
             sentido = "sin sentido"
         
-        print(f"Eje de giro: {eje_str} ({sentido})")
+        print(f"Eje de giro: {signo}{eje_str}\033[0m \t( {sentido} \033[0m)")
         
         return eje*self.length
     
@@ -243,14 +251,17 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
             joint_axis=l['joint_axis']
         )
         robot.add_link(new_link)
-        robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
+        
+    robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
     return robot
 
+# Ejemplo de uso
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
     
     print("Ejes helicoidales del robot:")
-    print(robot.get_ejes_helicoidales())
+    print(robot.ejes_helicoidales)
+    #print(robot.get_ejes_helicoidales())
     print(f"\n{robot}")
 
     print("\nObtener_eje_de_giro")
