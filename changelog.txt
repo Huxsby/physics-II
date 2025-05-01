@@ -3,6 +3,9 @@ class_datos.py
     - Normalizar vector eje en la toma general de datos, dar la opcion de elegir entre ['x','y','z','g'] -> 'g' Irse por 'vector'
         - Cambiar en ejercicios.py
 
+class_robot_structure.py
+    - Optimizar (si se puede hacer): self.ejes_helicoidales = self.get_ejes_helicoidales()
+
 ejercicio.py
 !   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.
 

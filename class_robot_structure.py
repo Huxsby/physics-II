@@ -32,6 +32,7 @@ class Robot:
         """ Inicializa una nueva instancia de la clase Robot. """
         self.name = name
         self.links = []
+        self.ejes_helicoidales = self.get_ejes_helicoidales()
 
     def __str__(self):
         """ Retorna una representación en cadena del objeto Robot, incluyendo su nombre y los eslabones."""
@@ -145,7 +146,7 @@ class Link:
     
     def __str__(self):
         """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
-        return(f"El Eslabón '{self.id}' ({self.tipo}), eje helicoidal: {self.obtener_eje_helicoidal()}, coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
+        return(f"El Eslabón '{self.id}' ({self.tipo}), coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
 
 def cargar_robot_desde_yaml(path="robot.yaml"):
     """
@@ -196,8 +197,7 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
     print("Ejes helicoidales del robot:")
-    for eje in robot.get_ejes_helicoidales():
-        print("\t", eje)
+    print(robot.get_ejes_helicoidales())
     print(f"\n{robot}")
 
     print("\nobtener_eje_de_giro")
