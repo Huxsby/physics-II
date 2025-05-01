@@ -39,6 +39,36 @@ def Adjunta(T):
     lower = (p_skew * R).row_join(R)
     return upper.col_join(lower)
 
+""" Protocolo para calcular la Matriz Jacobiana de un Robot
+
+ - Al igual que se hizo en cinemática directa, obtén los ejes helicoidales en la
+posición cero del Robot: calcula el eje de rotación ωi , el vector de posición desde
+el sistema de referencia fijo hasta cada articulación qsi , el producto vectorial de
+estos 2 vectores con signo negativo (vi =-ωi x qsi ) y concatena ωi con el
+resultado de este producto vectorial: Si =(ωi ,vi ). En el caso de que se trate de
+una articulación prismática simplemente se coge el vector (0,0,0) como eje de
+rotación y se completa el eje helicoidal con un vector unitario en el sentido de la
+extensión: Si =(0,0,0,vi )
+
+ - Transforma el eje helicoidal a su forma de matriz antisimétrica ([Si ]) y calcula las
+matrices de transformación homogénea correspondientes a cada articulación a
+través de la matriz exponencial con las coordenadas θi elegidas: e[Si ]θi
+
+ - A continuación calcula las matrices de transformación homogéneas Ti obtenidas
+como el producto de matrices exponenciales correspondientes a las articulaciones
+(0,1,··· ,i): Ti =e[S1]θ1 ···e[Si ]θi
+
+ - Utiliza las matrices adjuntas de Ti para transformar los ejes helicoidades a la
+conformación que corresponda. Estos ejes helicoidales transformados serán
+directamente las columnas de la matriz Jacobiana: Jsi (θ)=AdTi-1 (Si )
+(∀ i =2,··· ,n).
+
+ - Fíjate que para transformar cada eje helicoidal utilizamos la matriz adjunta del
+producto de matrices exponenciales desde la primera articulación hasta la
+inmediatamente anterior por lo que la primera columna de la matriz jacobiana es
+directamente el eje helicoidal de la primera articulación en la posición cero del robot.
+"""
+
 def calcular_jacobiana(robot: Robot):
     """
     Calcula la matriz Jacobiana simbólica del robot proporcionado.
@@ -159,6 +189,33 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
         else:
             print(f"⎢ {row_text} ⎥")
 
+def calcular_configuraciones_singulares(Jacobian: sp.Matrix):
+    """
+    Calcula las configuraciones singulares de la Jacobiana proporcionada.
+    Las configuraciones singulares son aquellas donde el determinante de la Jacobiana es cero.
+    """
+    if not isinstance(Jacobian, sp.Matrix):
+        raise ValueError("La Jacobiana debe ser una matriz simbólica (sympy.Matrix).")
+    try:
+        # Obtener las variables simbólicas de la Jacobiana
+        thetas = list(Jacobian.free_symbols)
+        print(f"Variables libres en la Jacobiana: {thetas}")
+        # Calcular el determinante de la Jacobiana
+        det_J = Jacobian.det() 
+        # La operacion det para valores simbolicos no esta funcionando
+        """
+        El determinante de una 6x6 con entradas llenas de senos y cosenos en cinco
+         o seis variables produce una mega-expresión trigonométrica que Sympy tardará
+         una eternidad en expandir, factorizar o resolver.
+        """
+        print(f"Determinante de la Jacobiana: {det_J}")
+        # Encontrar las configuraciones singulares (donde el determinante es cero)
+        singularidades = sp.solve(det_J, thetas)
+        return singularidades
+    
+    except Exception as e:
+        raise ValueError(f"Could not evaluate Jacobian numerically: {e}")
+
 def prueba_jacobiana():
     """
     Función de prueba para calcular y mostrar la Jacobiana de un robot.
@@ -178,6 +235,14 @@ def prueba_jacobiana():
     # Mostrar Jacobiana de forma resumida
     print("\n--- Jacobiana ---")
     mostrar_jacobiana_resumida(Jacobian)
+
+    print("\n--- Buscando singularidades en la Jacobiana sin valores dados [det(J) = 0] ---")
+    try:
+        singularidades = calcular_configuraciones_singulares(Jacobian)
+        print(singularidades)
+    except Exception as e:
+        print(f"Error al calcular configuraciones singulares: {e}")
+        print("Valores intentados: None")
 
     # --- Prueba 1: Valores específicos ---
     print("\n--- Prueba con valores específicos ---")
@@ -220,7 +285,7 @@ def prueba_jacobiana():
         # mostrar_jacobiana_resumida(Jacobian_num1_1) # Mostrar simbólicamente
         # input()
         try:
-            singularidades = calcular_configuraciones_singulares(Jacobian, thetas, valores_especificos)
+            singularidades = calcular_configuraciones_singulares(Jacobian)
             print("\n--- Configuraciones singulares ---")
             print(singularidades)
         except Exception as e:
@@ -254,94 +319,6 @@ def prueba_jacobiana():
 
     except Exception as e:
         print(f"Error al sustituir valores pi: {e}")
-
-def calcular_configuraciones_singulares(Jacobian: sp.Matrix, thetas, valores):
-    """
-    Calcula las configuraciones singulares de la Jacobiana.
-
-    Parámetros:
-    - Jacobian: matriz simbólica de la Jacobiana (sympy.Matrix).
-    - thetas: lista o tupla de variables simbólicas (sympy.Symbol) correspondientes a las articulaciones.
-
-    Devuelve:
-    - singularidades: lista de configuraciones singulares encontradas.
-    """
-    
-    if not isinstance(valores, dict):
-        raise ValueError("Los valores deben ser un diccionario con las variables simbólicas como claves y los valores numéricos como valores.")
-    if not isinstance(Jacobian, sp.Matrix):
-        raise ValueError("La Jacobiana debe ser una matriz simbólica (sympy.Matrix).")
-    if sp.shape(Jacobian) != (6, len(valores)):
-        raise ValueError(f"La Jacobiana debe tener 6 filas y {len(valores)} columnas.")
-    
-    # Evaluate the Jacobian numerically at the given configuration
-    # Ensure 'valores' is a dictionary mapping symbols to numeric values
-    if not isinstance(valores, dict):
-         # Attempt to convert if 'valores' is a list/tuple matching 'thetas'
-         if len(valores) == len(thetas):
-             valores_dict = {thetas[i]: valores[i] for i in range(len(thetas))}
-         else:
-              # If fewer values than thetas are provided, assume the rest are zero (matching evaluar_jacobiana logic)
-              print(f"\tWarning: Fewer values ({len(valores)}) provided than thetas ({len(thetas)}). Assuming remaining thetas are 0 for singularity check.")
-              valores_dict = {}
-              for i in range(len(thetas)):
-                  if i < len(valores):
-                      valores_dict[thetas[i]] = valores[i]
-                  else:
-                      valores_dict[thetas[i]] = 0.0
-              # raise ValueError("Input 'valores' must be a dictionary {theta: value} or a list/tuple matching 'thetas'.")
-    else:
-        # Ensure all thetas are present in the dict, adding zeros if necessary
-        valores_dict = valores.copy() # Avoid modifying the original dict
-        provided_thetas = set(valores_dict.keys())
-        all_thetas_set = set(thetas)
-        missing_thetas = all_thetas_set - provided_thetas
-        if missing_thetas:
-            print(f"\tWarning: Values for thetas {missing_thetas} not provided. Assuming 0 for singularity check.")
-            for theta in missing_thetas:
-                valores_dict[theta] = 0.0
-
-
-    print(f"\tChecking singularity for configuration: {valores_dict}")
-    try:
-        # Substitute values and evaluate numerically
-        Jacobian_eval = Jacobian.subs(valores_dict).evalf(chop=True)
-        # Ensure the result is numeric
-        if not Jacobian_eval.is_Matrix or not all(val.is_number for val in Jacobian_eval):
-             raise ValueError("Jacobian did not evaluate to a fully numeric matrix.")
-
-    except Exception as e:
-        print(f"Error substituting/evaluating Jacobian with values {valores_dict}: {e}")
-        raise ValueError(f"Could not evaluate Jacobian numerically: {e}") from e
-
-    rows, cols = Jacobian_eval.shape
-    print(f"\tNumeric Jacobian shape: {rows}x{cols}")
-
-    # A configuration is singular if the rank of the Jacobian is deficient.
-    # For a square matrix (n x n), rank < n <=> det(J) = 0.
-    # For a rectangular matrix (m x n), rank < min(m, n).
-    # We calculate the rank of the numeric matrix.
-    try:
-        rank = Jacobian_eval.rank()
-    except Exception as e:
-        print(f"Error calculating rank of the numeric Jacobian: {e}")
-        # This might happen if substitution/evaluation failed silently.
-        raise RuntimeError(f"Rank calculation failed: {e}") from e
-
-    # Determine the expected full rank
-    full_rank = min(rows, cols)
-
-    # Check if the configuration is singular
-    is_singular = (rank < full_rank)
-
-    print(f"\tConfiguration check: Rank = {rank}, Expected full rank = {full_rank}. Singular: {is_singular}")
-
-    # The function name implies finding configurations, but the input 'valores'
-    # means we are *checking* a given configuration.
-    # Returning True if singular, False otherwise.
-    # Note: This function does not *solve* for the theta values that cause singularity.
-    # It only checks if the *given* theta values result in a singular configuration.
-    return is_singular
 
 if __name__ == "__main__":
     prueba_jacobiana()
