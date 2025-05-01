@@ -1,26 +1,77 @@
 """
-robot:
-  name: simple_robot
-  links:
-    - id: 0
-      length: 0.080
-      type: revolute
-      link_orientation: [0, 0, 1]
-      joint_coords: [0, 0, 0.103]
-      joint_axis: [0, 0, 1]
-    - id: 1
-      length: 0.210
-      type: revolute
-      link_orientation: [0, 0, 1]
-      joint_coords: [0, 0, 0.080]
-      joint_axis: [0, 1, 0]
-    - id: 2
-      length: 0.0415
-      type: prismatic
-      link_orientation: [0, 0, 1]
-      joint_coords: [0, 0, 0.210]
-      joint_axis: [1, 0, 0]
+class_robot_structure.py
+=====
+Este módulo proporciona clases y funciones para definir la estructura de un robot manipulador,
+incluyendo sus eslabones y articulaciones, y para cargar esta estructura desde un archivo
+de configuración YAML.
 
+Clases:
+    Robot: Representa un robot manipulador compuesto por varios eslabones.
+    Link: Representa un único eslabón del robot con las propiedades de su articulación asociada.
+
+Funciones:
+    cargar_robot_desde_yaml: Carga la estructura de un robot desde un archivo YAML especificado.
+
+Ejemplo:
+    Suponiendo que existe un archivo 'robot.yaml' con la siguiente estructura:
+
+    ```yaml
+    robot:
+      name: simple_robot
+      links:
+        - id: 0
+          length: 0.080
+          type: revolute
+          link_orientation: [0, 0, 1]
+          joint_coords: [0, 0, 0.103]
+          joint_axis: [0, 0, 1]
+        - id: 1
+          length: 0.210
+          type: revolute
+          link_orientation: [0, 0, 1]
+          joint_coords: [0, 0, 0.080]
+          joint_axis: [0, 1, 0]
+        - id: 2
+          length: 0.0415
+          type: prismatic
+          link_orientation: [0, 0, 1]
+          joint_coords: [0, 0, 0.210]
+          joint_axis: [1, 0, 0]
+    ```
+
+    Puedes cargar e inspeccionar el robot de esta manera:
+
+    >>> import numpy as np
+    >>> from class_robot_structure import Robot, Link, cargar_robot_desde_yaml
+    >>> # Crear un robot.yaml ficticio para el ejemplo
+    >>> yaml_content = '''
+    ... robot:
+    ...   name: example_robot
+    ...   links:
+    ...     - id: link1
+    ...       length: 1.0
+    ...       type: revolute
+    ...       link_orientation: [0, 0, 1]
+    ...       joint_coords: [0, 0, 0]
+    ...       joint_axis: [0, 0, 1]
+    ...     - id: link2
+    ...       length: 0.5
+    ...       type: prismatic
+    ...       link_orientation: [1, 0, 0]
+    ...       joint_coords: [1, 0, 0]
+    ...       joint_axis: [1, 0, 0]
+    ... '''
+    >>> with open("robot_example.yaml", "w") as f:
+    ...     f.write(yaml_content)
+    >>> robot = cargar_robot_desde_yaml("robot_example.yaml") # doctest: +SKIP
+    Ejes helicoidales del robot 'example_robot': Los ejes helicoidales se calcularán al crear el robot.
+    Robot 'example_robot' creado.
+    >>> print(robot) # doctest: +SKIP
+    Robot 'example_robot' con 2 eslabones.
+        El Eslabón 'link1' (revolute), coordenadas: [0. 0. 0.], eje: [0. 0. 1.], longitud: 1.0
+        El Eslabón 'link2' (prismatic), coordenadas: [1. 0. 0.], eje: [1. 0. 0.], longitud: 0.5
+    >>> print(robot.get_ejes_helicoidales()) # doctest: +SKIP
+    [array([ 0.,  0.,  1., -0.,  0.,  0.]), array([0., 0., 0., 1., 0., 0.])]
 """
 
 import numpy as np
@@ -32,7 +83,8 @@ class Robot:
         """ Inicializa una nueva instancia de la clase Robot. """
         self.name = name
         self.links = []
-        self.ejes_helicoidales = self.get_ejes_helicoidales()
+        self.ejes_helicoidales = "Los ejes helicoidales se calcularán al crear el robot."
+        print(f"\033[92\tmRobot '{self.name}' creado.\033[0m")
 
     def __str__(self):
         """ Retorna una representación en cadena del objeto Robot, incluyendo su nombre y los eslabones."""
@@ -63,7 +115,7 @@ class Robot:
         #print(f"qs {len(qs)}: {qs}") # qs se calcula bien
 
         # Recalculate based on standard screw axis definition in base frame {0} at zero configuration
-        ejes_helicoidales = []
+        # ejes_helicoidales = []
         for i, link in enumerate(self.links):
             w = np.array(link.joint_axis)
             q = qs[i] # Assuming q is a point on the joint axis in {0}
@@ -191,15 +243,16 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
             joint_axis=l['joint_axis']
         )
         robot.add_link(new_link)
-
+        robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
     return robot
 
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
+    
     print("Ejes helicoidales del robot:")
     print(robot.get_ejes_helicoidales())
     print(f"\n{robot}")
 
-    print("\nobtener_eje_de_giro")
+    print("\nObtener_eje_de_giro")
     for i in range(len(robot.links)):
         robot.links[i].obtener_eje_de_giro()
