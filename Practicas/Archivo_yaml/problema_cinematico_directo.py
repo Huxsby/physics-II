@@ -9,7 +9,7 @@
 import numpy as np
 import optparse
 
-desc="Resoluci ́on del problema cinem ́atico directo para el Robot Niryo One."
+desc="Resolución del problema cinem ́atico directo para el Robot Niryo One."
 
 def VecToso3(omg): # Convierte un vector de 3 componentes en una matriz antisim ́etrica
     return np.array([[0, -omg[2], omg[1]], [omg[2], 0, -omg[0]], [-omg[1], omg[0], 0]])
@@ -20,20 +20,20 @@ def VecTose3(V): # convierte un vector giro o eje helicoidal en matriz 4x4 se3
 def so3ToVec(so3mat): # extrae un vector de 3 componentes de una matriz antisim ́etrica so3
     return np.array([so3mat[2][1], so3mat[0][2], so3mat[1][0]])
 
-# convierte matriz se3 en una matriz de transformaci ́on homog ́enea a trav ́es de la exponencial
+# convierte matriz se3 en una matriz de transformación homog ́enea a trav ́es de la exponencial
 def MatrixExp6(se3mat):
-    se3mat = np.array(se3mat) # vector giro en representaci ́on matricial se3 (4x4)
+    se3mat = np.array(se3mat) # vector giro en representación matricial se3 (4x4)
     v=se3mat[0: 3, 3] # extraemos el vector v*theta (velocidad lineal)
     omgmattheta=se3mat[0: 3, 0: 3] # extraemos omega*theta en forma matricial 3x3 (so3)
     omgtheta = so3ToVec(omgmattheta) # lo pasamos a forma vectorial
     
     if (np.linalg.norm(omgtheta))<1.e-6: # en el caso de que no haya giro (omega despreciable)
-        return np.r_[np.c_[np.eye(3), v], [[0, 0, 0, 1]]] # concatena columnas y filas. S ́olo traslaci ́on
+        return np.r_[np.c_[np.eye(3), v], [[0, 0, 0, 1]]] # concatena columnas y filas. S ́olo traslación
     
     else: # caso general
         theta = np.linalg.norm(omgtheta)
         omgmat = omgmattheta / theta # omega en forma matricial 3x3 (so3) Normalizada
-        # a continuaci ́on aplicamos la definici ́on de matriz exponencial que vimos en clase (slide 42)
+        # a continuación aplicamos la definición de matriz exponencial que vimos en clase (slide 42)
         G_theta=np.eye(3)*theta+(1-np.cos(theta))*omgmat+(theta-np.sin(theta))*np.dot(omgmat,omgmat)
         R=np.eye(3)+np.sin(theta)*omgmat+(1.-np.cos(theta))*np.dot(omgmat,omgmat)
         return np.r_[np.c_[R,np.dot(G_theta,v)/theta],[[0, 0, 0, 1]]]
@@ -63,7 +63,7 @@ def main():
     #for i in range (0,6,1): t.append((np.float64(joints[i])))
     print("Coordenadas en radianes", np.round(t,5))
     
-    # Definimos ejes de rotaci ́on
+    # Definimos ejes de rotación
     w=[]
     w.append(np.array([0,0,1]))
     w.append(np.array([0,-1,0]))
@@ -85,7 +85,7 @@ def main():
     q.append(np.array([L[5],0,0]))
     q.append(np.array([L[6],0,L[7]]))
     
-    # Calculamos los ejes de giro y vectores posici ́on en la configuraci ́on final del robot
+    # Calculamos los ejes de giro y vectores posición en la configuración final del robot
     qs=[]; ws=[]
     qs.append(np.array(q[0]))
     ws.append(np.array(w[0]))
@@ -106,7 +106,7 @@ def main():
     for i in range(0,6,1):
         T=np.dot(T,MatrixExp6(VecTose3(Si[i]*t[i])))
     T=np.dot(T,M)
-    print("\nMatriz de transformaci ́on homog ́enea: \n", np.round(T, 3))
+    print("\nMatriz de transformación homog ́enea: \n", np.round(T, 3))
     print("\nCoordenadas (x,y,z) del TCP: ", np.round(T[0: 3, 3],3))
     R=(np.round(T[0: 3, 0: 3],3))
     print("\n ́Angulos de Euler en radianes", R2Euler(R))
