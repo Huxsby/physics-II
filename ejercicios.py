@@ -133,14 +133,18 @@ def menu():
             print("Lectura de archivo YAML (robot.yaml)")
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
             print(robot)
+            print("\nEjes helicoidales del robot:", robot.ejes_helicoidales)
+            print("\nObtener_eje_de_giro")
+            for i in range(len(robot.links)):
+                robot.links[i].obtener_eje_de_giro()
+
             limpiar_pantalla()
 
         elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
             print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
-            ejes_helicoidales = robot.get_ejes_helicoidales()
-            print("Ejes helicoidales del robot:", ejes_helicoidales, '\n')
+            print("\nEjes helicoidales del robot:", robot.ejes_helicoidales, '\n')
             # Calcular M (posición cero)
             M = calcular_M_generalizado(robot)
             print("Matriz M (posición cero):")
@@ -152,7 +156,7 @@ def menu():
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
-            T = calcular_T_robot(ejes_helicoidales, thetas, M)
+            T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
 
             print("Matriz de transformación homogénea T:")
             imprimir_matriz(T, "T")

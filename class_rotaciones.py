@@ -44,7 +44,7 @@ def RotGen(w, θ):
     matrix = np.array([[c + w1**2*t, w1*w2*t - w3*s, w1*w3*t + w2*s],
                     [w1*w2*t + w3*s, c + w2**2*t, w2*w3*t - w1*s],
                     [w1*w3*t - w2*s, w2*w3*t + w1*s, c + w3**2*t]])
-    print(f"\tTiempo de ejecución de Rot(w, θ) {time.time() - start} segundos")
+    print(f"\t\033[92mTiempo de ejecución de Rot(w, θ) {time.time() - start} segundos\033[0m")
     return matrix
 
 # Función de rotación con Rodrigues
@@ -83,7 +83,7 @@ def RotRodrigues(w, θ):
     I = np.eye(3)
     matrix = I + np.sin(θ) * W + (1 - np.cos(θ)) * W2
     
-    print(f"\tTiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos")
+    print(f"\t\033[92mTiempo de ejecución de RotRodrigues(w, θ) {time.time() - start} segundos\033[0m")
     return matrix
 
 # Función de rotación con logaritmica
