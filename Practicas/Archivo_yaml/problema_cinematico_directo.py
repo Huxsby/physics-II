@@ -9,7 +9,7 @@
 import numpy as np
 import optparse
 
-desc="Resolución del problema cinem ́atico directo para el Robot Niryo One."
+desc="Resolución del problema cinemático directo para el Robot Niryo One."
 
 def VecToso3(omg): # Convierte un vector de 3 componentes en una matriz antisim ́etrica
     return np.array([[0, -omg[2], omg[1]], [omg[2], 0, -omg[0]], [-omg[1], omg[0], 0]])
@@ -28,7 +28,7 @@ def MatrixExp6(se3mat):
     omgtheta = so3ToVec(omgmattheta) # lo pasamos a forma vectorial
     
     if (np.linalg.norm(omgtheta))<1.e-6: # en el caso de que no haya giro (omega despreciable)
-        return np.r_[np.c_[np.eye(3), v], [[0, 0, 0, 1]]] # concatena columnas y filas. S ́olo traslación
+        return np.r_[np.c_[np.eye(3), v], [[0, 0, 0, 1]]] # concatena columnas y filas. Sólo traslación
     
     else: # caso general
         theta = np.linalg.norm(omgtheta)
@@ -109,8 +109,8 @@ def main():
     print("\nMatriz de transformación homog ́enea: \n", np.round(T, 3))
     print("\nCoordenadas (x,y,z) del TCP: ", np.round(T[0: 3, 3],3))
     R=(np.round(T[0: 3, 0: 3],3))
-    print("\n ́Angulos de Euler en radianes", R2Euler(R))
-    print("\n ́Angulos de Euler en grados:")
+    print("\nángulos de Euler en radianes", R2Euler(R))
+    print("\nángulos de Euler en grados:")
     print(np.array([np.rad2deg(R2Euler(R)[0]), np.rad2deg(R2Euler(R)[1]), np.rad2deg(R2Euler(R)[2])]))
 
 if __name__=="__main__" :
