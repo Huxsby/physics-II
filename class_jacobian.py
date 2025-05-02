@@ -230,16 +230,17 @@ def prueba_jacobiana():
     Jacobian, thetas = calcular_jacobiana(robot)
 
     # Mostrar Jacobiana
-    sp.pprint(Jacobian)
+    #sp.pprint(Jacobian)
 
     # Mostrar Jacobiana de forma resumida
     print("\n--- Jacobiana ---")
     mostrar_jacobiana_resumida(Jacobian)
 
-    print("\n--- Buscando singularidades en la Jacobiana sin valores dados [det(J) = 0] ---")
+    #print("\n--- Buscando singularidades en la Jacobiana sin valores dados [det(J) = 0] ---")
     try:
-        singularidades = calcular_configuraciones_singulares(Jacobian)
-        print(singularidades)
+        pass
+        #singularidades = calcular_configuraciones_singulares(Jacobian)
+        #print(singularidades)
     except Exception as e:
         print(f"Error al calcular configuraciones singulares: {e}")
         print("Valores intentados: None")
@@ -285,9 +286,10 @@ def prueba_jacobiana():
         # mostrar_jacobiana_resumida(Jacobian_num1_1) # Mostrar simbólicamente
         # input()
         try:
-            singularidades = calcular_configuraciones_singulares(Jacobian)
-            print("\n--- Configuraciones singulares ---")
-            print(singularidades)
+            pass
+            #singularidades = calcular_configuraciones_singulares(Jacobian)
+            #print("\n--- Configuraciones singulares ---")
+            #print(singularidades)
         except Exception as e:
             print(f"Error al calcular configuraciones singulares: {e}")
             print("Valores intentados:", valores_especificos)
@@ -319,6 +321,18 @@ def prueba_jacobiana():
 
     except Exception as e:
         print(f"Error al sustituir valores pi: {e}")
+     
+    # --- Prueba 4: Todos los valores a pi/2 ---
+    print("\n--- Prueba con todos los valores a pi/2 ---")
+    valores_pi = {theta: sp.pi/2 for theta in thetas}
+    try:
+        Jacobian_num4 = Jacobian.subs(valores_pi)
+        # Usar evalf() para obtener valores numéricos aproximados de expresiones como sin(pi), cos(pi)
+        mostrar_jacobiana_resumida(Jacobian_num4.evalf(chop=True)) # chop=True para eliminar pequeños errores numéricos
+        input()
+
+    except Exception as e:
+        print(f"Error al sustituir valores pi/2: {e}")
 
 if __name__ == "__main__":
     prueba_jacobiana()
