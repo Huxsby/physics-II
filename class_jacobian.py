@@ -2,9 +2,11 @@ import sympy as sp
 import numpy as np
 import time
 
-from class_robot_structure import Robot
+from class_robot_structure import Robot, cargar_robot_desde_yaml
 
-def VecToso3sp(v):
+""" Funciones de calculo simbólico de la Jacobiana"""
+
+def VecToso3sp(v: sp.Matrix):
     v = sp.Matrix(v)
     return sp.Matrix([
         [0, -v[2], v[1]],
@@ -12,25 +14,31 @@ def VecToso3sp(v):
         [-v[1], v[0], 0]
     ])
 
-def MatrixExp3sp(w, theta):
+def MatrixExp3sp(w: sp.Matrix, theta):
+    """ Calcula la matriz exponencial de un vector w en SO(3) usando la fórmula de Rodrigues. """
     w = sp.Matrix(w).normalized()
     omgmat = VecToso3sp(w)
     return sp.eye(3) + sp.sin(theta) * omgmat + (1 - sp.cos(theta)) * (omgmat * omgmat)
 
-def MatrixExp6sp(S, theta):
+def MatrixExp6sp(S: sp.Matrix, theta):
+    """ Calcula la matriz exponencial de un elemento de Lie en SE(3) usando la fórmula de Rodrigues. """
     w = sp.Matrix(S[0:3])
     v = sp.Matrix(S[3:6])
     omgmat = VecToso3sp(w)
 
-    if w.norm() < 1e-5:
+    # Check for pure translation
+    if w.norm() < 1e-5: # Use a small tolerance for floating point comparison
+        # Simplified matrix exponential for pure translation
         return sp.eye(3).row_join(v * theta).col_join(sp.Matrix([[0, 0, 0, 1]]))
     else:
+        # Standard matrix exponential for general screw axis
         R = MatrixExp3sp(w, theta)
         G_theta = sp.eye(3) * theta + (1 - sp.cos(theta)) * omgmat + (theta - sp.sin(theta)) * (omgmat * omgmat)
         p = G_theta * v
         return R.row_join(p).col_join(sp.Matrix([[0, 0, 0, 1]]))
 
-def Adjunta(T):
+def Adjunta(T: sp.Matrix):
+    """ Calcula la matriz adjunta de una transformación homogénea T en el espacio SE(3). """
     R = T[0:3, 0:3]
     p = T[0:3, 3]
     p_skew = VecToso3sp(p)
@@ -39,300 +47,164 @@ def Adjunta(T):
     lower = (p_skew * R).row_join(R)
     return upper.col_join(lower)
 
-""" Protocolo para calcular la Matriz Jacobiana de un Robot
-
- - Al igual que se hizo en cinemática directa, obtén los ejes helicoidales en la
-posición cero del Robot: calcula el eje de rotación ωi , el vector de posición desde
-el sistema de referencia fijo hasta cada articulación qsi , el producto vectorial de
-estos 2 vectores con signo negativo (vi =-ωi x qsi ) y concatena ωi con el
-resultado de este producto vectorial: Si =(ωi ,vi ). En el caso de que se trate de
-una articulación prismática simplemente se coge el vector (0,0,0) como eje de
-rotación y se completa el eje helicoidal con un vector unitario en el sentido de la
-extensión: Si =(0,0,0,vi )
-
- - Transforma el eje helicoidal a su forma de matriz antisimétrica ([Si ]) y calcula las
-matrices de transformación homogénea correspondientes a cada articulación a
-través de la matriz exponencial con las coordenadas θi elegidas: e[Si ]θi
-
- - A continuación calcula las matrices de transformación homogéneas Ti obtenidas
-como el producto de matrices exponenciales correspondientes a las articulaciones
-(0,1,··· ,i): Ti =e[S1]θ1 ···e[Si ]θi
-
- - Utiliza las matrices adjuntas de Ti para transformar los ejes helicoidades a la
-conformación que corresponda. Estos ejes helicoidales transformados serán
-directamente las columnas de la matriz Jacobiana: Jsi (θ)=AdTi-1 (Si )
-(∀ i =2,··· ,n).
-
- - Fíjate que para transformar cada eje helicoidal utilizamos la matriz adjunta del
-producto de matrices exponenciales desde la primera articulación hasta la
-inmediatamente anterior por lo que la primera columna de la matriz jacobiana es
-directamente el eje helicoidal de la primera articulación en la posición cero del robot.
-"""
-
 def calcular_jacobiana(robot: Robot):
     """
-    Calcula la matriz Jacobiana simbólica del robot proporcionado.
+    Calcula la matriz Jacobiana simbólica del robot proporcionado usando la
+    formulación del espacio (Space Jacobian).
 
     Parámetros:
     - robot: objeto Robot cargado (de tu clase Robot)
 
     Devuelve:
-    - Jacobian: matriz simbólica 6xn de la Jacobiana
+    - Jacobian: matriz simbólica 6xn de la Jacobiana del Espacio
     - thetas: variables simbólicas correspondientes a las articulaciones
     """
     time_i = time.time()  # Iniciar temporizador
-    # Obtener ejes helicoidales
+    # Obtener ejes helicoidales en la posición cero (referencia espacial {s})
     ejes_helicoidales = robot.get_ejes_helicoidales()
     n = len(ejes_helicoidales)
 
-    # Crear variables simbólicas
+    # Crear variables simbólicas para los ángulos/desplazamientos de las articulaciones
     thetas = sp.symbols(f't0:{n}')  # t0, t1, ..., tn-1
 
-    # Inicializar transformaciones
+    # Calcular las transformaciones homogéneas acumuladas T_i = exp([S1]t1)*...*exp([Si]ti)
     Ts = []
     T = sp.eye(4)
-
     for i in range(n):
         S = ejes_helicoidales[i]
         T_i = MatrixExp6sp(S, thetas[i])
         T = T * T_i
-        Ts.append(T)
+        Ts.append(T) # Ts[i] = T_1 * T_2 * ... * T_{i+1}
 
-    # Calcular columnas de la Jacobiana
+    # Calcular las columnas de la Jacobiana del Espacio J_s
     J_cols = []
-    T_prev = sp.eye(4)
+    # La primera columna es simplemente el primer eje helicoidal S1
+    J_cols.append(sp.Matrix(ejes_helicoidales[0]))
 
-    for i in range(n):
+    # Las columnas subsiguientes J_si = Ad(T_{i-1}) * Si
+    # donde T_{i-1} = exp([S1]t1)*...*exp([S_{i-1}]t_{i-1})
+    for i in range(1, n):
+        # T_prev = T_0 * T_1 * ... * T_{i} -> Ts[i-1]
+        T_prev = Ts[i-1]
         Ad = Adjunta(T_prev)
         S = sp.Matrix(ejes_helicoidales[i])
         J_cols.append(Ad * S)
-        T_prev = Ts[i]
 
     Jacobian = sp.Matrix.hstack(*J_cols)
 
     print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - time_i:.4f} segundos\033[0m")
     return Jacobian, thetas
 
-def evaluar_jacobiana(Jacobian: sp.Matrix, thetas, valores):
-    """
-    Evalúa la matriz Jacobiana simbólica con los valores numéricos proporcionados para las articulaciones.
-
-    Parámetros:
-    - Jacobian: matriz simbólica de la Jacobiana (sympy.Matrix).
-    - thetas: lista o tupla de variables simbólicas (sympy.Symbol) correspondientes a las articulaciones.
-    - valores: lista, tupla o np.array de valores numéricos para las articulaciones,
-               en el mismo orden que las variables en `thetas`.
-
-    Devuelve:
-    - Jacobian_num: matriz numérica de la Jacobiana evaluada (sympy.Matrix con valores flotantes),
-                    o None si ocurre un error.
-    """
-    # try:
-    n_thetas = len(thetas)
-    n_valores = len(valores)
-
-    if n_valores > n_thetas:
-        raise ValueError(f"Se proporcionaron más valores ({n_valores}) que variables theta ({n_thetas}).")
-
-    # Crear el diccionario para la sustitución, rellenando con 0 si faltan valores
-    valores_dict = {}
-    for i in range(n_thetas):
-        if i < n_valores:
-            valores_dict[thetas[i]] = valores[i]
-        else:
-            # Rellenar con 0 los valores faltantes
-            valores_dict[thetas[i]] = 0.0
-    
-    print(f"Valores para la Jacobiana: {valores_dict}")
-    # Sustituir y evaluar numéricamente
-    # chop=True ayuda a eliminar pequeños errores numéricos (ej. convertir 1e-15 a 0)
-    Jacobian_num = Jacobian.subs(valores_dict).evalf(chop=True)
-    return Jacobian_num
-    
-    # except Exception as e:
-    #     print(f"Error al evaluar la Jacobiana: {e}")
-    #     print(f"  Thetas: {thetas}")
-    #     print(f"  Valores proporcionados: {valores}")
-    #     return None
+""" Funciones de visualización de la Jacobiana"""
 
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
-    rows, cols = np.shape(Jacobian)
+    # Si la entrada es numérica (numpy array), usarla directamente
+    if isinstance(Jacobian, np.ndarray):
+        matrix_data = Jacobian
+        rows, cols = matrix_data.shape
+        is_symbolic = False
+    # Si es simbólica (sympy Matrix), convertir a texto
+    elif isinstance(Jacobian, sp.Matrix):
+        matrix_data = Jacobian
+        rows, cols = matrix_data.shape
+        is_symbolic = True
+    else:
+        print("Error: La entrada debe ser una matriz SymPy o un array NumPy.")
+        return
 
-    # Primero, convertir todo a texto corto
+    # Convertir elementos a texto y truncar si es necesario
     matrix_text = []
     for i in range(rows):
-        row = []
+        row_text = []
         for j in range(cols):
-            elem = str(Jacobian[i, j])
+            if is_symbolic:
+                elem = str(matrix_data[i, j])
+            else:
+                # Formatear números flotantes
+                elem = f"{matrix_data[i, j]:.3f}" # 3 decimales por defecto
             if len(elem) > max_chars:
                 elem = elem[:max_chars] + "..."
-            row.append(elem)
-        matrix_text.append(row)
+            row_text.append(elem)
+        matrix_text.append(row_text)
 
-    # Calcular el ancho máximo de cada columna
-    col_widths = [max(len(matrix_text[i][j]) for i in range(rows)) for j in range(cols)]
+    # Calcular el ancho máximo de cada columna para alinear
+    col_widths = [max(len(matrix_text[r][c]) for r in range(rows)) for c in range(cols)]
 
-    # Imprimir con bordes
+    # Imprimir la matriz formateada con bordes
     print()
     for i in range(rows):
         formatted_row = []
         for j in range(cols):
             elem = matrix_text[i][j]
-            formatted_row.append(elem.ljust(col_widths[j]))  # Alinear a la izquierda
+            # Alinear a la derecha para números, izquierda para simbólicos/truncados
+            if not is_symbolic or "..." in elem:
+                 formatted_row.append(elem.ljust(col_widths[j]))
+            else:
+                 formatted_row.append(elem.rjust(col_widths[j]))
 
-        row_text = "  ".join(formatted_row)  # Separador entre columnas
+        row_str = "  ".join(formatted_row)
         if i == 0:
-            print(f"⎡ {row_text} ⎤")
+            print(f"⎡ {row_str} ⎤")
         elif i == rows - 1:
-            print(f"⎣ {row_text} ⎦")
+            print(f"⎣ {row_str} ⎦")
         else:
-            print(f"⎢ {row_text} ⎥")
-
-def calcular_configuraciones_singulares(Jacobian: sp.Matrix):
-    """
-    Calcula las configuraciones singulares de la Jacobiana proporcionada.
-    Las configuraciones singulares son aquellas donde el determinante de la Jacobiana es cero.
-    """
-    if not isinstance(Jacobian, sp.Matrix):
-        raise ValueError("La Jacobiana debe ser una matriz simbólica (sympy.Matrix).")
-    try:
-        # Obtener las variables simbólicas de la Jacobiana
-        thetas = list(Jacobian.free_symbols)
-        print(f"Variables libres en la Jacobiana: {thetas}")
-        # Calcular el determinante de la Jacobiana
-        det_J = Jacobian.det() 
-        # La operacion det para valores simbolicos no esta funcionando
-        """
-        El determinante de una 6x6 con entradas llenas de senos y cosenos en cinco
-         o seis variables produce una mega-expresión trigonométrica que Sympy tardará
-         una eternidad en expandir, factorizar o resolver.
-        """
-        print(f"Determinante de la Jacobiana: {det_J}")
-        # Encontrar las configuraciones singulares (donde el determinante es cero)
-        singularidades = sp.solve(det_J, thetas)
-        return singularidades
-    
-    except Exception as e:
-        raise ValueError(f"Could not evaluate Jacobian numerically: {e}")
+            print(f"⎢ {row_str} ⎥")
 
 def prueba_jacobiana():
-    """
-    Función de prueba para calcular y mostrar la Jacobiana de un robot.
-    """
+    """ Función de prueba para calcular y mostrar la Jacobiana de un robot. """
+    robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
+    Jacobian, thetas = calcular_jacobiana(robot) # Calcular Jacobiana Simbólica
 
-    from class_robot_structure import cargar_robot_desde_yaml
-
-    # Carga del robot
-    robot = cargar_robot_desde_yaml("robot.yaml")
-
-    # Calcular Jacobiana
-    Jacobian, thetas = calcular_jacobiana(robot)
-
-    # Mostrar Jacobiana
-    #sp.pprint(Jacobian)
-
-    # Mostrar Jacobiana de forma resumida
-    print("\n--- Jacobiana ---")
+    # Mostrar Jacobiana simbólica de forma resumida
+    print("\n--- Jacobiana Simbólica (Resumida) ---")
     mostrar_jacobiana_resumida(Jacobian)
+    input("Presiona Enter para continuar con las evaluaciones numéricas...")
 
-    #print("\n--- Buscando singularidades en la Jacobiana sin valores dados [det(J) = 0] ---")
-    try:
-        pass
-        #singularidades = calcular_configuraciones_singulares(Jacobian)
-        #print(singularidades)
-    except Exception as e:
-        print(f"Error al calcular configuraciones singulares: {e}")
-        print("Valores intentados: None")
+    # --- Prueba 1: Valores parciales (ejemplo: solo t0 varía, el resto 0) ---
+    print("\n--- Prueba con valores parciales (t0 variable, resto 0) ---")
+    # Crea un diccionario donde todas las thetas excepto la primera (thetas[0]) se ponen a 0
+    valores_parciales_t0 = {theta: 0 for i, theta in enumerate(thetas) if i != 0}
+    Jacobian_parcial_t0 = Jacobian.subs(valores_parciales_t0)
+    print(f"Sustituyendo: {valores_parciales_t0}")
+    mostrar_jacobiana_resumida(Jacobian_parcial_t0) # Mostrar simbólicamente con t0
+    input("Presiona Enter...")
 
-    # --- Prueba 1: Valores específicos ---
-    print("\n--- Prueba con valores específicos ---")
-    n_thetas = len(thetas)
-    # Asegúrate de que los índices coincidan con el número de thetas
-    valores_especificos = {
-        thetas[0]: 0,
-        thetas[1]: 0,
-        #thetas[2]: -0.1,
-        # Añade o quita según n_thetas si es necesario
-        # thetas[3]: 0.2,
-        # thetas[4]: 0.4,
-        # thetas[5]: -0.3
-    }
-    # Rellenar con 0 si hay más thetas de los especificados
-    for i in range(len(valores_especificos), n_thetas):
-        if thetas[i] not in valores_especificos:
-            valores_especificos[thetas[i]] = 0.0
+    # --- Prueba 2: Valores parciales (ejemplo: solo t1 varía, el resto 0) ---
+    print("\n--- Prueba con valores parciales (t1 variable, resto 0) ---")
+    # Crea un diccionario donde todas las thetas excepto la segunda (thetas[1]) se ponen a 0
+    valores_parciales_t1 = {theta: 0 for i, theta in enumerate(thetas) if i != 1}
+    Jacobian_parcial_t1 = Jacobian.subs(valores_parciales_t1)
+    print(f"Sustituyendo: {valores_parciales_t1}")
+    mostrar_jacobiana_resumida(Jacobian_parcial_t1) # Mostrar simbólicamente con t1
+    input("Presiona Enter...")
 
-    print(f"Valores para la Jacobiana: {valores_especificos}")
-
-    try:
-        Jacobian_num1 = Jacobian.subs(valores_especificos)
-        """
-        .subs() sustituye las variables simbólicas en la matriz Jacobiana por los valores numéricos proporcionados.
-        En caso de que no haya suficientes valores en valores_especificos, el resto de las variables se mantendrán simbólicas.
-        Por ejemplo, si tienes 6 variables y solo proporcionas 3 valores, las otras 3 seguirán siendo simbólicas.
-        """
-        mostrar_jacobiana_resumida(Jacobian_num1) # Mostrar simbólicamente
-        input()
-        # print("Evaluando numéricamente...")
-        # mostrar_jacobiana_resumida(Jacobian_num1.evalf(chop=True)) # Evaluar numéricamente
-        # input()
-        """
-        .evalf() convierte expresiones simbólicas (como sqrt(2) o pi/2) a sus aproximaciones decimales.
-        Si tu matriz Jacobian_num1 ya contenía solo números decimales después de la sustitución, llamar a .evalf() no cambiará su representación numérica de forma apreciable.
-        Verías una diferencia si Jacobian_num1 contuviera expresiones simbólicas que necesitan ser evaluadas numéricamente.
-        """
-        # Jacobian_num1_1 = evaluar_jacobiana(Jacobian, thetas, [0.5, 0.3, -0.1])
-        # mostrar_jacobiana_resumida(Jacobian_num1_1) # Mostrar simbólicamente
-        # input()
-        try:
-            pass
-            #singularidades = calcular_configuraciones_singulares(Jacobian)
-            #print("\n--- Configuraciones singulares ---")
-            #print(singularidades)
-        except Exception as e:
-            print(f"Error al calcular configuraciones singulares: {e}")
-            print("Valores intentados:", valores_especificos)
-
-    except Exception as e:
-        print(f"Error al sustituir valores específicos: {e}")
-        print("Valores intentados:", valores_especificos)
-
-
-    # --- Prueba 2: Todos los valores a cero ---
+    # --- Prueba 3: Todos los valores a cero ---
     print("\n--- Prueba con todos los valores a cero ---")
     valores_cero = {theta: 0 for theta in thetas}
-    try:
-        Jacobian_num2 = Jacobian.subs(valores_cero)
-        mostrar_jacobiana_resumida(Jacobian_num2.evalf()) # Evaluar numéricamente
-        input()
+    # Sustituir y evaluar numéricamente. chop=True elimina pequeños errores numéricos.
+    Jacobian_num_cero = Jacobian.subs(valores_cero).evalf(chop=True)
+    print(f"Sustituyendo: {valores_cero}")
+    # Convertir a NumPy array para mostrar con formato numérico
+    mostrar_jacobiana_resumida(np.array(Jacobian_num_cero).astype(np.float64))
+    input("Presiona Enter...")
 
-    except Exception as e:
-        print(f"Error al sustituir valores cero: {e}")
-
-    # --- Prueba 3: Todos los valores a pi ---
+    # --- Prueba 4: Todos los valores a pi ---
     print("\n--- Prueba con todos los valores a pi ---")
     valores_pi = {theta: sp.pi for theta in thetas}
-    try:
-        Jacobian_num3 = Jacobian.subs(valores_pi)
-        # Usar evalf() para obtener valores numéricos aproximados de expresiones como sin(pi), cos(pi)
-        mostrar_jacobiana_resumida(Jacobian_num3.evalf(chop=True)) # chop=True para eliminar pequeños errores numéricos
-        input()
+    Jacobian_num_pi = Jacobian.subs(valores_pi).evalf(chop=True)
+    print(f"Sustituyendo: {valores_pi}")
+    mostrar_jacobiana_resumida(np.array(Jacobian_num_pi).astype(np.float64))
+    input("Presiona Enter...")
 
-    except Exception as e:
-        print(f"Error al sustituir valores pi: {e}")
-     
-    # --- Prueba 4: Todos los valores a pi/2 ---
+    # --- Prueba 5: Todos los valores a pi/2 ---
     print("\n--- Prueba con todos los valores a pi/2 ---")
-    valores_pi = {theta: sp.pi/2 for theta in thetas}
-    try:
-        Jacobian_num4 = Jacobian.subs(valores_pi)
-        # Usar evalf() para obtener valores numéricos aproximados de expresiones como sin(pi), cos(pi)
-        mostrar_jacobiana_resumida(Jacobian_num4.evalf(chop=True)) # chop=True para eliminar pequeños errores numéricos
-        input()
+    valores_pi_half = {theta: sp.pi/2 for theta in thetas}
+    Jacobian_num_pi_half = Jacobian.subs(valores_pi_half).evalf(chop=True)
+    print(f"Sustituyendo: {valores_pi_half}")
+    mostrar_jacobiana_resumida(np.array(Jacobian_num_pi_half).astype(np.float64))
+    input("Presiona Enter...")
 
-    except Exception as e:
-        print(f"Error al sustituir valores pi/2: {e}")
-
+# Función principal para ejecutar la prueba de Jacobiana
 if __name__ == "__main__":
     prueba_jacobiana()
