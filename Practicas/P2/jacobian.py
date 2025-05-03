@@ -13,6 +13,7 @@
 #!/usr/bin/env python
 import numpy as np
 import sympy as sp
+import time
 
 """ Funcines mías --------------------------------------------------- """
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
@@ -52,6 +53,8 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
 """ ----------------------------------------------------------------- """
 # Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
 def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
+
+tiempo = time.time()
 
 # Definimos ejes de rotación de las articulaciones en la posición cero del robot
 w=[]
@@ -103,6 +106,8 @@ for i in range(1,6,1):
     vs.append(qs[i].cross(ws[i]))
     Ji.append(ws[i].row_insert(3,vs[i]))
     J=J.col_insert(i,Ji[i])
+
+print("\nTiempo de calculo de la Jacobiana: ", time.time()-tiempo, "s")
 """
 El resultado de este código es una matriz Jacobiana parametrizada en función de los ángulos de las articulaciones.
 A continuación se puede ver cómo queda la Matriz Jacobiana de manera general, en función de todas las
@@ -146,16 +151,39 @@ configuraciones singulares. La resolución del determinante completo, sin ningun
 tiempo de cómputo. Podemos, sin embargo, imponer restricciones en varias configuraciones para hacer el cálculo
 más sencillo. Veamos algunos ejemplos:
 """
-sol1 = sp.solve(J.subs({t[2]:0, t[3]:0, t[4]:0}).det())
-# Resultado: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
+# Nueva función desarollada validada
+def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
+    """
+    Calcula las configuraciones singulares para una Jacobiana dada
+    con ciertas restricciones en los ángulos.
+    """
+    try:
+        determinant = jacobian.subs(substitutions).det()
+        solutions = sp.solve(determinant)
+        return solutions
+    except Exception as e:
+        print(f"\033[91mError al calcular configuraciones singulares con {substitutions}:\033[0m {e}")
+        return None
 
-sol2= sp.solve(J.subs({t[1]:0, t[3]:0, t[4]:0}).det())
-# Resultado: [{t2: -1.70541733137745},
+tiempo = time.time()
+
+# Restricciones para el primer caso
+subs1 = {t[2]:0, t[3]:0, t[4]:0}
+sol1 = find_singular_configurations(J, subs1)
+# Resultado esperado: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
+
+# Restricciones para el segundo caso
+subs2 = {t[1]:0, t[3]:0, t[4]:0}
+sol2 = find_singular_configurations(J, subs2)
+# Resultado esperado: [{t2: -1.70541733137745},
             # {t2: -1.57079632679490},
             # {t2: 1.43617532221234},
             # {t2: 1.57079632679490}]
 
-print("\nConfiguraciones singulares:", sol1,'\n', sol2)
+print("\nConfiguraciones singulares:")
+print(f"Caso 1 (t2=t3=t4=0): {sol1}")
+print(f"Caso 2 (t1=t3=t4=0): {sol2}")
+print(f"Tiempo de ejecución: {time.time()-tiempo:.2f} segundos")
 """
 OJO!!! Estas configuraciones singulares, obtenidas matemáticamente, pueden no ser accesibles
 por el robot. Antes de mover el robot a alguna de estas configuraciones, verifica que est ́e dentro

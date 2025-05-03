@@ -61,7 +61,7 @@ def calcular_jacobiana(robot: Robot):
     """
     time_i = time.time()  # Iniciar temporizador
     # Obtener ejes helicoidales en la posición cero (referencia espacial {s})
-    ejes_helicoidales = robot.get_ejes_helicoidales()
+    ejes_helicoidales = robot.ejes_helicoidales # Copia la dirección la lista, no se malgasta memoria.
     n = len(ejes_helicoidales)
 
     # Crear variables simbólicas para los ángulos/desplazamientos de las articulaciones
@@ -94,6 +94,19 @@ def calcular_jacobiana(robot: Robot):
 
     print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - time_i:.4f} segundos\033[0m")
     return Jacobian, thetas
+
+def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
+    """
+    Calcula las configuraciones singulares para una Jacobiana dada
+    con ciertas restricciones en los ángulos.
+    """
+    try:
+        determinant = jacobian.subs(substitutions).det()
+        solutions = sp.solve(determinant)
+        return solutions
+    except Exception as e:
+        print(f"\033[91mError al calcular configuraciones singulares con {substitutions}:\033[0m {e}")
+        return None
 
 """ Funciones de visualización de la Jacobiana"""
 
@@ -154,7 +167,7 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
 def prueba_jacobiana():
     """ Función de prueba para calcular y mostrar la Jacobiana de un robot. """
     robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
-    Jacobian, thetas = calcular_jacobiana(robot) # Calcular Jacobiana Simbólica
+    Jacobian, thetas_s = calcular_jacobiana(robot) # Calcular Jacobiana Simbólica
 
     # Mostrar Jacobiana simbólica de forma resumida
     print("\n--- Jacobiana Simbólica (Resumida) ---")
@@ -164,7 +177,7 @@ def prueba_jacobiana():
     # --- Prueba 1: Valores parciales (ejemplo: solo t0 varía, el resto 0) ---
     print("\n--- Prueba con valores parciales (t0 variable, resto 0) ---")
     # Crea un diccionario donde todas las thetas excepto la primera (thetas[0]) se ponen a 0
-    valores_parciales_t0 = {theta: 0 for i, theta in enumerate(thetas) if i != 0}
+    valores_parciales_t0 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 0}
     Jacobian_parcial_t0 = Jacobian.subs(valores_parciales_t0)
     print(f"Sustituyendo: {valores_parciales_t0}")
     mostrar_jacobiana_resumida(Jacobian_parcial_t0) # Mostrar simbólicamente con t0
@@ -173,7 +186,7 @@ def prueba_jacobiana():
     # --- Prueba 2: Valores parciales (ejemplo: solo t1 varía, el resto 0) ---
     print("\n--- Prueba con valores parciales (t1 variable, resto 0) ---")
     # Crea un diccionario donde todas las thetas excepto la segunda (thetas[1]) se ponen a 0
-    valores_parciales_t1 = {theta: 0 for i, theta in enumerate(thetas) if i != 1}
+    valores_parciales_t1 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 1}
     Jacobian_parcial_t1 = Jacobian.subs(valores_parciales_t1)
     print(f"Sustituyendo: {valores_parciales_t1}")
     mostrar_jacobiana_resumida(Jacobian_parcial_t1) # Mostrar simbólicamente con t1
@@ -181,7 +194,7 @@ def prueba_jacobiana():
 
     # --- Prueba 3: Todos los valores a cero ---
     print("\n--- Prueba con todos los valores a cero ---")
-    valores_cero = {theta: 0 for theta in thetas}
+    valores_cero = {theta: 0 for theta in thetas_s}
     # Sustituir y evaluar numéricamente. chop=True elimina pequeños errores numéricos.
     Jacobian_num_cero = Jacobian.subs(valores_cero).evalf(chop=True)
     print(f"Sustituyendo: {valores_cero}")
@@ -191,7 +204,7 @@ def prueba_jacobiana():
 
     # --- Prueba 4: Todos los valores a pi ---
     print("\n--- Prueba con todos los valores a pi ---")
-    valores_pi = {theta: sp.pi for theta in thetas}
+    valores_pi = {theta: sp.pi for theta in thetas_s}
     Jacobian_num_pi = Jacobian.subs(valores_pi).evalf(chop=True)
     print(f"Sustituyendo: {valores_pi}")
     mostrar_jacobiana_resumida(np.array(Jacobian_num_pi).astype(np.float64))
@@ -199,11 +212,31 @@ def prueba_jacobiana():
 
     # --- Prueba 5: Todos los valores a pi/2 ---
     print("\n--- Prueba con todos los valores a pi/2 ---")
-    valores_pi_half = {theta: sp.pi/2 for theta in thetas}
+    valores_pi_half = {theta: sp.pi/2 for theta in thetas_s}
     Jacobian_num_pi_half = Jacobian.subs(valores_pi_half).evalf(chop=True)
     print(f"Sustituyendo: {valores_pi_half}")
     mostrar_jacobiana_resumida(np.array(Jacobian_num_pi_half).astype(np.float64))
     input("Presiona Enter...")
+
+    # --- Prueba 6: Buscar singularidades ---
+    print("\n--- Búsqueda de configuraciones singulares ---")
+    
+    # Restricciones para el primer caso
+    subs1 = {thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0}
+    sol1 = find_singular_configurations(Jacobian, subs1)
+    # Resultado esperado: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
+
+    # Restricciones para el segundo caso
+    subs2 = {thetas_s[1]:0, thetas_s[3]:0, thetas_s[4]:0}
+    sol2 = find_singular_configurations(Jacobian, subs2)
+    # Resultado esperado: [{t2: -1.70541733137745},
+                # {t2: -1.57079632679490},
+                # {t2: 1.43617532221234},
+                # {t2: 1.57079632679490}]
+
+    print("\nConfiguraciones singulares:")
+    print(f"Caso 1 (t2=t3=t4=0): {sol1}")
+    print(f"Caso 2 (t1=t3=t4=0): {sol2}")
 
 # Función principal para ejecutar la prueba de Jacobiana
 if __name__ == "__main__":
