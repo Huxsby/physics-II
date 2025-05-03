@@ -1,3 +1,6 @@
+Global
+    - Trabajar siempre en radians y nunca en grados, dejar estos para la toma de datos y castearlos enseguida a radians.
+
 class_datos.py
     - Terminar implementación del tipo 'cordenadas_exponenciales'. ¿Es necesario usar el nuevo tipo de dato 'cordenadas_exponenciales'?
     - Normalizar vector eje en la toma general de datos, dar la opcion de elegir entre ['x','y','z','g'] -> 'g' Irse por 'vector'
@@ -8,9 +11,6 @@ class_robot_structure.py
 
 ejercicio.py
 !   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.
-
-class_tr.py
-    - [Stoped] Viendo si es workfit.
 
 T4
     - Configuraciones singulares.
@@ -25,3 +25,9 @@ P1
     (0,3π/4).
 
         - Cabiar nombre de antisimetrica() -> VecToso3sp o parecido.
+
+P2  7. Ejercicios prácticos
+     [] 7.1 Matriz jacobiana
+     [] 7.2 Configuraciones singulares (Preparar codigo para experimentar con el robot como se indica en la práctica)
+     [] 7.3 Elipsoides de Manipulabilidad y Fuerza (Generalizar el código)
+     [] 7.4 Cinemática Inversa
