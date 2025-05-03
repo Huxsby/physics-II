@@ -99,9 +99,13 @@ def main():
         vs.append(np.cross(qs[i],ws[i]))
         Si.append(np.r_[ws[i],vs[i]])
     
+    print("\nvs: \n", vs)
+    print("\nws: \n", ws)
+    
     M=np.array([[1,0,0,L[6]+L[5]+L[4]],[0,1,0,0],[0,0,1,L[0]+L[1]+L[2]+L[3]+L[7]],[0,0,0,1]])
     print("\nMatriz M: \n", np.round(M, 3))
-    
+    print("\nEjes helicoidales: \n", Si)
+
     T=np.eye(4)
     for i in range(0,6,1):
         T=np.dot(T,MatrixExp6(VecTose3(Si[i]*t[i])))
