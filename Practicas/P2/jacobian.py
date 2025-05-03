@@ -55,6 +55,7 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
 def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
 
 tiempo = time.time()
+print("Calculando la matriz Jacobiana...")
 
 # Definimos ejes de rotación de las articulaciones en la posición cero del robot
 w=[]
@@ -78,6 +79,10 @@ q.append(np.array([L[4],0,L[3]]))
 q.append(np.array([L[5],0,0]))
 q.append(np.array([L[6],0,L[7]]))
 
+# print("Largo de los eslabones:\n", L)
+# print("Ejes de rotación:", w)
+# print("Vectores de posición:\n", q)
+
 # Coordenadas de las articulaciones
 t=sp.symbols('t0, t1, t2, t3, t4, t5')
 
@@ -97,7 +102,7 @@ for i in range(1,6,1):
     Ri=Ri*R[i]
 
 # Calculamos las velocidades lineales, los vectores giro correspondientes y la matriz Jacobiana
-vs=[]; Ji=[]
+vs=[]; Ji=[]    # Ji equivale a Si (cada eje helicoidal)
 i=0
 vs.append(qs[i].cross(ws[i]))
 Ji.append(ws[i].row_insert(3,vs[i]))
@@ -106,6 +111,9 @@ for i in range(1,6,1):
     vs.append(qs[i].cross(ws[i]))
     Ji.append(ws[i].row_insert(3,vs[i]))
     J=J.col_insert(i,Ji[i])
+
+# for i in range(0,6,1):
+#     print(list(Ji[i].subs({t[0]:0, t[1]:0, t[2]:0, t[3]:0, t[4]:0})))
 
 print("\nTiempo de calculo de la Jacobiana: ", time.time()-tiempo, "s")
 """
@@ -166,6 +174,9 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
         return None
 
 tiempo = time.time()
+
+print("Matriz Jacobiana en este momento:")
+mostrar_jacobiana_resumida(J)
 
 # Restricciones para el primer caso
 subs1 = {t[2]:0, t[3]:0, t[4]:0}

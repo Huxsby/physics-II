@@ -31,3 +31,25 @@ P2  7. Ejercicios prácticos
      [] 7.2 Configuraciones singulares (Preparar codigo para experimentar con el robot como se indica en la práctica)
      [] 7.3 Elipsoides de Manipulabilidad y Fuerza (Generalizar el código)
      [] 7.4 Cinemática Inversa
+
+# Info.
+
+Ejes helicoidales en problema_cinematico_directo.py (P1):
+[array([0., 0., 1., 0., 0., 0.]), array([ 0.   , -1.   ,  0.   ,  0.183,  0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393,  0.   , -0.   ]), array([1.   , 0.   , 0.   , 0.   , 0.423, 0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 ,  0.    , -0.2215]), array([1.    , 0.    , 0.    , 0.    , 0.4175, 0.    ])]
+vs: [array([0., 0., 0.]), array([ 0.183,  0.   , -0.   ]), array([ 0.393,  0.   , -0.   ]), array([0.   , 0.423, 0.   ]), array([ 0.423 ,  0.    , -0.2215]), array([0.    , 0.4175, 0.    ])]
+ws: [array([0, 0, 1]), array([ 0, -1,  0]), array([ 0, -1,  0]), array([1, 0, 0]), array([ 0, -1,  0]), array([1, 0, 0])]
+
+Ejes helicoidales con .yalm del robot niryo_one:
+[array([ 0.,  0.,  1., -0., -0., -0.]), array([ 0.   , -1.   ,  0.   ,  0.183, -0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393, -0.   , -0.   ]), array([ 1.   ,  0.   ,  0.   , -0.   ,  0.423, -0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 , -0.    , -0.2215]), array([ 1.    ,  0.    ,  0.    , -0.    ,  0.4175, -0.    ])]
+
+Ejes helicoidales en calcular_jacobiana():
+[array([ 0.,  0.,  1., -0., -0., -0.]), array([ 0.   , -1.   ,  0.   ,  0.183, -0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393, -0.   , -0.   ]), array([ 1.   ,  0.   ,  0.   , -0.   ,  0.423, -0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 , -0.    , -0.2215]), array([ 1.    ,  0.    ,  0.    , -0.    ,  0.4175, -0.    ])]
+
+Ejes helicoidales en jacobian.py (P2):
+[[0,0,1,0,0,0], Monstruosidad simbólica] *Nota Si es Ji, los vectores están en columnas.
+Dados t = 0: 
+( [0, 0, 1, 0, 0, 0],                           [0, -1, 0, 0.183, 0, 0],                                [0, -1, 0, 0.393, 0, 0],                                [1, 0, 0, 0, 0.423, 0],                                 [0, -1, 0, 0.423, 0, -0.2215],                                  [1, 0, 0, 0, 0.4175, 0] )
+
+
+vs: [Monstruosidad simbólica]
+ws: [Monstruosidad simbólica]

@@ -47,53 +47,47 @@ def Adjunta(T: sp.Matrix):
     lower = (p_skew * R).row_join(R)
     return upper.col_join(lower)
 
+# Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
+def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
+
 def calcular_jacobiana(robot: Robot):
-    """
-    Calcula la matriz Jacobiana simbólica del robot proporcionado usando la
-    formulación del espacio (Space Jacobian).
+    tiempo = time.time()  # Iniciar temporizador
+    w = []; q = []
+    for link in robot.links:
+        w.append(link.joint_axis)   # Definimos ejes de rotación de las articulaciones en la posición cero del robot
+        q.append(link.joint_coords) # Definimos los vectores que van del centro de cada eje al centro del siguiente
 
-    Parámetros:
-    - robot: objeto Robot cargado (de tu clase Robot)
+    # Coordenadas de las articulaciones
+    n = len(w)  # Número de articulaciones
+    thetas_s = sp.symbols(f't0:{n}')  # t0, t1, ..., tn-1
 
-    Devuelve:
-    - Jacobian: matriz simbólica 6xn de la Jacobiana del Espacio
-    - thetas: variables simbólicas correspondientes a las articulaciones
-    """
-    time_i = time.time()  # Iniciar temporizador
-    # Obtener ejes helicoidales en la posición cero (referencia espacial {s})
-    ejes_helicoidales = robot.ejes_helicoidales # Copia la dirección la lista, no se malgasta memoria.
-    n = len(ejes_helicoidales)
+    # Calculamos las matrices de rotación a partir de los ejes w, utilizando la fórmula de Rodrigues
+    R = []
+    for i in range(0,6,1):
+        wmat = VecToso3(w[i])
+        R.append(sp.eye(3)+sp.sin(thetas_s[i])*wmat+(1-sp.cos(thetas_s[i]))*(wmat*wmat))
 
-    # Crear variables simbólicas para los ángulos/desplazamientos de las articulaciones
-    thetas = sp.symbols(f't0:{n}')  # t0, t1, ..., tn-1
+    # Aplicamos rotaciones a los vectores q y w para llevarlos a la configuración deseada
+    qs = []; ws = []; Ri = R[0]
+    qs.append(sp.Matrix(q[0]))
+    ws.append(sp.Matrix(w[0]))
+    for i in range(1,6,1):
+        ws.append(Ri*sp.Matrix(w[i]))
+        qs.append(Ri*sp.Matrix(q[i])+qs[i-1])
+        Ri = Ri*R[i]
 
-    # Calcular las transformaciones homogéneas acumuladas T_i = exp([S1]t1)*...*exp([Si]ti)
-    Ts = []
-    T = sp.eye(4)
-    for i in range(n):
-        S = ejes_helicoidales[i]
-        T_i = MatrixExp6sp(S, thetas[i])
-        T = T * T_i
-        Ts.append(T) # Ts[i] = T_1 * T_2 * ... * T_{i+1}
-
-    # Calcular las columnas de la Jacobiana del Espacio J_s
-    J_cols = []
-    # La primera columna es simplemente el primer eje helicoidal S1
-    J_cols.append(sp.Matrix(ejes_helicoidales[0]))
-
-    # Las columnas subsiguientes J_si = Ad(T_{i-1}) * Si
-    # donde T_{i-1} = exp([S1]t1)*...*exp([S_{i-1}]t_{i-1})
-    for i in range(1, n):
-        # T_prev = T_0 * T_1 * ... * T_{i} -> Ts[i-1]
-        T_prev = Ts[i-1]
-        Ad = Adjunta(T_prev)
-        S = sp.Matrix(ejes_helicoidales[i])
-        J_cols.append(Ad * S)
-
-    Jacobian = sp.Matrix.hstack(*J_cols)
-
-    print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - time_i:.4f} segundos\033[0m")
-    return Jacobian, thetas
+    # Calculamos las velocidades lineales, los vectores giro correspondientes y la matriz Jacobiana
+    vs = []; Ji = []    # Ji equivale a Si (cada eje helicoidal)
+    i = 0
+    vs.append(qs[i].cross(ws[i]))
+    Ji.append(ws[i].row_insert(3,vs[i]))
+    Jacobian = Ji[0]
+    for i in range(1,6,1):
+        vs.append(qs[i].cross(ws[i]))
+        Ji.append(ws[i].row_insert(3,vs[i]))
+        Jacobian = Jacobian.col_insert(i,Ji[i])
+    print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - tiempo:.4f} segundos\033[0m")
+    return Jacobian, thetas_s
 
 def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     """
