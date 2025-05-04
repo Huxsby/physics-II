@@ -273,7 +273,9 @@ Jp0=np.array(J.subs({t[0]:0, t[1]:0, t[2]:0, t[3]:0, t[4]:0}), dtype=np.float64)
 
 import numpy as np
 import matplotlib.pyplot as plt
-Jp0=np.array(J.subs({t[0]:0, t[1]:0, t[2]:0, t[3]:0, t[4]:0}), dtype=np.float64)
+
+print("\nCalculando elipsoides de fuerza y manipulabilidad en la Configuración 0, Jacobiana:")
+mostrar_jacobiana_resumida(Jp0)
 
 # Generamos las coordenadas de una circunferencia
 u = np.linspace(0, np.pi/2, 100)
@@ -322,7 +324,14 @@ Como resultado de este código debes obtener la siguiente gráfica:
 Puedes calcular el volumen de los elipsoides añadiendo las siguientes líneas al código que calcula las Matrices
 Jacobianas (sección 3):
 """
+print("\nCalculando el volumen de los elipsoides de manipulabilidad y fuerza para todas las articulaciones en pi:")
 Jpi = J.subs({t[0]:np.pi, t[1]:np.pi, t[2]:np.pi, t[3]:np.pi, t[4]:np.pi})
+
+# Nueva función para calcular el volumen de los elipsoides
+def calcular_volumen_elipsoides(J):
+    vol_EM = (J*sp.Transpose(J)).det() # Volumen del elipsoide de manipulabilidad
+    vol_EF = ((J*sp.Transpose(J)).inv()).det() # Volumen del elipsoide de fuerza
+    return vol_EM, vol_EF
 
 # Volumen del elipsoide de manipulabilidad
 vol_EM = (Jpi*sp.Transpose(Jpi)).det()
@@ -331,3 +340,4 @@ vol_EM = (Jpi*sp.Transpose(Jpi)).det()
 vol_EF = ((Jpi*sp.Transpose(Jpi)).inv()).det()
 
 print(f"El vólumen del elipsoide de Manipulabilidad es {vol_EM} y el de Fuerza {vol_EF}")
+print(f"El producto de ambos volúmenes es {calcular_volumen_elipsoides(Jpi)}")

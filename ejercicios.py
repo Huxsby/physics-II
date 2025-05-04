@@ -47,7 +47,7 @@ def menu():
         print("8. Lectura de archivo YAML (robot.yaml).")
         print("9. Calcular la matriz de transformación homogénea del robot.")
         print("-"*90)   # Separador
-        print("10. Calcular la matriz Jacobiana del robot).")
+        print("10. Calcular la matriz Jacobiana del robot). Singularidades y elipsoides.")
         print("-"*90)   # Separador
         print("0. Salir.")
 
@@ -171,32 +171,10 @@ def menu():
             limpiar_pantalla()
 
         elif opcion == "10":                            # 10. Calcular la matriz Jacobiana del robot
-            print("Calcular la matriz Jacobiana del robot.")
-            # Cargar robot
-            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
-            # Valores de las articulaciones
-            valores = []
-            for i in range(len(robot.links)):
-                valores.append(Datos(tipo="angulo", mensaje=f"Ingrese el valor de theta{i+1} (º): ").valor)
-
-            # Calcular Jacobiana
-            Jacobian, thetas = calcular_jacobiana(robot)
-            
-            # Mostrar Jacobiana
-            mostrar_jacobiana_resumida(Jacobian)
-
-            # Dar valores a la Jacobiana
-            mostrar_jacobiana_resumida(evaluar_jacobiana(Jacobian, thetas, valores))
-
-
-            singularidades = calcular_configuraciones_singulares(Jacobian, valores)
-            print("\n--- Configuraciones singulares ---")
-            print(singularidades)
-
-
-            if input("Desea ver mas pruebas? (s/n): ").lower() == "s":
-                prueba_jacobiana()
-            
+            print("Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
+            prueba_jacobiana()
+            limpiar_pantalla()
+            prueba_elipsoides()
             limpiar_pantalla()
             
         elif opcion == "0":                             # 0. Salir

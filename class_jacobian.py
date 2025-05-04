@@ -1,10 +1,14 @@
 import sympy as sp
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 from class_robot_structure import Robot, cargar_robot_desde_yaml
 
 """ Funciones de calculo simbólico de la Jacobiana"""
+
+# Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
+def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
 
 def VecToso3sp(v: sp.Matrix):
     v = sp.Matrix(v)
@@ -47,10 +51,10 @@ def Adjunta(T: sp.Matrix):
     lower = (p_skew * R).row_join(R)
     return upper.col_join(lower)
 
-# Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
-def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
+""" Funciones de cálculo de la Jacobiana """
 
 def calcular_jacobiana(robot: Robot):
+    """ Calcula la Jacobiana simbólica de un robot dado. """
     tiempo = time.time()  # Iniciar temporizador
     w = []; q = []
     for link in robot.links:
@@ -93,16 +97,20 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     """
     Calcula las configuraciones singulares para una Jacobiana dada
     con ciertas restricciones en los ángulos.
+    
+    Nota: Estas configuraciones singulares, pueden no ser accesibles por el robot.
+    Antes de mover el robot a alguna de estas configuraciones, verifica que esté dentro
+    del rango alcanzable para las articulaciones correspondientes.
     """
     try:
+        tiempo = time.time()  # Iniciar temporizador
         determinant = jacobian.subs(substitutions).det()
         solutions = sp.solve(determinant)
+        print(f"\t\033[92mTiempo de cálculo de configuraciones singulares con {substitutions}: {time.time() - tiempo:.4f} segundos\033[0m")
         return solutions
     except Exception as e:
         print(f"\033[91mError al calcular configuraciones singulares con {substitutions}:\033[0m {e}")
         return None
-
-""" Funciones de visualización de la Jacobiana"""
 
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
@@ -157,6 +165,71 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
             print(f"⎣ {row_str} ⎦")
         else:
             print(f"⎢ {row_str} ⎥")
+
+""" Funciones de calculo de elipsoides de manipulabilidad y fuerza"""
+
+def elipsoide_manipulabilidad(J, articulaciones_idx=[1, 2], puntos=100):
+    """ Calcula el elipsoide de manipulabilidad a partir de la Jacobiana. """
+    J_num = np.array(J).astype(np.float64)      # Convertir la matriz Jacobiana simbólica (SymPy) a un array NumPy para operaciones numéricas.
+    u = np.linspace(0, np.pi / 2, puntos)       # Generar un vector de ángulos 'u' desde 0 hasta pi/2, con 'puntos' divisiones. Se usa para parametrizar un cuarto de círculo unitario.
+    x = np.cos(u)                               # Calcular las coordenadas X del cuarto de círculo unitario.
+    y = np.sin(u)                               # Calcular las coordenadas Y del cuarto de círculo unitario.
+    xx = np.concatenate([x, -x, -x, x])         # Extender las coordenadas X para formar un círculo completo (reflejando en los ejes).
+    yy = np.concatenate([y, y, -y, -y])         # Extender las coordenadas Y para formar un círculo completo (reflejando en los ejes).
+    
+    giro = []                                   # Inicializar una lista para almacenar los vectores de velocidad del efector final resultantes.
+    for i in range(len(xx)):                    # Iterar sobre cada punto (xx[i], yy[i]) del círculo unitario.
+        vjoints = np.zeros(J_num.shape[1])      # Crear un vector de velocidades articulares (vjoints) inicializado a ceros, con la misma longitud que el número de columnas de J (número de articulaciones).
+        vjoints[articulaciones_idx[0]] = xx[i]  # Asignar las coordenadas del círculo unitario (xx[i], yy[i]) a las velocidades de las articulaciones especificadas por 'articulaciones_idx'.
+        vjoints[articulaciones_idx[1]] = yy[i]  # Esto simula aplicar una velocidad unitaria distribuida entre estas dos articulaciones.
+        giro.append(J_num @ vjoints)            # Calcular la velocidad resultante del efector final usando la relación v_efector = J * v_articulaciones.
+    giro = np.array(giro)                       # Convertir la lista de vectores de velocidad del efector final a un array NumPy.
+    return xx, yy, giro                         # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de manipulabilidad (giro).
+
+def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
+    """ Calcula el elipsoide de fuerza a partir de la Jacobiana. """
+    J_num = np.array(J).astype(np.float64)      # Convertir la matriz Jacobiana simbólica (SymPy) a un array NumPy para operaciones numéricas
+    J_T_inv = np.linalg.inv(J_num.T)            # Calcular la inversa de la transpuesta de la Jacobiana numérica. Esta matriz relaciona los pares articulares con las fuerzas/momentos en el efector final.
+    u = np.linspace(0, np.pi / 2, puntos)       # Generar un vector de ángulos 'u' desde 0 hasta pi/2, con 'puntos' divisiones. Se usa para parametrizar un cuarto de círculo unitario.
+    x = np.cos(u)                               # Calcular las coordenadas X del cuarto de círculo unitario.
+    y = np.sin(u)                               # Calcular las coordenadas Y del cuarto de círculo unitario.
+    xx = np.concatenate([x, -x, -x, x])         # Extender las coordenadas X para formar un círculo completo (reflejando en los ejes).
+    yy = np.concatenate([y, y, -y, -y])         # Extender las coordenadas Y para formar un círculo completo (reflejando en los ejes).
+
+    llave = []                                  # Inicializar una lista para almacenar los vectores de fuerza/momento resultantes (llave de torsión).
+    for i in range(len(xx)):                    # Iterar sobre cada punto (xx[i], yy[i]) del círculo unitario.
+        tau = np.zeros(J.shape[1])              # Crear un vector de pares articulares (tau) inicializado a ceros, con la misma longitud que el número de columnas de J (número de articulaciones).
+        tau[articulaciones_idx[0]] = xx[i]      # Asignar las coordenadas del círculo unitario (xx[i], yy[i]) a los pares de las articulaciones especificadas por 'articulaciones_idx'.
+        tau[articulaciones_idx[1]] = yy[i]      # Esto simula aplicar un par unitario distribuido entre estas dos articulaciones.
+        llave.append(J_T_inv @ tau)             # Calcular la llave de torsión (fuerza/momento) resultante en el efector final usando la relación F = (J^T)^-1 * tau.
+    llave = np.array(llave)                     # Convertir la lista de vectores de llave de torsión a un array NumPy.
+    return xx, yy, llave                        # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de fuerza (llave).
+
+def graficar_elipsoides(xx, yy, giro, llave, indices=(1, 3), limitplot=8):
+    """
+    Función para graficar los elipsoides de manipulabilidad y fuerza. 
+    
+    Nota: En la práctica 2 del curso 2024-25 la gráfica tiene el eje X invertido.
+    """
+    plt.scatter(xx, yy, label=r'${\dot\theta}$ ó $\tau$')
+    plt.scatter(giro[:, indices[0]], giro[:, indices[1]], label="manipulabilidad")
+    plt.scatter(llave[:, indices[0]], llave[:, indices[1]], label="fuerza")
+    plt.ylim(top=limitplot, bottom=-limitplot)
+    plt.xlim(left=-limitplot, right=limitplot)
+    plt.legend(loc='upper right', fontsize='large')
+    plt.grid(True)
+    plt.title("Elipsoides de Manipulabilidad y Fuerza")
+    plt.xlabel("Eje X")
+    plt.ylabel("Eje Y")
+    plt.show()
+
+def calcular_volumen_elipsoides(J):
+    """ Calcula el volumen de los elipsoides de manipulabilidad y fuerza a partir de la Jacobiana. """
+    vol_EM = (J*sp.Transpose(J)).det() # Volumen del elipsoide de manipulabilidad
+    vol_EF = ((J*sp.Transpose(J)).inv()).det() # Volumen del elipsoide de fuerza
+    return vol_EM, vol_EF
+
+""" Funciones de validación """
 
 def prueba_jacobiana():
     """ Función de prueba para calcular y mostrar la Jacobiana de un robot. """
@@ -232,6 +305,31 @@ def prueba_jacobiana():
     print(f"Caso 1 (t2=t3=t4=0): {sol1}")
     print(f"Caso 2 (t1=t3=t4=0): {sol2}")
 
-# Función principal para ejecutar la prueba de Jacobiana
+def prueba_elipsoides():
+    """ Función de prueba para calcular y graficar los elipsoides de manipulabilidad y fuerza. """
+    robot = cargar_robot_desde_yaml("robot.yaml")
+    J_sym, t = calcular_jacobiana(robot)
+
+    
+    Jpi = J_sym.subs({t[0]:np.pi, t[1]:np.pi, t[2]:np.pi, t[3]:np.pi, t[4]:np.pi})
+    Jp0 = J_sym.subs({t[0]:0, t[1]:0, t[2]:0, t[3]:0, t[4]:0})
+
+    # Primero obtenemos la matriz Jacobiana. Tomando la configuración cero del robot:
+    # A partir de la Jacobiana podemos calcular los elipsoides de manipulabilidad y fuerza en 2 dimensiones, si
+    # restringimos las velocidades de las articulaciones a sólo 2 grados de libertad:
+
+    vol_EM, vol_EF = calcular_volumen_elipsoides(Jpi)
+    print("\n--- Volúmenes de los elipsoides (θs=pi)---")
+    # mostrar_jacobiana_resumida(Jpi)
+    print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
+    print(f"Volumen del elipsoide de fuerza: {vol_EF}")
+
+    print("\n--- Gráfica de los volúmenes de los elipsoides (θs=0)---")
+    # mostrar_jacobiana_resumida(Jp0)
+    xx, yy, giro = elipsoide_manipulabilidad(Jp0)
+    _, _, llave = elipsoide_fuerza(Jp0)
+    graficar_elipsoides(xx, yy, giro, llave)
+
 if __name__ == "__main__":
     prueba_jacobiana()
+    prueba_elipsoides()
