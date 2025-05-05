@@ -47,7 +47,7 @@ def menu():
         print("8. Lectura de archivo YAML (robot.yaml).")
         print("9. Calcular la matriz de transformación homogénea del robot.")
         print("-"*90)   # Separador
-        print("10. Calcular la matriz Jacobiana del robot). Singularidades y elipsoides.")
+        print("10. Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
         print("-"*90)   # Separador
         print("0. Salir.")
 

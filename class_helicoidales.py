@@ -483,7 +483,7 @@ def menu_helicoidales():
             print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
             robot = cargar_robot_desde_yaml("robot.yaml")
-            ejes_helicoidales = robot.get_ejes_helicoidales()
+            ejes_helicoidales = robot.ejes_helicoidales
 
             # Calcular M (posición cero)
             M = calcular_M_generalizado(robot)

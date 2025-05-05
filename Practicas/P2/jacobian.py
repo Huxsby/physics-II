@@ -2,13 +2,13 @@
 3. Matriz Jacobiana
     La metodologia para calcular la matriz Jacobiana de cualquier robot de lazo abierto consiste simplemente en
     determinar los ejes helicoidales para cada una de las articulaciones del robot en la configuración considerada.
-    Estos ejes son directamente las columnas de la matriz Jacobiana. El protocolo detallado pod ́eis verlo en este
+    Estos ejes son directamente las columnas de la matriz Jacobiana. El protocolo detallado podéis verlo en este
     video y el cálculo de esta matriz para el Robot Niryo One está descrito aquí.
     Los ejes de referencia y de rotación utizados en este último video no se corresponden con los utilzados en el
     software Niryo One Studio ni tampoco con el sentido de rotación positivo de algunas de las articulaciones. En
     el código que copiamos a continuación se usan exactamente los mismos sistemas de referencia y ejes de rotación
     utilizados en el software del Robot. El código está desarrollado con cálculo simbólico (utilizando la libreria
-    sympy) para tener un resultado gen ́erico, parametrizado en función de las coordenadas de las articulaciones.
+    sympy) para tener un resultado genérico, parametrizado en función de las coordenadas de las articulaciones.
 """
 #!/usr/bin/env python
 import numpy as np
@@ -51,7 +51,7 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
             print(f"⎢ {row_text} ⎥")
 
 """ ----------------------------------------------------------------- """
-# Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
+# Función que convierte un eje de rotación en matriz antisimétrica 3x3 (so3)
 def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
 
 tiempo = time.time()
@@ -197,21 +197,21 @@ print(f"Caso 2 (t1=t3=t4=0): {sol2}")
 print(f"Tiempo de ejecución: {time.time()-tiempo:.2f} segundos")
 """
 OJO!!! Estas configuraciones singulares, obtenidas matemáticamente, pueden no ser accesibles
-por el robot. Antes de mover el robot a alguna de estas configuraciones, verifica que est ́e dentro
+por el robot. Antes de mover el robot a alguna de estas configuraciones, verifica que esté dentro
 del rango alcanzable para las articulaciones correspondientes.
 """
 
 """ 5. Elipsoides de Manipulabilidad y Fuerza
 La matriz Jacobiana mapea las velocidades de las articulaciones en una configuración dada, a velocidades del
-elemento terminal. Tambi ́en sirve para mapear los torques o pares de fuerza en las articulaciones, a la fuerza
+elemento terminal. También sirve para mapear los torques o pares de fuerza en las articulaciones, a la fuerza
 neta que puede ejercer el elemento terminal en esa configuración.
     v = J(θ) * ̇θ    ;  F = [(J)**-T]*(θ)τ
 En clase vimos como calcular elipses (2D) de manipulabilidad y fuerza para un robot plano 2R, partiendo de
 una circunferencia de radio unidad en el espacio generado por las velocidades de las articulaciones (θ) o en
 el espacio de los torques (τ). En el caso del robot Niryo One tendríamos un elipsoide en 6 dimensiones en el
-espacio de velocidades o fuerzas a partir de hiperesferas en  ̇θ o τ. No es posible representar gr ́aficamente estas
+espacio de velocidades o fuerzas a partir de hiperesferas en  ̇θ o τ. No es posible representar gráficamente estas
 figuras 6D de manera sencilla. Podemos sin embargo escoger sólo 2 ó 3 articulaciones del robot, manteniendo las
-dem ́as fijas, y calcular el elipsoide de manipulabilidad en esas condiciones. Para utilizar 3 dimensiones, debes
+demás fijas, y calcular el elipsoide de manipulabilidad en esas condiciones. Para utilizar 3 dimensiones, debes
 partir de los puntos de la superficie de una esfera en el espacio de las velocidades de las articulaciones. recuerda
 que la ecuación de una esfera de radio unidad en este escenario vendría dada por:
     ∑(θi)**2 = 1
@@ -244,13 +244,13 @@ giro.append(np.dot(Jp0,vjoints)) # Mod. Anteriormente np.dot(Jp0,v)
     Para cada punto de la esfera en el espacio de velocidades de las articulaciones, se obtiene un punto del elipsoide
 de manipulabilidad en el espacio de velocidades del elemento terminal. Tanto la esfera en el espacio de  ̇θ como
 los vectores giro se pueden representar en 3D. Esto nos permite visualizar directamente el elipsoide.
-Para el elipsoide de fuerza se sigue un proceso totalmente an ́alogo, aunque en este caso se utiliza la inversa de
+Para el elipsoide de fuerza se sigue un proceso totalmente análogo, aunque en este caso se utiliza la inversa de
 la traspuesta de la matriz Jacobiana para transformar los torques de las articulaciones en la llave que ejerce el
 elemento terminal.
 
-    El caso bidimensional, en el que sólo consideramos 2 articulaciones, es mucho m ́as sencillo y r ́apido, ya que sólo
-necesitamos los puntos de una circunferencia, que se transforman en una elipse a trav ́es de la matriz Jacobiana.
-Para un Robot gen ́erico de lazo abierto y un espacio de tareas con coordenadas q ∈Rm donde m ≤n, el elipsoide
+    El caso bidimensional, en el que sólo consideramos 2 articulaciones, es mucho más sencillo y rápido, ya que sólo
+necesitamos los puntos de una circunferencia, que se transforman en una elipse a través de la matriz Jacobiana.
+Para un Robot genérico de lazo abierto y un espacio de tareas con coordenadas q ∈Rm donde m ≤n, el elipsoide
 de manipulabilidad representa las velocidades del elemento terminal para velocidades de articulaciones dadas
 por  ̇θ donde || ̇θ|| = 1 ⇒ una esfera unitaria en el espacio de las velocidades de las articulaciones ⇒  ̇θT  ̇θ = 1.
 En este escenario, podemos definir una matriz A = JJT a partir de la cual es posible estimar el volumen del
@@ -258,7 +258,7 @@ elipsoide de manipulabilidad (ver demostración en los apuntes de clase):
     ∝ √det(J*(J)**T) (1)
 
     Análogamente podemos estimar el volumen del elipsoide de fuerza a partir de la inversa de la matriz A. Los
-ejes principales del elipsoide de fuerza est ́an alineados con los del elipsoide de manipulabilidad (los autovectores
+ejes principales del elipsoide de fuerza están alineados con los del elipsoide de manipulabilidad (los autovectores
 de la matriz A coinciden con los de la matriz A-1) pero los autovalores de A coinciden con los inversos de
 los autovalores de A-1. Esto quiere decir que conforme el volumen del elipsoide de manipulabilidad aumenta,
 disminuye el volumen del elipsoide de fuerza y viceversa, de manera que el producto de ambos volúmenes es
@@ -307,7 +307,7 @@ llave=np.array(llave)
 vx=giro[:,1]; vy=giro[:,3]
 fx=llave[:,1]; fy=llave[:,3]
 
-# Generamos gr ́afica con círculo y elipses
+# Generamos gráfica con círculo y elipses
 plt.scatter(xx,yy, label=r'${\dot\theta}$ ó $\tau$') #${\dot\theta}$ ó $\tau$'
 plt.scatter(vx,vy, label="manipulabilidad")
 plt.scatter(fx,fy, label="fuerza")
