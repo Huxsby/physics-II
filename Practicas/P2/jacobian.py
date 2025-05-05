@@ -4,7 +4,7 @@
     determinar los ejes helicoidales para cada una de las articulaciones del robot en la configuración considerada.
     Estos ejes son directamente las columnas de la matriz Jacobiana. El protocolo detallado pod ́eis verlo en este
     video y el cálculo de esta matriz para el Robot Niryo One está descrito aquí.
-    Los ejes de referencia y de rotación utizados en este  ́ultimo video no se corresponden con los utilzados en el
+    Los ejes de referencia y de rotación utizados en este último video no se corresponden con los utilzados en el
     software Niryo One Studio ni tampoco con el sentido de rotación positivo de algunas de las articulaciones. En
     el código que copiamos a continuación se usan exactamente los mismos sistemas de referencia y ejes de rotación
     utilizados en el software del Robot. El código está desarrollado con cálculo simbólico (utilizando la libreria
@@ -261,7 +261,7 @@ elipsoide de manipulabilidad (ver demostración en los apuntes de clase):
 ejes principales del elipsoide de fuerza est ́an alineados con los del elipsoide de manipulabilidad (los autovectores
 de la matriz A coinciden con los de la matriz A-1) pero los autovalores de A coinciden con los inversos de
 los autovalores de A-1. Esto quiere decir que conforme el volumen del elipsoide de manipulabilidad aumenta,
-disminuye el volumen del elipsoide de fuerza y viceversa, de manera que el producto de ambos vol ́umenes es
+disminuye el volumen del elipsoide de fuerza y viceversa, de manera que el producto de ambos volúmenes es
 constante.
 """
 
