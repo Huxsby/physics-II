@@ -7,7 +7,7 @@ from class_robot_structure import Robot, cargar_robot_desde_yaml
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 
-# Función que convierte un eje de rotación en matriz antisim ́etrica 3x3 (so3)
+# Función que convierte un eje de rotación en matriz antisimétrica 3x3 (so3)
 def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
 
 def VecToso3sp(v: sp.Matrix):

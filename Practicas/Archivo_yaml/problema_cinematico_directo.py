@@ -11,16 +11,16 @@ import optparse
 
 desc="Resolución del problema cinemático directo para el Robot Niryo One."
 
-def VecToso3(omg): # Convierte un vector de 3 componentes en una matriz antisim ́etrica
+def VecToso3(omg): # Convierte un vector de 3 componentes en una matriz antisimétrica
     return np.array([[0, -omg[2], omg[1]], [omg[2], 0, -omg[0]], [-omg[1], omg[0], 0]])
 
 def VecTose3(V): # convierte un vector giro o eje helicoidal en matriz 4x4 se3
     return np.r_[np.c_[VecToso3([V[0], V[1], V[2]]), [V[3], V[4], V[5]]], np.zeros((1, 4))]
 
-def so3ToVec(so3mat): # extrae un vector de 3 componentes de una matriz antisim ́etrica so3
+def so3ToVec(so3mat): # extrae un vector de 3 componentes de una matriz antisimétrica so3
     return np.array([so3mat[2][1], so3mat[0][2], so3mat[1][0]])
 
-# convierte matriz se3 en una matriz de transformación homog ́enea a trav ́es de la exponencial
+# convierte matriz se3 en una matriz de transformación homogénea a través de la exponencial
 def MatrixExp6(se3mat):
     se3mat = np.array(se3mat) # vector giro en representación matricial se3 (4x4)
     v=se3mat[0: 3, 3] # extraemos el vector v*theta (velocidad lineal)
@@ -110,7 +110,7 @@ def main():
     for i in range(0,6,1):
         T=np.dot(T,MatrixExp6(VecTose3(Si[i]*t[i])))
     T=np.dot(T,M)
-    print("\nMatriz de transformación homog ́enea: \n", np.round(T, 3))
+    print("\nMatriz de transformación homogénea: \n", np.round(T, 3))
     print("\nCoordenadas (x,y,z) del TCP: ", np.round(T[0: 3, 3],3))
     R=(np.round(T[0: 3, 0: 3],3))
     print("\nángulos de Euler en radianes", R2Euler(R))
