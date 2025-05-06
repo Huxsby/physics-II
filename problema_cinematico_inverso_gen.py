@@ -1,12 +1,5 @@
 #!/usr/bin/env python
-#
-# By Angel.Pineiro at usc.es
-# Version April, 2021
-#
-# EJEMPLO DE USO:
-# python CinematicaInversaNiryo_03.py -a '0 0 90' -r '0.2 0 0.1' -j '0 -0.8 -0.8 0 -1.5 0'
-#
-#
+# -*- coding: utf-8 -*-
 
 import numpy as np
 import sympy as sp
@@ -78,40 +71,10 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
     R=T[0: 3, 0: 3]; p = T[0: 3, 3]
     return np.r_[np.c_[R, np.zeros((3, 3))], np.c_[np.dot(VecToso3(p), R), R]]
 
-#_______________________________________________INPUTS_______________________________________________________
-
-def getR(w,RPY): # Formula de Rodrigues para obtener matriz de Rotación
-    """
-    Para el calculo pasamos la orientacion a esta matriz de rotacion R,
-    el input a su vez de la orientacion cara el usuario pueden ser 3 angulos de Euler RPY.
-    Para hacer la conversion de RPY a matriz de rotacion se utiliza Euler2R => Invertir R2Euler.
-    """
-    wmat=VecToso3(w)
-    return np.eye(3)+np.sin(RPY)*wmat+(1.-np.cos(RPY))*np.dot(wmat,wmat)
-
-def getT(orientation, r): # Devuelve la matriz de transformación homogénea
-    """
-    Esta funcion es la union delos input de la posicion y la orientacion
-    siendo respectivamente la posicion el vector p y la orientacion la matriz de rotacion R
-    """
-
-    i=np.array([1,0,0]); j=np.array([0,1,0]); k=np.array([0,0,1])
-    Ri=getR(i,orientation[0]); Rj=getR(j,orientation[1]); Rk=getR(k,orientation[2])
-    R=np.matmul(Rk,np.matmul(Rj,Ri))
-    aux=np.array([[0,0,0,1]])
-    return np.r_[np.c_[R,r],aux]
-    
-
 def CinematicaDirecta(M,S,t):
     T=np.eye(4)
     for i in range(0,6,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
     return np.dot(T,M)
-
-def main():
-    """Resolución del problema cinemático inverso para el Robot Niryo One."""
-    
-    robot = cargar_robot_desde_yaml('robot.yaml')
-    CinematicaInversa(robot)
 
 def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
@@ -207,6 +170,12 @@ def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0
         print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
     
     return thetas_follower
+
+def main():
+    """Resolución del problema cinemático inverso para el Robot Niryo One."""
     
+    robot = cargar_robot_desde_yaml('robot.yaml')
+    CinematicaInversa(robot)
+
 if __name__=="__main__" :
     main()
