@@ -10,10 +10,12 @@
 
 import numpy as np
 import sympy as sp
+import time
 
 from class_robot_structure import Robot, cargar_robot_desde_yaml
 from class_helicoidales import calcular_M_generalizado, calcular_T_robot
-from class_jacobian import calcular_jacobiana
+from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida
+from class_rotaciones import Rp2Trans, Euler2R, R2Euler
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinemático inverso del Niryo One
 
@@ -76,63 +78,51 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
     R=T[0: 3, 0: 3]; p = T[0: 3, 3]
     return np.r_[np.c_[R, np.zeros((3, 3))], np.c_[np.dot(VecToso3(p), R), R]]
 
-#____________________________________________________________________________________________________________
+#_______________________________________________INPUTS_______________________________________________________
 
 def getR(w,RPY): # Formula de Rodrigues para obtener matriz de Rotación
+    """
+    Para el calculo pasamos la orientacion a esta matriz de rotacion R,
+    el input a su vez de la orientacion cara el usuario pueden ser 3 angulos de Euler RPY.
+    Para hacer la conversion de RPY a matriz de rotacion se utiliza Euler2R => Invertir R2Euler.
+    """
     wmat=VecToso3(w)
     return np.eye(3)+np.sin(RPY)*wmat+(1.-np.cos(RPY))*np.dot(wmat,wmat)
 
-def getqs(): # Definimos vectores q para la posición cero del Robot Niryo One
-    # vectores que van de cada eje al siguiente
-    q=[]; scalefactor=0.001
-    L=np.array([103.0, 80.0, 210.0, 30.0, 41.5, 180.0, 23.7, -5.5])*scalefactor
-    q.append(np.array([0,0,L[0]]))
-    q.append(np.array([0,0,L[1]]))
-    q.append(np.array([0,0,L[2]]))
-    q.append(np.array([L[4],0,L[3]]))
-    q.append(np.array([L[5],0,0]))
-    q.append(np.array([L[6],0,L[7]]))
-    return q
+def getT(orientation, r): # Devuelve la matriz de transformación homogénea
+    """
+    Esta funcion es la union delos input de la posicion y la orientacion
+    siendo respectivamente la posicion el vector p y la orientacion la matriz de rotacion R
+    """
 
-def getT(orientation,r): # Devuelve la matriz de transformación homogénea
-    i=np.array([1,0,0]); j=np.array([0,1,0]); k=np.array([0,0,1]);
-    Ri=getR(i,orientation[0]); Rj=getR(j,orientation[1]); Rk=getR(k,orientation[2]);
+    i=np.array([1,0,0]); j=np.array([0,1,0]); k=np.array([0,0,1])
+    Ri=getR(i,orientation[0]); Rj=getR(j,orientation[1]); Rk=getR(k,orientation[2])
     R=np.matmul(Rk,np.matmul(Rj,Ri))
     aux=np.array([[0,0,0,1]])
     return np.r_[np.c_[R,r],aux]
-
-#____________________________________________________________________________________________________________
+    
 
 def CinematicaDirecta(M,S,t):
     T=np.eye(4)
     for i in range(0,6,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
     return np.dot(T,M)
 
-
 def main():
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
     
     robot = cargar_robot_desde_yaml('robot.yaml')
-    
-    # Por defecto:
-    thethas_actuales = '0 0 0 0 0 0'    # Coordenadas iniciales de las articulaciones en rad
-    p_xyz = '0.1 0.1 0.1'               # Coordenadas p_xyz finales para el elemento terminal
-    RPY = '0 0 0'                       # ángulos de Euler finales para el elemento terminal en grados
-    error_oet = 0.01                    # Error en la orientación del elemento terminal (0.01 por defecto)
-    error_pet = 0.001                   # Error en la posición del elemento terminal (0.001 por defecto)
-    error_vel_lineal = 0.001            # Error en la velocidad lineal del elemento terminal (0.001 por defecto)
+    CinematicaInversa(robot)
 
-    """
-    *Manejar entradas de usuario para los parámetros del problema cinemático inverso.
-    """
+def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
+    """Resolución del problema cinemático inverso para el Robot Niryo One."""
+    tiempo = time.time()
+    if robot is None:
+        raise ValueError("El robot no está definido. Por favor, carga un robot válido.")
 
-    # Convertir thethas_actuales y p_xyz a una lista de np.float64 directamente
-    thethas_actuales = np.array([np.float64(theta) for theta in str(thethas_actuales).split()])
-    p_xyz = [np.float64(coord) for coord in str(p_xyz).split()]
-
-    # Convertir RPY a una lista de radianes directamente
-    orientation = [np.deg2rad(np.float64(angle)) for angle in str(RPY).split()]
-    
+    # Casting inputs a tipos apropiados
+    thetas_actuales = np.array([np.float64(theta) for theta in thetas_actuales])
+    p_xyz = np.array([np.float64(coord) for coord in p_xyz])
+    orientation = Euler2R(RPY[0], RPY[1], RPY[2])
     error_oet=float(error_oet)
     error_vel_lineal=float(error_vel_lineal)
 
@@ -140,68 +130,83 @@ def main():
     M = calcular_M_generalizado(robot)
 
     # Calculamos la Matriz de Transformación Homogénea a partir de posiciones y ángulos
-    T = getT(orientation, p_xyz)
-    print("\nMatriz de transformación homogénea original T:\n", T)
-
-    print("\nValores de las articulaciones iniciales:", [0,0,0,0,0,0])
-    Tm = calcular_T_robot(robot.ejes_helicoidales, [0,0,0,0,0,0], M)
-    print("\nMatriz de transformación homogénea mia T:", Tm)
-    print("\nOrientacion y p_xyz comparation", '\n', orientation, '\n', p_xyz)
-
-    S = robot.ejes_helicoidales
-
-    J, thetas_s = calcular_jacobiana(robot)
+    Tsd = Rp2Trans(orientation, p_xyz)
+    print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
+    print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{np.round(orientation, 8)}\n{np.round(p_xyz, 8)}")
+   
+    print(f"\nExtrayendo dastos del robot:")
+    S = robot.ejes_helicoidales; print("Ejes helicoidales del robot:", S)
+    print("\nMatriz Jacobiana del robot:")
+    J, thetas_s = calcular_jacobiana(robot); mostrar_jacobiana_resumida(J)
+    
+    thetas_follower = []                                # Lista para almacenar los ángulos de las articulaciones por los que ha pasado el robot en cada iteración.
+    Tsb = CinematicaDirecta(M,S, thetas_actuales)       # Resuelve la Cinemática Directa para thetas_actuales
+    Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), Tsd))    # vector Giro para ir a la posición deseada en {b}
+    Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb))             # vector Giro en el SR de la base {s}
+    
+    # Condición de convergencia: módulo de velocidad angular < error_oet y velocidad lineal < error_vel_lineal
+    err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > error_oet or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > error_vel_lineal
     i = 0
     maxiterations = 20
-    Tsb = CinematicaDirecta(M,S, thethas_actuales) # Resuelve la Cinemática Directa para thethas_actuales
-    Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), T)) # vector Giro para ir a la posición deseada en {b}
-    Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb)) # vector Giro en el SR de la base {s}
-    
-    # condición de convergencia: módulo de velocidad angular < error_oet y velocidad lineal < error_vel_lineal
-    err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > error_oet or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > error_vel_lineal
-    
-    # Bucle principal del algoritmo de cinemática inversa iterativo.
-    while err and i < maxiterations: # Continúa mientras el error 'err' sea verdadero (es decir, el error supera los umbrales) y el número de iteraciones 'i' sea menor que 'maxiterations'.
-        thetalist_s = {thetas_s[i]: np.float64(thethas_actuales[i]) for i in range(len(thetas_s))}
-        Jp = J.subs(thetalist_s)     # Sustituye los valores actuales de los ángulos de las articulaciones (thetalist_s).
 
+    # Bucle principal del algoritmo de cinemática inversa iterativo.
+    print("\nIteraciones de la cinemática inversa:")
+    while err and i < maxiterations: # Continúa mientras el error 'err' sea verdadero (es decir, el error supera los umbrales) y el número de iteraciones 'i' sea menor que 'maxiterations'.
+        thetalist_s = {thetas_s[i]: np.float64(thetas_actuales[i]) for i in range(len(thetas_s))}
+        Jp = J.subs(thetalist_s)     # Sustituye los valores actuales de los ángulos de las articulaciones (thetalist_s).
         Jp = np.array(Jp.tolist()).astype(np.float64)   # Convierte la Jacobiana numérica (SymPy) a un array NumPy de tipo float64.
+
+        thetas_follower.append(thetas_actuales.tolist())        # Almacena los ángulos por los que ha pasado el robot en cada iteración.
 
         # Actualiza los ángulos de las articulaciones. Esta es la fórmula central del método de Newton-Raphson para cinemática inversa usando la pseudo-inversa de la Jacobiana.
         # np.linalg.pinv(Jp): Calcula la pseudo-inversa de Moore-Penrose de la Jacobiana numérica. Se usa porque la Jacobiana puede no ser cuadrada o invertible.
         # np.dot(..., Vs): Multiplica la pseudo-inversa por el vector de giro espacial 'Vs' (error de velocidad). El resultado es el cambio necesario en los ángulos de las articulaciones (delta_theta).
-        # thethas_actuales + ...: Suma el cambio calculado a los ángulos actuales para obtener los nuevos ángulos.
-        thethas_actuales = thethas_actuales + np.dot(np.linalg.pinv(Jp), Vs)
+        # thetas_actuales + ...: Suma el cambio calculado a los ángulos actuales para obtener los nuevos ángulos.
+        thetas_actuales = thetas_actuales + np.dot(np.linalg.pinv(Jp), Vs)
 
         i = i + 1 # Incrementa el contador de iteraciones.
 
-        # Calcula la cinemática directa con los *nuevos* ángulos de las articulaciones ('thethas_actuales').
-        # 'M' es la configuración inicial (home), 'S' son los ejes de giro (screw axes), 'thethas_actuales' son los ángulos actualizados.
+        # Calcula la cinemática directa con los *nuevos* ángulos de las articulaciones ('thetas_actuales').
+        # 'M' es la configuración inicial (home), 'S' son los ejes de giro (screw axes), 'thetas_actuales' son los ángulos actualizados.
         # El resultado 'Tsb' es la nueva pose (posición y orientación) del efector final en el marco espacial.
-        Tsb = CinematicaDirecta(M, S, thethas_actuales)
+        Tsb = CinematicaDirecta(M, S, thetas_actuales)
 
-        # Calcula el error de transformación entre la pose actual y la deseada ('T').
+        # Calcula el error de transformación entre la pose actual y la deseada ('Tsd').
         # np.linalg.inv(Tsb): Calcula la inversa de la matriz de transformación homogénea actual.
-        # np.dot(..., T): Multiplica la inversa de la pose actual por la pose deseada (T_error = Tsb^-1 * T).
+        # np.dot(..., Tsd): Multiplica la inversa de la pose actual por la pose deseada (T_error = Tsb^-1 * Tsd).
         # MatrixLog6(...): Calcula el logaritmo matricial de la matriz de error. Esto convierte la matriz de transformación de error (SE(3)) en su representación de vector de giro (twist) 'Vb' (se(3)) en el marco del cuerpo (body frame).
-        Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), T))
+        Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), Tsd))
 
         # Convierte el vector de giro del marco del cuerpo 'Vb' al marco espacial 'Vs'.
         # Adjunta(Tsb): Calcula la matriz Adjunta de la pose actual 'Tsb'. La Adjunta transforma vectores de giro (twists) entre marcos.
         # se3ToVec(Vb): Convierte la matriz se(3) 'Vb' a un formato de vector 6x1 (si no lo está ya).
         # np.dot(..., ...): Multiplica la Adjunta por el vector de giro del cuerpo 'Vb' para obtener el vector de giro equivalente 'Vs' en el marco espacial (fixed frame).
         # print(Vs): Imprime el vector de giro espacial actual (útil para depuración).
-        Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb)); print (Vs)
+        Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb))
 
         # Update the error condition 'err' for the next loop iteration.
         # The loop continues if the norm of the angular velocity (Vs[0:3]) exceeds error_oet
         # OR the norm of the linear velocity (Vs[3:6]) exceeds error_vel_lineal.
         err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > error_oet or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > error_vel_lineal
+        # Print the error status with color: red if True (error exists), green if False (converged)
+        print(f"\tIter ({i:02d}) Vector giro: \033[36m{np.round(Vs.tolist(), 8)}\033[0m", f"Error: {(f'\033[31m{err}' if err else f'\033[32m{err} ⭢  Solución valida')}\033[0m")
+    print(f"\t\033[92mTiempo de cálculo total de la cinemática inversa: {time.time() - tiempo:.4f} segundos\033[0m")
     
-    print ("\n\nCoordenadas de las articulaciones:\n", thethas_actuales)
-    print ("Error en w:", np.round(np.linalg.norm([Vs[0], Vs[1], Vs[2]]),8))
-    print ("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
-    print ("Número de iteraciones:", i)
+    # Imprime el resultado final de la cinemática inversa.
+    print(f"\nCoordenadas de las articulaciones:\n {thetas_actuales.tolist()}")
+    print("Error en w:", np.round(np.linalg.norm([Vs[0], Vs[1], Vs[2]]),8))
+    print("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
+    print("Número de iteraciones:", i)
 
+    Tsd_re = calcular_T_robot(robot.ejes_helicoidales, thetas_actuales, M)
+    print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
+    print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
+    
+    print(f"\nLas tethas por las que ha pasado el robot son:")
+    for i in range(len(thetas_follower)):
+        print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
+    
+    return thetas_follower
+    
 if __name__=="__main__" :
     main()

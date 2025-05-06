@@ -151,6 +151,23 @@ def R2Euler(R):
         z=0.
     return np.array([x,y,z])
 
+# Función para convertir ángulos de Euler en una matriz de rotación
+def Euler2R(roll, pitch, yaw):
+    """ Convierte ángulos de Euler (roll, pitch, yaw) en una matriz de rotación R. """
+    R_x = np.array([[1, 0, 0],
+                    [0, np.cos(roll), -np.sin(roll)],
+                    [0, np.sin(roll), np.cos(roll)]])
+
+    R_y = np.array([[np.cos(pitch), 0, np.sin(pitch)],
+                    [0, 1, 0],
+                    [-np.sin(pitch), 0, np.cos(pitch)]])
+
+    R_z = np.array([[np.cos(yaw), -np.sin(yaw), 0],
+                    [np.sin(yaw), np.cos(yaw), 0],
+                    [0, 0, 1]])
+    
+    return np.dot(R_z, np.dot(R_y, R_x)) # Producto matricial de las rotaciones
+
 # Rotar un vector selecion automática
 def RotarVector(v, eje, θ):
     """
