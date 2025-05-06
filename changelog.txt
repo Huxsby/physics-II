@@ -31,7 +31,7 @@ P2  7. Ejercicios prácticos
      [x] 7.2 Configuraciones singulares (Preparar codigo para experimentar con el robot como se indica en la práctica)
          [ ] - Limitar ángulos
      [x] 7.3 Elipsoides de Manipulabilidad y Fuerza (Generalizar el código)
-     [ ] 7.4 Cinemática Inversa
+     [x] 7.4 Cinemática Inversa
 
 # Info.
 

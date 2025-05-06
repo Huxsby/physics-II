@@ -341,3 +341,4 @@ vol_EF = ((Jpi*sp.Transpose(Jpi)).inv()).det()
 
 print(f"El vólumen del elipsoide de Manipulabilidad es {vol_EM} y el de Fuerza {vol_EF}")
 print(f"El producto de ambos volúmenes es {calcular_volumen_elipsoides(Jpi)}")
+print(f"Producto de volúmenes: {vol_EM * vol_EF}")

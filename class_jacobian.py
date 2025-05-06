@@ -112,8 +112,9 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
         print(f"\033[91mError al calcular configuraciones singulares con {substitutions}:\033[0m {e}")
         return None
 
-def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, max_chars=30):
+def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
+    print(f"{msg}", sep="")
     # Si la entrada es numérica (numpy array), usarla directamente
     if isinstance(Jacobian, np.ndarray):
         matrix_data = Jacobian
@@ -323,6 +324,7 @@ def prueba_elipsoides():
     # mostrar_jacobiana_resumida(Jpi)
     print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
     print(f"Volumen del elipsoide de fuerza: {vol_EF}")
+    print(f"Producto de volúmenes: {vol_EM * vol_EF}")
 
     print("\n--- Gráfica de los volúmenes de los elipsoides (θs=0)---")
     # mostrar_jacobiana_resumida(Jp0)
