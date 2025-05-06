@@ -207,14 +207,14 @@ def main():
     
     thetalist = np.array(t).copy()
     i = 0
-    maxiterations = 20
+    MAXITERATIONS = 20
     Tsb = CinematicaDirecta(M,S, thetalist) # Resuelve la Cinem ́atica Directa para thetalist
     Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), T)) # vector Giro para ir a la posición deseada en {b}
     Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb)) # vector Giro en el SR de la base {s}
     
     # condición de convergencia: módulo de velocidad angular < eomg y velocidad lineal < ev
     err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
-    while err and i < maxiterations:
+    while err and i < MAXITERATIONS:
         J=Jacobiana(thetalist);
         J=np.array(J.tolist()).astype(np.float64)
         thetalist = thetalist + np.dot(np.linalg.pinv(J), Vs)

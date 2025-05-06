@@ -86,7 +86,7 @@ def calcular_jacobiana(robot: Robot):
     vs.append(qs[i].cross(ws[i]))
     Ji.append(ws[i].row_insert(3,vs[i]))
     Jacobian = Ji[0]
-    for i in range(1,6,1):
+    for i in range(1,len(robot.links),1):
         vs.append(qs[i].cross(ws[i]))
         Ji.append(ws[i].row_insert(3,vs[i]))
         Jacobian = Jacobian.col_insert(i,Ji[i])

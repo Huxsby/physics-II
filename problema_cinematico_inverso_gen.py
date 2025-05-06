@@ -71,16 +71,18 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
     R=T[0: 3, 0: 3]; p = T[0: 3, 3]
     return np.r_[np.c_[R, np.zeros((3, 3))], np.c_[np.dot(VecToso3(p), R), R]]
 
-def CinematicaDirecta(M,S,t):
+def CinematicaDirecta(robot, M,S,t):
     T=np.eye(4)
-    for i in range(0,6,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
+    for i in range(0,len(robot.links),1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
     return np.dot(T,M)
 
-def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
+def CinematicaInversa(robot: Robot, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
     tiempo = time.time()
     if robot is None:
         raise ValueError("El robot no está definido. Por favor, carga un robot válido.")
+    if thetas_actuales is None:
+        thetas_actuales = [0]*len(robot.links)
 
     # Casting inputs a tipos apropiados
     thetas_actuales = np.array([np.float64(theta) for theta in thetas_actuales])
@@ -103,18 +105,18 @@ def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0
     J, thetas_s = calcular_jacobiana(robot); mostrar_jacobiana_resumida(J)
     
     thetas_follower = []                                # Lista para almacenar los ángulos de las articulaciones por los que ha pasado el robot en cada iteración.
-    Tsb = CinematicaDirecta(M,S, thetas_actuales)       # Resuelve la Cinemática Directa para thetas_actuales
+    Tsb = CinematicaDirecta(robot, M,S, thetas_actuales)       # Resuelve la Cinemática Directa para thetas_actuales
     Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), Tsd))    # vector Giro para ir a la posición deseada en {b}
     Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb))             # vector Giro en el SR de la base {s}
     
     # Condición de convergencia: módulo de velocidad angular < error_oet y velocidad lineal < error_vel_lineal
     err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > error_oet or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > error_vel_lineal
     i = 0
-    maxiterations = 20
+    MAXITERATIONS = 20
 
     # Bucle principal del algoritmo de cinemática inversa iterativo.
     print("\nIteraciones de la cinemática inversa:")
-    while err and i < maxiterations: # Continúa mientras el error 'err' sea verdadero (es decir, el error supera los umbrales) y el número de iteraciones 'i' sea menor que 'maxiterations'.
+    while err and i < MAXITERATIONS: # Continúa mientras el error 'err' sea verdadero (es decir, el error supera los umbrales) y el número de iteraciones 'i' sea menor que 'MAXITERATIONS'.
         thetalist_s = {thetas_s[i]: np.float64(thetas_actuales[i]) for i in range(len(thetas_s))}
         Jp = J.subs(thetalist_s)     # Sustituye los valores actuales de los ángulos de las articulaciones (thetalist_s).
         Jp = np.array(Jp.tolist()).astype(np.float64)   # Convierte la Jacobiana numérica (SymPy) a un array NumPy de tipo float64.
@@ -132,7 +134,7 @@ def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0
         # Calcula la cinemática directa con los *nuevos* ángulos de las articulaciones ('thetas_actuales').
         # 'M' es la configuración inicial (home), 'S' son los ejes de giro (screw axes), 'thetas_actuales' son los ángulos actualizados.
         # El resultado 'Tsb' es la nueva pose (posición y orientación) del efector final en el marco espacial.
-        Tsb = CinematicaDirecta(M, S, thetas_actuales)
+        Tsb = CinematicaDirecta(robot, M, S, thetas_actuales)
 
         # Calcula el error de transformación entre la pose actual y la deseada ('Tsd').
         # np.linalg.inv(Tsb): Calcula la inversa de la matriz de transformación homogénea actual.
