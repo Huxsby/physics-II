@@ -67,7 +67,7 @@ def calcular_jacobiana(robot: Robot):
 
     # Calculamos las matrices de rotación a partir de los ejes w, utilizando la fórmula de Rodrigues
     R = []
-    for i in range(0,6,1):
+    for i in range(0,len(robot.links),1):
         wmat = VecToso3(w[i])
         R.append(sp.eye(3)+sp.sin(thetas_s[i])*wmat+(1-sp.cos(thetas_s[i]))*(wmat*wmat))
 
@@ -75,7 +75,7 @@ def calcular_jacobiana(robot: Robot):
     qs = []; ws = []; Ri = R[0]
     qs.append(sp.Matrix(q[0]))
     ws.append(sp.Matrix(w[0]))
-    for i in range(1,6,1):
+    for i in range(1,len(robot.links),1):
         ws.append(Ri*sp.Matrix(w[i]))
         qs.append(Ri*sp.Matrix(q[i])+qs[i-1])
         Ri = Ri*R[i]

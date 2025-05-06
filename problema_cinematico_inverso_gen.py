@@ -165,7 +165,7 @@ def CinematicaInversa(robot: Robot, thetas_actuales=[0, 0, 0, 0, 0, 0], p_xyz=[0
     print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
     print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
     
-    print(f"\nLas tethas por las que ha pasado el robot son:")
+    print(f"\nLas thetas por las que ha pasado el robot son:")
     for i in range(len(thetas_follower)):
         print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
     
