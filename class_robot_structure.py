@@ -78,6 +78,8 @@ import numpy as np
 import time
 import yaml
 
+MARGEN_LIMITES_THETAS = 5 # Grados de margen para los límites de las articulaciones y evitar colisiones
+
 class Robot:
     """ Clase que representa un robot con eslabones y sus propiedades."""
     def __init__(self, name: str):
@@ -249,8 +251,32 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
         if joint_limits_str:
             # Eliminar paréntesis y dividir por la coma
             parts = joint_limits_str.strip('()').split(',')
-            # Convertir a flotantes y crear una tupla
-            joint_limits = tuple(float(part.strip()) for part in parts)
+            # Convertir a flotantes
+            initial_min_limit = float(parts[0].strip())
+            initial_max_limit = float(parts[1].strip())
+
+            # Definir el margen
+            margen = np.deg2rad(MARGEN_LIMITES_THETAS)  # Convertir a radianes
+
+            # Aplicar el margen para reducir el rango de operación
+            # El límite inferior se incrementa y el límite superior se decrementa
+            adjusted_min_limit = initial_min_limit + margen
+            adjusted_max_limit = initial_max_limit - margen
+            
+            # Asegurarse de que el límite inferior no supere al superior después del ajuste.
+            # Si el margen es tan grande que los límites se cruzan (o el rango original es muy pequeño),
+            # se establece un rango de un solo punto en el centro del rango original.
+            # Esto significa que la articulación efectivamente no tiene rango de movimiento
+            # después de aplicar el margen.
+            if adjusted_min_limit > adjusted_max_limit:
+                mid_point = (initial_min_limit + initial_max_limit) / 2.0
+                joint_limits = (mid_point, mid_point)
+                # Opcionalmente, se podría imprimir una advertencia:
+                # print(f"Advertencia: Para el eslabón {l.get('id', 'desconocido')}, el margen de {margen:.3f} rad "
+                #       f"es demasiado grande para el rango original ({initial_min_limit:.3f}, {initial_max_limit:.3f}). "
+                #       f"Límites ajustados a ({mid_point:.3f}, {mid_point:.3f}).")
+            else:
+                joint_limits = (adjusted_min_limit, adjusted_max_limit)
         else:
             joint_limits = None
 
@@ -273,14 +299,35 @@ def limits(robot: Robot, θ):
     """
     Function to limit the angles of the Niryo One robot.
     """
+    if robot.limits_dict is None or len(robot.limits_dict) == 0:
+        return True, "No limits defined for the robot."
+    
     # If θ is a dictionary, extract its values as a list
     if isinstance(θ, dict):
         θ = list(θ.values())
     
     # Check if each joint angle is within its limits
     for i in range(len(θ)):
-        if θ[i] < robot.limits_dict[f'joint_{i+1}'][0] or θ[i] > robot.limits_dict[f'joint_{i+1}'][1]:
-            return False, f"Joint {i+1} out of limits: {θ[i]}"
+        current_value = θ[i]
+        joint_key = f'joint_{i+1}'
+        
+        if joint_key not in robot.limits_dict:
+            print(f"Warning: Limits for {joint_key} not found in robot.limits_dict.")
+            # Depending on desired behavior, either skip or treat as out of limits
+            return False, f"Limits for {joint_key} not defined."
+
+        lower_limit = robot.limits_dict[joint_key][0]
+        upper_limit = robot.limits_dict[joint_key][1]
+
+        # Diagnostic print to show values for each joint before the check
+        # print(f"DEBUG: Joint {i+1}: Value={current_value}, Limits=({lower_limit}, {upper_limit})")
+        # print(f"DEBUG: Checking condition: {current_value} < {lower_limit} (is {current_value < lower_limit}) OR {current_value} > {upper_limit} (is {current_value > upper_limit})")
+
+        if current_value < lower_limit or current_value > upper_limit:
+            # This print executes if the joint is out of limits
+            print(f"Details for out-of-limit Joint {i+1}: Value={current_value}, LowerLimit={lower_limit}, UpperLimit={upper_limit}")
+            print(f"Comparison results: Value < LowerLimit is {current_value < lower_limit}, Value > UpperLimit is {current_value > upper_limit}")
+            return False, f"Joint {i+1} out of limits: {current_value} not in ({lower_limit}, {upper_limit})"
     return True, "All joints within limits"
 
 def get_limits_positive(robot: Robot):
@@ -292,6 +339,12 @@ def get_limits_negative(robot: Robot):
     return np.array(negative_limits)
 
 def thetas_aleatorias(robot: Robot):
+    if robot.limits_dict is None or len(robot.limits_dict) == 0:
+        random_config = np.zeros(len(robot.links))
+        for i in range(len(robot.links)):
+            random_config[i] = np.random.uniform(-2*np.pi, 2*np.pi)
+        return random_config, {f"t{i}": random_config[i] for i in range(len(robot.links))}
+    
     negative_limits = get_limits_negative(robot)
     positive_limits = get_limits_positive(robot)
     # print(f"negative_limits: {negative_limits}")
