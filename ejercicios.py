@@ -209,7 +209,7 @@ def menu():
             positive_limits = get_limits_positive()
             print("\nComparando configuraciones random 8 veces...")
             for vueltas in range(8):
-                random_config, thetas_dic_random = thetas_aleatorias(robot.links)
+                random_config, thetas_dic_random = thetas_aleatorias(robot)
 
                 J_num_random = J_sym.subs(thetas_dic_random).evalf(chop=True)
                 vol_EM_random, vol_EF_random = calcular_volumen_elipsoides(J_num_random)

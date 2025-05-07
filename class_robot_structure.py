@@ -80,11 +80,12 @@ import yaml
 
 class Robot:
     """ Clase que representa un robot con eslabones y sus propiedades."""
-    def __init__(self, name):
+    def __init__(self, name: str):
         """ Inicializa una nueva instancia de la clase Robot. """
         self.name = name
         self.links = []
         self.ejes_helicoidales = "Los ejes helicoidales se calcularán al crear el robot."
+        self.limits_dict = None # Inicializa limits_dict como None, se puede establecer más tarde
         print(f"\033[92\tmRobot '{self.name}' creado.\033[0m")
 
     def __str__(self):
@@ -157,7 +158,7 @@ class Link:
         joint_coords (numpy.ndarray): Coordenadas de la articulación del eslabón en el espacio.
         joint_axis (numpy.ndarray): Eje de la articulación del eslabón.
     """
-    def __init__(self, id, length, tipo, orientation, joint_coords, joint_axis):
+    def __init__(self, id, length, tipo, orientation, joint_coords, joint_axis, joint_limits):
         """ Inicializa una nueva instancia de la clase Link. """
         self.id = id
         self.length = length
@@ -165,12 +166,17 @@ class Link:
         self.orientation = np.array(orientation)
         self.joint_coords = np.array(joint_coords)
         self.joint_axis = np.array(joint_axis)
+        self.joint_limits = joint_limits
+        
+    def __str__(self):
+        """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
+        return(f"El Eslabón '{self.id}' ({self.tipo}), coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length} y límites: {self.joint_limits}")
     
     def obtener_eje_de_giro(self):
         """
-        Devuelve el eje de giro del eslabón.  El eje de giro se define como el eje de la articulación
-        multiplicado por la longitud del eslabón.  Este método es útil para calcular la posición y
-        orientación del eslabón en el espacio.
+        Devuelve el eje de giro del eslabón.  El eje de giro se define como el eje de la articulación multiplicado
+        por la longitud del eslabón.  Este método es útil para calcular la posición y orientación del eslabón en el espacio.
+        Pero sobretodo, para verificar que los ejes de giro son correctos.
         """
         eje = self.joint_axis
         eje_abs = np.abs(eje)
@@ -203,10 +209,7 @@ class Link:
         print(f"Eje de giro: {signo}{eje_str}\033[0m \t( {sentido} \033[0m)")
         
         return eje*self.length
-    
-    def __str__(self):
-        """ Retorna una representación en cadena del objeto Link, incluyendo su ID, tipo y eje helicoidal."""
-        return(f"El Eslabón '{self.id}' ({self.tipo}), coordenadas: {self.joint_coords}, eje: {self.joint_axis}, longitud: {self.length}")
+
 
 def cargar_robot_desde_yaml(path="robot.yaml"):
     """
@@ -242,85 +245,65 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
     robot = Robot(robot_data['name'])
 
     for l in robot_data['links']:
+        joint_limits_str = l.get('joint_limits', None)
+        if joint_limits_str:
+            # Eliminar paréntesis y dividir por la coma
+            parts = joint_limits_str.strip('()').split(',')
+            # Convertir a flotantes y crear una tupla
+            joint_limits = tuple(float(part.strip()) for part in parts)
+        else:
+            joint_limits = None
+
         new_link = Link(
             id=l['id'],
             length=l['length'],
             tipo=l['type'],
             orientation=l['link_orientation'],
             joint_coords=l['joint_coords'],
-            joint_axis=l['joint_axis']
+            joint_axis=l['joint_axis'],
+            joint_limits=joint_limits
         )
         robot.add_link(new_link)
         
     robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
+    robot.limits_dict = {f'joint_{i+1}': link.joint_limits for i, link in enumerate(robot.links) if link.joint_limits is not None}
     return robot
 
-# Función para imponer limites
-def limits(θ):
+def limits(robot: Robot, θ):
     """
     Function to limit the angles of the Niryo One robot.
     """
-    margen = np.deg2rad(5)
-    # Define the limits for each joint
-    limits = {
-        'joint_1': (-3.054+margen, 3.054-margen),
-        'joint_2': (-1.571+margen, 0.6405-margen),
-        'joint_3': (-1.396+margen, 1.571-margen),
-        'joint_4': (-3.054+margen, 3.054-margen),
-        'joint_5': (-1.745+margen, 1.745-margen),
-        'joint_6': (-2.574+margen, 2.574-margen),
-    }
-    
     # If θ is a dictionary, extract its values as a list
     if isinstance(θ, dict):
         θ = list(θ.values())
     
     # Check if each joint angle is within its limits
     for i in range(len(θ)):
-        if θ[i] < limits[f'joint_{i+1}'][0] or θ[i] > limits[f'joint_{i+1}'][1]:
+        if θ[i] < robot.limits_dict[f'joint_{i+1}'][0] or θ[i] > robot.limits_dict[f'joint_{i+1}'][1]:
             return False, f"Joint {i+1} out of limits: {θ[i]}"
     return True, "All joints within limits"
 
-def get_limits_positive():
-    margen = np.deg2rad(5)
-    # Define the limits for each joint
-    limits = {
-        'joint_1': (-3.054+margen, 3.054-margen),
-        'joint_2': (-1.571+margen, 0.6405-margen),
-        'joint_3': (-1.396+margen, 1.571-margen),
-        'joint_4': (-3.054+margen, 3.054-margen),
-        'joint_5': (-1.745+margen, 1.745-margen),
-        'joint_6': (-2.574+margen, 2.574-margen),
-    }
-    positive_limits = [limits[f'joint_{i+1}'][1] for i in range(6)]
+def get_limits_positive(robot: Robot):
+    positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(6)]
     return np.array(positive_limits)
 
-def get_limits_negative():
-    margen = np.deg2rad(5)
-    # Define the limits for each joint
-    limits = {
-        'joint_1': (-3.054+margen, 3.054-margen),
-        'joint_2': (-1.571+margen, 0.6405-margen),
-        'joint_3': (-1.396+margen, 1.571-margen),
-        'joint_4': (-3.054+margen, 3.054-margen),
-        'joint_5': (-1.745+margen, 1.745-margen),
-        'joint_6': (-2.574+margen, 2.574-margen),
-    }
-    negative_limits = [limits[f'joint_{i+1}'][0] for i in range(6)]
+def get_limits_negative(robot: Robot):
+    negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(6)]
     return np.array(negative_limits)
 
-def thetas_aleatorias(links):
-    negative_limits = get_limits_negative()
-    positive_limits = get_limits_positive()
-
+def thetas_aleatorias(robot: Robot):
+    negative_limits = get_limits_negative(robot)
+    positive_limits = get_limits_positive(robot)
+    # print(f"negative_limits: {negative_limits}")
+    # print(f"positive_limits: {positive_limits}")
     while True:
         random_config = np.zeros(len(negative_limits))
         for i in range(len(negative_limits)):
             random_config[i] = np.random.uniform(negative_limits[i], positive_limits[i])
         # Validar la configuración generada
-        valid, msg = limits(random_config)
+        valid, msg = limits(robot, random_config)
         if valid:
-            return random_config, {f"t{i}": random_config[i] for i in range(len(links))}
+            return random_config, {f"t{i}": random_config[i] for i in range(len(robot.links))}
         else:
             print(f"Configuración random {np.round(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
 
@@ -331,6 +314,7 @@ if __name__ == "__main__":
     print("Ejes helicoidales del robot:")
     print(robot.ejes_helicoidales)
     #print(robot.get_ejes_helicoidales())
+    print(f"\nLímites de las articulaciones: {robot.limits_dict}")
     print(f"\n{robot}")
 
     print("\nObtener_eje_de_giro")

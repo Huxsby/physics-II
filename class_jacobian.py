@@ -206,20 +206,20 @@ def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
     llave = np.array(llave)                     # Convertir la lista de vectores de llave de torsión a un array NumPy.
     return xx, yy, llave                        # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de fuerza (llave).
 
-def graficar_elipsoides(xx, yy, giro, llave, indices=(1, 3), limitplot=8):
+def graficar_elipsoides(xx, yy, giro, llave, name=None, indices=(1, 3), limitplot=8, point_size=2):
     """
     Función para graficar los elipsoides de manipulabilidad y fuerza. 
     
     Nota: En la práctica 2 del curso 2024-25 la gráfica tiene el eje X invertido.
     """
-    plt.scatter(xx, yy, label=r'${\dot\theta}$ ó $\tau$')
-    plt.scatter(giro[:, indices[0]], giro[:, indices[1]], label="manipulabilidad")
-    plt.scatter(llave[:, indices[0]], llave[:, indices[1]], label="fuerza")
+    plt.scatter(xx, yy, label=r'${\dot\theta}$ ó $\tau$', s=point_size)
+    plt.scatter(giro[:, indices[0]], giro[:, indices[1]], label="manipulabilidad", s=point_size)
+    plt.scatter(llave[:, indices[0]], llave[:, indices[1]], label="fuerza", s=point_size)
     plt.ylim(top=limitplot, bottom=-limitplot)
     plt.xlim(left=-limitplot, right=limitplot)
     plt.legend(loc='upper right', fontsize='large')
     plt.grid(True)
-    plt.title("Elipsoides de Manipulabilidad y Fuerza")
+    plt.title(f"Elipsoides de Manipulabilidad y Fuerza de {name}")
     plt.xlabel("Eje X")
     plt.ylabel("Eje Y")
     plt.show()
@@ -311,7 +311,7 @@ def prueba_elipsoides(sol1, sol2):
     robot = cargar_robot_desde_yaml("robot.yaml")
     J_sym, thetas_s = calcular_jacobiana(robot)
 
-    random_config, thetas_dic_random = thetas_aleatorias(robot.links)
+    random_config, thetas_dic_random = thetas_aleatorias(robot)
 
     Jal = J_sym.subs(thetas_dic_random)
     Jp0 = J_sym.subs({thetas_s[0]:0, thetas_s[1]:0, thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0})
@@ -321,62 +321,63 @@ def prueba_elipsoides(sol1, sol2):
     # restringimos las velocidades de las articulaciones a sólo 2 grados de libertad:
 
     vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
-    print(f"\n--- Volúmenes de los elipsoides ({random_config})---")
+    print(f"\n\033[93m--- Elipsoides de una configuración aleatoria (validada) ({random_config})---\033[0m")
     # mostrar_jacobiana_resumida(Jal)
-    print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
-    print(f"Volumen del elipsoide de fuerza: {vol_EF}")
-    print("Graficando elipsoides... configuración aleatoria")
+    print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
+    print("\tGraficando elipsoides... configuración aleatoria")
     xx, yy, giro = elipsoide_manipulabilidad(Jal)
     _, _, llave = elipsoide_fuerza(Jal)
-    graficar_elipsoides(xx, yy, giro, llave)
+    graficar_elipsoides(xx, yy, giro, llave, name=random_config)
 
+    input("\nPresiona Enter para continuar con la búsqueda de configuraciones válidas...")
     # Buscar el primer caso válido en sol1 o sol2
     valid_config = None
     msg = ""
 
+    print(f"\n\033[93m--- Buscando configuraciones válidas (Probaremos a gráficar la primera que sea compatible con {robot.name}) ---\033[0m")
     # Caso 1: t2=t3=t4=0
     for config in sol1:
         complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
         complete_config.update(config)  # Actualizar con la solución actual de sol1
-        complete_config.update({thetas_s[2]: 0, thetas_s[3]: 0, thetas_s[4]: 0})  # Completar con restricciones
-        print(f"Configuración completa: {complete_config}")
-        valid, msg = limits(complete_config)
+        print(f"\tProbando configuración completa en \033[35mCaso 1: \033[36m{complete_config}\033[0m")
+        valid, msg = limits(robot, complete_config)
         if valid:
             valid_config = complete_config
-            msg = f"Configuración válida encontrada en Caso 1: {valid_config}"
+            msg = f"Configuración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m"
             break
 
     # Caso 2: t1=t3=t4=0
     for config in sol2:
         complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
         complete_config.update(config)  # Actualizar con la solución actual de sol2
-        complete_config.update({thetas_s[1]: 0, thetas_s[3]: 0, thetas_s[4]: 0})  # Completar con restricciones
-        print(f"Configuración completa: {complete_config}")
-        valid, msg = limits(complete_config)
+        print(f"\tProbando configuración completa en \033[35mCaso 2: \033[36m{complete_config}\033[0m")
+        valid, msg = limits(robot, complete_config)
         if valid:
             valid_config = complete_config
-            msg = f"Configuración válida encontrada en Caso 2: {valid_config}"
+            msg = f"Configuración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m"
             break
 
     if valid_config:
         print(msg)
         Jal = J_sym.subs(valid_config)
         vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
-        print(f"\n--- Volúmenes de los elipsoides ({valid_config})---")
-        print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
-        print(f"Volumen del elipsoide de fuerza: {vol_EF}")
-        print("Graficando elipsoides... configuración válida")
+        print(f"\n--- Volúmenes de los elipsoides ({valid_config}) ---")
+        print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
+        print(f"\tGraficando elipsoides... configuración singular válida para {robot.name}")
         xx, yy, giro = elipsoide_manipulabilidad(Jal)
         _, _, llave = elipsoide_fuerza(Jal)
-        graficar_elipsoides(xx, yy, giro, llave)
+        graficar_elipsoides(xx, yy, giro, llave, name=valid_config)
     else:
-        print("No se encontró una configuración válida en los casos analizados.")
+        print("\tNo se encontró una configuración válida en los casos analizados.")
 
-    print("\n--- Gráfica de los volúmenes de los elipsoides (θs=0)---")
+    print("\n\033[93m--- Elipsoides configuración nula (θs=0) ---\033[0m")
+    print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
+    print(f"\tGraficando elipsoides... configuración θs=0")
     # mostrar_jacobiana_resumida(Jp0)
     xx, yy, giro = elipsoide_manipulabilidad(Jp0)
     _, _, llave = elipsoide_fuerza(Jp0)
-    graficar_elipsoides(xx, yy, giro, llave)
+    graficar_elipsoides(xx, yy, giro, llave, name="(θs=0)")
+    print("\n\n\033[93m--- Fin de la prueba ---\033[0m")
 
 if __name__ == "__main__":
     sol1, sol2 = prueba_jacobiana()
