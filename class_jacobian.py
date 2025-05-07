@@ -3,7 +3,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-from class_robot_structure import Robot, cargar_robot_desde_yaml
+from class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 
@@ -226,8 +226,7 @@ def graficar_elipsoides(xx, yy, giro, llave, indices=(1, 3), limitplot=8):
 
 def calcular_volumen_elipsoides(J):
     """ Calcula el volumen de los elipsoides de manipulabilidad y fuerza a partir de la Jacobiana. """
-    vol_EM = (J*sp.Transpose(J)).det() # Volumen del elipsoide de manipulabilidad
-    vol_EF = ((J*sp.Transpose(J)).inv()).det() # Volumen del elipsoide de fuerza
+    vol_EM = vol_EF =  (J*sp.Transpose(J)).det() # Volumen del elipsoide de manipulabilidad
     return vol_EM, vol_EF
 
 """ Funciones de validación """
@@ -305,26 +304,73 @@ def prueba_jacobiana():
     print("\nConfiguraciones singulares:")
     print(f"Caso 1 (t2=t3=t4=0): {sol1}")
     print(f"Caso 2 (t1=t3=t4=0): {sol2}")
+    return sol1, sol2
 
-def prueba_elipsoides():
+def prueba_elipsoides(sol1, sol2):
     """ Función de prueba para calcular y graficar los elipsoides de manipulabilidad y fuerza. """
     robot = cargar_robot_desde_yaml("robot.yaml")
-    J_sym, t = calcular_jacobiana(robot)
+    J_sym, thetas_s = calcular_jacobiana(robot)
 
-    
-    Jpi = J_sym.subs({t[0]:np.pi, t[1]:np.pi, t[2]:np.pi, t[3]:np.pi, t[4]:np.pi})
-    Jp0 = J_sym.subs({t[0]:0, t[1]:0, t[2]:0, t[3]:0, t[4]:0})
+    random_config, thetas_dic_random = thetas_aleatorias(robot.links)
+
+    Jal = J_sym.subs(thetas_dic_random)
+    Jp0 = J_sym.subs({thetas_s[0]:0, thetas_s[1]:0, thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0})
 
     # Primero obtenemos la matriz Jacobiana. Tomando la configuración cero del robot:
     # A partir de la Jacobiana podemos calcular los elipsoides de manipulabilidad y fuerza en 2 dimensiones, si
     # restringimos las velocidades de las articulaciones a sólo 2 grados de libertad:
 
-    vol_EM, vol_EF = calcular_volumen_elipsoides(Jpi)
-    print("\n--- Volúmenes de los elipsoides (θs=pi)---")
-    # mostrar_jacobiana_resumida(Jpi)
+    vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
+    print(f"\n--- Volúmenes de los elipsoides ({random_config})---")
+    # mostrar_jacobiana_resumida(Jal)
     print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
     print(f"Volumen del elipsoide de fuerza: {vol_EF}")
-    print(f"Producto de volúmenes: {vol_EM * vol_EF}")
+    print("Graficando elipsoides... configuración aleatoria")
+    xx, yy, giro = elipsoide_manipulabilidad(Jal)
+    _, _, llave = elipsoide_fuerza(Jal)
+    graficar_elipsoides(xx, yy, giro, llave)
+
+    # Buscar el primer caso válido en sol1 o sol2
+    valid_config = None
+    msg = ""
+
+    # Caso 1: t2=t3=t4=0
+    for config in sol1:
+        complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
+        complete_config.update(config)  # Actualizar con la solución actual de sol1
+        complete_config.update({thetas_s[2]: 0, thetas_s[3]: 0, thetas_s[4]: 0})  # Completar con restricciones
+        print(f"Configuración completa: {complete_config}")
+        valid, msg = limits(complete_config)
+        if valid:
+            valid_config = complete_config
+            msg = f"Configuración válida encontrada en Caso 1: {valid_config}"
+            break
+
+    # Caso 2: t1=t3=t4=0
+    for config in sol2:
+        complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
+        complete_config.update(config)  # Actualizar con la solución actual de sol2
+        complete_config.update({thetas_s[1]: 0, thetas_s[3]: 0, thetas_s[4]: 0})  # Completar con restricciones
+        print(f"Configuración completa: {complete_config}")
+        valid, msg = limits(complete_config)
+        if valid:
+            valid_config = complete_config
+            msg = f"Configuración válida encontrada en Caso 2: {valid_config}"
+            break
+
+    if valid_config:
+        print(msg)
+        Jal = J_sym.subs(valid_config)
+        vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
+        print(f"\n--- Volúmenes de los elipsoides ({valid_config})---")
+        print(f"\nVolumen del elipsoide de manipulabilidad: {vol_EM}")
+        print(f"Volumen del elipsoide de fuerza: {vol_EF}")
+        print("Graficando elipsoides... configuración válida")
+        xx, yy, giro = elipsoide_manipulabilidad(Jal)
+        _, _, llave = elipsoide_fuerza(Jal)
+        graficar_elipsoides(xx, yy, giro, llave)
+    else:
+        print("No se encontró una configuración válida en los casos analizados.")
 
     print("\n--- Gráfica de los volúmenes de los elipsoides (θs=0)---")
     # mostrar_jacobiana_resumida(Jp0)
@@ -333,5 +379,5 @@ def prueba_elipsoides():
     graficar_elipsoides(xx, yy, giro, llave)
 
 if __name__ == "__main__":
-    prueba_jacobiana()
-    prueba_elipsoides()
+    sol1, sol2 = prueba_jacobiana()
+    prueba_elipsoides(sol1, sol2)
