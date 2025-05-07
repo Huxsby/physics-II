@@ -255,6 +255,75 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
     robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
     return robot
 
+# Función para imponer limites
+def limits(θ):
+    """
+    Function to limit the angles of the Niryo One robot.
+    """
+    margen = np.deg2rad(5)
+    # Define the limits for each joint
+    limits = {
+        'joint_1': (-3.054+margen, 3.054-margen),
+        'joint_2': (-1.571+margen, 0.6405-margen),
+        'joint_3': (-1.396+margen, 1.571-margen),
+        'joint_4': (-3.054+margen, 3.054-margen),
+        'joint_5': (-1.745+margen, 1.745-margen),
+        'joint_6': (-2.574+margen, 2.574-margen),
+    }
+    
+    # If θ is a dictionary, extract its values as a list
+    if isinstance(θ, dict):
+        θ = list(θ.values())
+    
+    # Check if each joint angle is within its limits
+    for i in range(len(θ)):
+        if θ[i] < limits[f'joint_{i+1}'][0] or θ[i] > limits[f'joint_{i+1}'][1]:
+            return False, f"Joint {i+1} out of limits: {θ[i]}"
+    return True, "All joints within limits"
+
+def get_limits_positive():
+    margen = np.deg2rad(5)
+    # Define the limits for each joint
+    limits = {
+        'joint_1': (-3.054+margen, 3.054-margen),
+        'joint_2': (-1.571+margen, 0.6405-margen),
+        'joint_3': (-1.396+margen, 1.571-margen),
+        'joint_4': (-3.054+margen, 3.054-margen),
+        'joint_5': (-1.745+margen, 1.745-margen),
+        'joint_6': (-2.574+margen, 2.574-margen),
+    }
+    positive_limits = [limits[f'joint_{i+1}'][1] for i in range(6)]
+    return np.array(positive_limits)
+
+def get_limits_negative():
+    margen = np.deg2rad(5)
+    # Define the limits for each joint
+    limits = {
+        'joint_1': (-3.054+margen, 3.054-margen),
+        'joint_2': (-1.571+margen, 0.6405-margen),
+        'joint_3': (-1.396+margen, 1.571-margen),
+        'joint_4': (-3.054+margen, 3.054-margen),
+        'joint_5': (-1.745+margen, 1.745-margen),
+        'joint_6': (-2.574+margen, 2.574-margen),
+    }
+    negative_limits = [limits[f'joint_{i+1}'][0] for i in range(6)]
+    return np.array(negative_limits)
+
+def thetas_aleatorias(links):
+    negative_limits = get_limits_negative()
+    positive_limits = get_limits_positive()
+
+    while True:
+        random_config = np.zeros(len(negative_limits))
+        for i in range(len(negative_limits)):
+            random_config[i] = np.random.uniform(negative_limits[i], positive_limits[i])
+        # Validar la configuración generada
+        valid, msg = limits(random_config)
+        if valid:
+            return random_config, {f"t{i}": random_config[i] for i in range(len(links))}
+        else:
+            print(f"Configuración random {np.round(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
+
 # Ejemplo de uso
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")

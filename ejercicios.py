@@ -49,6 +49,8 @@ def menu():
         print("-"*90)   # Separador
         print("10. Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
         print("-"*90)   # Separador
+        print("11. Comparar configuraciones random.")
+        print("-"*90)   # Separador
         print("0. Salir.")
 
         opcion = input("\nSeleccione una opción: ")
@@ -176,7 +178,46 @@ def menu():
             limpiar_pantalla()
             prueba_elipsoides()
             limpiar_pantalla()
+        
+        elif opcion == "11":                            # 11. Comparar configuraciones random 8 veces
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
+            J_sym, thetas_s = calcular_jacobiana(robot)
+            print("Comparando configuraciones...")
+
+            # Configuración cero
+            zero_config = np.zeros(len(robot.links))
+            thetas_dic_zero = {f"t{i}": zero_config[i] for i in range(len(robot.links))}
+            J_num_zero = J_sym.subs(thetas_dic_zero).evalf(chop=True)
+            vol_EM_zero, vol_EF_zero = calcular_volumen_elipsoides(J_num_zero)
+            print(f"Configuración Cero: {zero_config}\tVol EM: {vol_EM_zero:.2e}\tVol EF: {vol_EF_zero:.2e}")
+
+            # Configuración limite positiva
+            limit_conf = get_limits_positive()
+            thetas_dic_limit = {f"t{i}": limit_conf[i] for i in range(len(robot.links))}
+            J_num_limit = J_sym.subs(thetas_dic_limit).evalf(chop=True)
+            vol_EM_limit, vol_EF_limit = calcular_volumen_elipsoides(J_num_limit)
+            print(f"Configuración Límite Positiva: {limit_conf}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
+
+            # Configuración singular propuesta
+            singular_config = np.array([0, 0, 1.43617532221234, 0, 0, 0])
+            thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(len(robot.links))}
+            J_num_singular = J_sym.subs(thetas_dic_singular).evalf(chop=True)
+            vol_EM_singular, vol_EF_singular = calcular_volumen_elipsoides(J_num_singular)
+            print(f"Configuración Singular Propuesta: {singular_config}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
+
+            negative_limits = get_limits_negative()
+            positive_limits = get_limits_positive()
+            print("\nComparando configuraciones random 8 veces...")
+            for vueltas in range(8):
+                random_config, thetas_dic_random = thetas_aleatorias(robot.links)
+
+                J_num_random = J_sym.subs(thetas_dic_random).evalf(chop=True)
+                vol_EM_random, vol_EF_random = calcular_volumen_elipsoides(J_num_random)
+                print(f"Random Config {vueltas+1}: {np.round(random_config, 2)}\tVol EM: {vol_EM_random:.2e}\tVol EF: {vol_EF_random:.2e}")
+            limpiar_pantalla()
             
+                
+
         elif opcion == "0":                             # 0. Salir
             print("Saliendo...", end=" ")
             limpiar_pantalla()
