@@ -343,19 +343,24 @@ def prueba_elipsoides(sol1, sol2):
         valid, msg = limits(robot, complete_config)
         if valid:
             valid_config = complete_config
-            msg = f"Configuración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m"
+            msg = f"Configuración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m {msg}"
             break
+        else:
+            print(f"\tConfiguración inválida en \033[35mCaso 1: \033[36m{complete_config}\033[0m {msg}")
 
     # Caso 2: t1=t3=t4=0
-    for config in sol2:
-        complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
-        complete_config.update(config)  # Actualizar con la solución actual de sol2
-        print(f"\tProbando configuración completa en \033[35mCaso 2: \033[36m{complete_config}\033[0m")
-        valid, msg = limits(robot, complete_config)
-        if valid:
-            valid_config = complete_config
-            msg = f"Configuración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m"
-            break
+    if not valid_config:  # Solo buscar en el caso 2 si no se encontró una configuración válida en el caso 1
+        for config in sol2:
+            complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
+            complete_config.update(config)  # Actualizar con la solución actual de sol2
+            print(f"\tProbando configuración completa en \033[35mCaso 2: \033[36m{complete_config}\033[0m")
+            valid, msg = limits(robot, complete_config)
+            if valid:
+                valid_config = complete_config
+                msg = f"Configuración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m {msg}"
+                break
+            else:
+                print(f"\tConfiguración inválida en \033[35mCaso 2: \033[36m{complete_config}\033[0m {msg}")
 
     if valid_config:
         print(msg)
