@@ -46,18 +46,9 @@ robot:
       length: 0.0415
       type: revolute
       link_orientation: [1, 0, 0]
-      joint_coords: [0.170, 0, 0]
+      joint_coords: [0.180, 0, 0]
       joint_axis: [0, -1, 0]  # Eje -Y
       joint_limits: (-1.745, 1.745)   # t4
-
-    # Articulación prismática añadida (J6)
-    - id: Extensor
-      length: 0.1                     # sin longitud fija: es solo un deslizador
-      type: prismatic
-      link_orientation: [1, 0, 0]
-      joint_coords: [0.010, 0, 0]     # Posición corregida para el deslizador
-      joint_axis: [1, 0, 0]           # se desliza a lo largo de Z
-      joint_limits: (0.0, 0.15)      # t5 recorrido de 0 a 0.15 m (15 cm) (Se resguarda dentro del antebrazo dejando un margen de 10 cm)
 
     # Muñeca (J6) - Corrección de eje y coordenadas
     - id: Muneca

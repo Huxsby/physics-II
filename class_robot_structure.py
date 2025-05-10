@@ -256,7 +256,8 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
             initial_max_limit = float(parts[1].strip())
 
             # Definir el margen
-            margen = np.deg2rad(MARGEN_LIMITES_THETAS)  # Convertir a radianes
+            #margen = np.deg2rad(MARGEN_LIMITES_THETAS)  # Convertir a radianes
+            margen = 0
 
             # Aplicar el margen para reducir el rango de operación
             # El límite inferior se incrementa y el límite superior se decrementa
@@ -331,11 +332,11 @@ def limits(robot: Robot, θ):
     return True, "All joints within limits"
 
 def get_limits_positive(robot: Robot):
-    positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(6)]
+    positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(len(robot.links))]
     return np.array(positive_limits)
 
 def get_limits_negative(robot: Robot):
-    negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(6)]
+    negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(len(robot.links))]
     return np.array(negative_limits)
 
 def thetas_aleatorias(robot: Robot):
@@ -360,6 +361,52 @@ def thetas_aleatorias(robot: Robot):
         else:
             print(f"Configuración random {np.round(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
 
+def thetas_limite(robot: Robot, thetas):
+    """
+    Limita los ángulos de las articulaciones del robot a sus límites definidos.
+    """
+    if robot.limits_dict is None or len(robot.limits_dict) == 0:
+        return thetas
+
+    # Si thetas es un diccionario, extraer sus valores como una lista
+    if isinstance(thetas, dict):
+        thetas = list(thetas.values())
+
+    # Limitar cada ángulo a su rango definido
+    for i in range(len(thetas)):
+        joint_key = f'joint_{i+1}'
+        if joint_key in robot.limits_dict:
+            lower_limit = robot.limits_dict[joint_key][0]
+            upper_limit = robot.limits_dict[joint_key][1]
+            thetas[i] = np.clip(thetas[i], lower_limit, upper_limit)
+    return thetas
+
+def limitar_thetas(robot: Robot, thetas):
+    """
+    Dado un array de thethas se comprueba que estén dentro de los límites del robot.
+    Si no lo están, se ajustan a su limite mas proximo y se anuncia el cambio por la terminal.
+    """
+    if robot.limits_dict is None or len(robot.limits_dict) == 0:
+        return thetas
+
+    # Si thetas es un diccionario, extraer sus valores como una lista
+    if isinstance(thetas, dict):
+        thetas = list(thetas.values())
+
+    # Limitar cada ángulo a su rango definido
+    for i in range(len(thetas)):
+        joint_key = f'joint_{i+1}'
+        if joint_key in robot.limits_dict:
+            lower_limit = robot.limits_dict[joint_key][0]
+            upper_limit = robot.limits_dict[joint_key][1]
+            if thetas[i] < lower_limit:
+                print(f"El valor de joint {joint_key} ({thetas[i]}) está por debajo del límite inferior ({lower_limit}). Ajustando a {lower_limit}.")
+                thetas[i] = lower_limit
+            elif thetas[i] > upper_limit:
+                print(f"El valor de joint {joint_key} ({thetas[i]}) está por encima del límite superior ({upper_limit}). Ajustando a {upper_limit}.")
+                thetas[i] = upper_limit
+    return thetas
+    
 # Ejemplo de uso
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
