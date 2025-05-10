@@ -7,7 +7,9 @@ class_datos.py
         - Cambiar en ejercicios.py
 
 class_robot_structure.py
-    - Optimizar (si se puede hacer): self.ejes_helicoidales = self.get_ejes_helicoidales()
+    [X] - Optimizar (si se puede hacer): self.ejes_helicoidales = self.get_ejes_helicoidales()
+    [ ] - Los margenes no se calculan de forma correcta en casos limite / de precisión.
+
 
 ejercicio.py
 !   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.
