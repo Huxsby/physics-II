@@ -201,6 +201,7 @@ def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_sp
         plt.tight_layout()
         plt.show()
     return fig, ax, anim
+
 def _plot_frame(robot, thetas, ax):
     """Función interna para dibujar un solo frame del robot."""
     transformaciones = calcular_transformaciones(robot, thetas)

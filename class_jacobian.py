@@ -319,7 +319,6 @@ def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
 
     return xx, yy, np.array(llave)
 
-
 def graficar_elipsoides(xx, yy, giro, llave, name=None, indices=(1, 3), limitplot=8, point_size=2):
     """
     Función para graficar los elipsoides de manipulabilidad y fuerza. 

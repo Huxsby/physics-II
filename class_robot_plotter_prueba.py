@@ -94,7 +94,7 @@ def ejemplo_animacion(robot: Robot):
     
     if anim:
         print("Guardando animación en 'animacion_dos_configuraciones.mp4'...")
-        anim.save("animacion_dos_configuraciones.mp4", writer="ffmpeg", fps=30)
+        anim.save("animacion_dos_configuraciones.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
         print("Animación guardada.")
     plt.close(fig)
 
@@ -216,7 +216,7 @@ def ejemplo_cinematica_inversa_circular(robot: Robot):
     # Visualizar y guardar animación
     print("Animando trayectoria circular...")
     fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos)
-    anim.save("trayectoria_circular.mp4", writer="ffmpeg", fps=30)
+    anim.save("trayectoria_circular.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
     plt.close()
 
 if __name__ == "__main__":
