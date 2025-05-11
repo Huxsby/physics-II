@@ -1,5 +1,5 @@
 robot:
-  name: niryo_one
+  name: brazo_dron
   # Función para imponer limites
   # margen = np.deg2rad(5) # This line is a comment and not valid YAML for variable assignment.
                           # The string values from limits_dict will be moved as is.

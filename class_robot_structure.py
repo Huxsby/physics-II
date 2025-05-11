@@ -88,6 +88,7 @@ class Robot:
         self.links = []
         self.ejes_helicoidales = "Los ejes helicoidales se calcularán al crear el robot."
         self.limits_dict = None # Inicializa limits_dict como None, se puede establecer más tarde
+        self.num_links = 0
         print(f"\033[92\tmRobot '{self.name}' creado.\033[0m")
 
     def __str__(self):
@@ -104,6 +105,7 @@ class Robot:
             raise ValueError("Tipo de eslabón no válido. Debe ser 'revolute' o 'prismatic'.")
 
         self.links.append(new_link)
+        self.num_links += 1
 
     def get_ejes_helicoidales(self):
         """ Devuelve una lista de los ejes helicoidales de todos los eslabones del robot. """
