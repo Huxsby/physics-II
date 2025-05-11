@@ -2,6 +2,7 @@ import sympy as sp
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+from itertools import combinations
 
 from class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits
 
@@ -95,22 +96,99 @@ def calcular_jacobiana(robot: Robot):
 
 def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     """
-    Calcula las configuraciones singulares para una Jacobiana dada
-    con ciertas restricciones en los ángulos.
-    
-    Nota: Estas configuraciones singulares, pueden no ser accesibles por el robot.
-    Antes de mover el robot a alguna de estas configuraciones, verifica que esté dentro
-    del rango alcanzable para las articulaciones correspondientes.
+    Calcula las configuraciones singulares de una Jacobiana simbólica
+    basándose en el determinante de dos submatrices específicas:
+    1. Jacobiana[primeras 6 filas, primeras 6 columnas]
+    2. Jacobiana[primeras 6 filas, primeras 5 columnas + última columna]
     """
-    try:
-        tiempo = time.time()  # Iniciar temporizador
-        determinant = jacobian.subs(substitutions).det()
-        solutions = sp.solve(determinant)
-        print(f"\t\033[92mTiempo de cálculo de configuraciones singulares con {substitutions}: {time.time() - tiempo:.4f} segundos\033[0m")
-        return solutions
-    except Exception as e:
-        print(f"\033[91mError al calcular configuraciones singulares con {substitutions}:\033[0m {e}")
-        return None
+    tiempo_total_start = time.time()
+    J_sub = jacobian.subs(substitutions)
+    
+    # Ordenar free_vars por nombre para consistencia, útil si las soluciones se comparan/muestran
+    free_vars = sorted([s for s in jacobian.free_symbols if s not in substitutions], key=lambda x: str(x.name))
+
+    all_solutions = []
+
+    # Verificar si la Jacobiana tiene suficientes filas
+    if J_sub.rows < 6:
+        print(f"\t\033[91mLa Jacobiana sustituida tiene {J_sub.rows} filas, se necesitan al menos 6 para este análisis.\033[0m")
+        print(f"\t\033[92mTiempo total de procesamiento: {time.time() - tiempo_total_start:.4f}s\033[0m")
+        return []
+
+    # --- Determinante 1: Primeras 6 filas, primeras 6 columnas ---
+    print(f"\n\t--- Analizando Determinante 1 (submatriz 6x6 de las primeras 6 columnas) ---")
+    tiempo_det1_start = time.time()
+    if J_sub.cols >= 6:
+        try:
+            sub_matrix1 = J_sub[:6, :6]
+            det1 = sub_matrix1.det()
+            # print(f"\tExpresión del Determinante 1: {det1}") # Descomentar para depuración
+            solutions1 = sp.solve(det1, free_vars, dict=True)
+            
+            if not isinstance(solutions1, list): # sp.solve puede devolver un solo dict
+                solutions1 = [solutions1] if solutions1 else []
+            
+            # Filtrar soluciones que no sean diccionarios (ej. True/False para ecuaciones triviales)
+            solutions1 = [s for s in solutions1 if isinstance(s, dict)]
+
+            all_solutions.extend(solutions1)
+            msg_color = "\033[92m" if solutions1 else "\033[96m"
+            print(f"\t{msg_color}Soluciones para Det1 ({len(solutions1)} encontradas): {solutions1 if solutions1 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
+        except Exception as e:
+            print(f"\t\033[91mError calculando/resolviendo Det1: {e}. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
+    else:
+        print(f"\t\033[93mOmitiendo Det1: J_sub tiene {J_sub.cols} columnas, se necesitan al menos 6. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
+
+    # --- Determinante 2: Primeras 6 filas, primeras 5 columnas + última columna ---
+    print(f"\n\t--- Analizando Determinante 2 (submatriz 6x6 de las primeras 5 columnas y la última) ---")
+    tiempo_det2_start = time.time()
+    if J_sub.cols >= 6: # Se necesitan al menos 6 columnas para formar esta submatriz 6x6
+        col_indices_det2 = list(range(5))  # Columnas 0, 1, 2, 3, 4
+        last_col_idx = J_sub.cols - 1
+        col_indices_det2.append(last_col_idx)
+        # col_indices_det2 es ahora [0,1,2,3,4, J_sub.cols-1]
+        # Esta lista tiene 6 elementos distintos porque J_sub.cols-1 >= 5 (dado que J_sub.cols >= 6)
+
+        if J_sub.cols == 6:
+            # En este caso, col_indices_det2 será [0,1,2,3,4,5], idéntica a la submatriz de Det1
+            print(f"\t\033[96mNota: Para la forma de J_sub {J_sub.shape}, Det2 es idéntico a Det1 (columnas: {col_indices_det2}). Se re-evaluará como solicitado.\033[0m")
+        else:
+            print(f"\t\033[96mFormando Det2 con columnas: {col_indices_det2}.\033[0m")
+            
+        try:
+            sub_matrix2 = J_sub.extract(list(range(6)), col_indices_det2)
+            det2 = sub_matrix2.det()
+            # print(f"\tExpresión del Determinante 2: {det2}") # Descomentar para depuración
+            solutions2 = sp.solve(det2, free_vars, dict=True)
+
+            if not isinstance(solutions2, list):
+                solutions2 = [solutions2] if solutions2 else []
+            
+            solutions2 = [s for s in solutions2 if isinstance(s, dict)]
+
+            all_solutions.extend(solutions2)
+            msg_color = "\033[92m" if solutions2 else "\033[96m"
+            print(f"\t{msg_color}Soluciones para Det2 ({len(solutions2)} encontradas): {solutions2 if solutions2 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
+        except Exception as e:
+            print(f"\t\033[91mError calculando/resolviendo Det2: {e}. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
+    else: # J_sub.cols < 6
+        print(f"\t\033[93mOmitiendo Det2: J_sub tiene {J_sub.cols} columnas, se necesitan al menos 6. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
+
+    # Eliminar soluciones duplicadas
+    unique_sols_tuples = set()
+    final_unique_solutions = []
+    if all_solutions:
+        for sol_dict in all_solutions:
+            if isinstance(sol_dict, dict):
+                # Crear una representación canónica (tupla ordenada de items) para la unicidad
+                sol_tuple = tuple(sorted(sol_dict.items(), key=lambda item: str(item[0])))
+                if sol_tuple not in unique_sols_tuples:
+                    unique_sols_tuples.add(sol_tuple)
+                    final_unique_solutions.append(sol_dict)
+    
+    print(f"\n\tSe encontraron {len(final_unique_solutions)} configuraciones singulares únicas de las evaluadas.")
+    print(f"\t\033[92mTiempo total de procesamiento para find_singular_configurations: {time.time() - tiempo_total_start:.4f}s\033[0m")
+    return final_unique_solutions
 
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
@@ -289,12 +367,12 @@ def prueba_jacobiana():
     print("\n--- Búsqueda de configuraciones singulares ---")
     
     # Restricciones para el primer caso
-    subs1 = {thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0}
+    subs1 = {thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0}
     sol1 = find_singular_configurations(Jacobian, subs1)
     # Resultado esperado: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
 
     # Restricciones para el segundo caso
-    subs2 = {thetas_s[1]:0, thetas_s[3]:0, thetas_s[4]:0}
+    subs2 = {thetas_s[1]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0}
     sol2 = find_singular_configurations(Jacobian, subs2)
     # Resultado esperado: [{t2: -1.70541733137745},
                 # {t2: -1.57079632679490},
@@ -314,7 +392,7 @@ def prueba_elipsoides(sol1, sol2):
     random_config, thetas_dic_random = thetas_aleatorias(robot)
 
     Jal = J_sym.subs(thetas_dic_random)
-    Jp0 = J_sym.subs({thetas_s[0]:0, thetas_s[1]:0, thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0})
+    Jp0 = J_sym.subs({thetas_s[0]:0, thetas_s[1]:0, thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0})
 
     # Primero obtenemos la matriz Jacobiana. Tomando la configuración cero del robot:
     # A partir de la Jacobiana podemos calcular los elipsoides de manipulabilidad y fuerza en 2 dimensiones, si
