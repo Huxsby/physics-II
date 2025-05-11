@@ -6,6 +6,9 @@ from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, th
 from class_robot_plotter import plot_robot
 import numpy as np
 import matplotlib.pyplot as plt
+from problema_cinematico_inverso_gen import CinematicaInversa
+from class_rotaciones import Rp2Trans, Euler2R
+from class_helicoidales import calcular_M_generalizado
 
 # Ejemplo 1: Visualización simple
 def ejemplo_visualizacion_simple():
@@ -125,6 +128,55 @@ def ejemplo_trayectoria():
     print(f"Animando trayectoria con {len(trayectoria)} frames...")
     plot_robot(robot, trayectoria, animation_speed=20)
 
+# Ejemplo 6: Cinemática directa con configuración específica
+def ejemplo_cinematica_directa():
+    # Cargar el robot
+    robot = cargar_robot_desde_yaml("robot.yaml")
+    
+    # Configuración personalizada (ejemplo)
+    thetas = [0.5, -0.5, 0.7, 1.0, 0.5, 0.05, 1.2]
+    thetas = thetas_limite(robot, thetas)
+    
+    # Visualizar el robot
+    print(f"Visualizando robot con cinemática directa: {np.round(thetas, 3)}")
+    plot_robot(robot, thetas)
+
+# Ejemplo 7: Cinemática inversa con trayectoria circular
+def ejemplo_cinematica_inversa_circular():
+    # Cargar el robot y matriz M
+    robot = cargar_robot_desde_yaml("robot.yaml")
+    M = calcular_M_generalizado(robot)
+    
+    # Generar puntos en una trayectoria circular
+    num_puntos = 30
+    radio = 0.15
+    z = 0.3
+    angulos = np.linspace(0, 2*np.pi, num_puntos)
+    puntos = np.array([[radio*np.cos(theta), radio*np.sin(theta), z] for theta in angulos])
+    
+    # Calcular configuraciones articulares para cada punto
+    thetas_anim = []
+    for punto in puntos:
+        # Orientación fija (ejemplo: orientación hacia abajo)
+        Tsd = Rp2Trans(Euler2R(0, np.pi, 0), punto)
+        thetas_follower = CinematicaInversa(robot, p_xyz=punto, RPY=[0, np.pi, 0])
+        if thetas_follower:
+            thetas_anim.extend(thetas_follower)  # Usar todas las iteraciones
+            
+    # Suavizar trayectoria si es necesario
+    if len(thetas_anim) < 100:
+        print("Aplicando interpolación para suavizar...")
+        from scipy.interpolate import CubicSpline
+        t_original = np.linspace(0, 1, len(thetas_anim))
+        t_nuevo = np.linspace(0, 1, 100)
+        thetas_anim = CubicSpline(t_original, thetas_anim, axis=0)(t_nuevo)
+    
+    # Visualizar y guardar animación
+    print("Animando trayectoria circular...")
+    fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=False)
+    anim.save("trayectoria_circular.mp4", writer="ffmpeg", fps=30)
+    plt.close()
+
 if __name__ == "__main__":
     print("\n1. Ejemplo de visualización simple")
     ejemplo_visualizacion_simple()
@@ -140,3 +192,9 @@ if __name__ == "__main__":
     
     print("\n5. Ejemplo de trayectoria con múltiples puntos")
     ejemplo_trayectoria()
+    
+    print("\n6. Ejemplo de cinemática directa")
+    ejemplo_cinematica_directa()
+    
+    print("\n7. Ejemplo de cinemática inversa con trayectoria circular")
+    ejemplo_cinematica_inversa_circular()
