@@ -3,7 +3,8 @@ class_robot_structure.py
 =====
 Este módulo proporciona clases y funciones para definir la estructura de un robot manipulador,
 incluyendo sus eslabones y articulaciones, y para cargar esta estructura desde un archivo
-de configuración YAML.
+de configuración YAML. También incluye funciones para manejar los límites de las articulaciones
+y generar configuraciones aleatorias dentro de estos límites.
 
 Clases:
     Robot: Representa un robot manipulador compuesto por varios eslabones.
@@ -11,6 +12,14 @@ Clases:
 
 Funciones:
     cargar_robot_desde_yaml: Carga la estructura de un robot desde un archivo YAML especificado.
+    limits: Verifica si una configuración de articulaciones dada está dentro de los límites definidos para el robot.
+    get_limits_positive: Devuelve los límites superiores de las articulaciones del robot.
+    get_limits_negative: Devuelve los límites inferiores de las articulaciones del robot.
+    thetas_aleatorias: Genera una configuración de articulaciones aleatoria dentro de los límites del robot.
+    thetas_limite: Ajusta una configuración de articulaciones para que se encuentre dentro de los límites del robot,
+                   recortando los valores que exceden los límites.
+    limitar_thetas: Similar a thetas_limite, pero anuncia por la terminal si se realizan ajustes.
+
 
 Ejemplo:
     Suponiendo que existe un archivo 'robot.yaml' con la siguiente estructura:
@@ -25,24 +34,27 @@ Ejemplo:
           link_orientation: [0, 0, 1]
           joint_coords: [0, 0, 0.103]
           joint_axis: [0, 0, 1]
+          joint_limits: "(-2.96, 2.96)"
         - id: 1
           length: 0.210
           type: revolute
           link_orientation: [0, 0, 1]
           joint_coords: [0, 0, 0.080]
           joint_axis: [0, 1, 0]
+          joint_limits: "(-1.57, 1.57)"
         - id: 2
           length: 0.0415
           type: prismatic
           link_orientation: [0, 0, 1]
           joint_coords: [0, 0, 0.210]
           joint_axis: [1, 0, 0]
+          joint_limits: "(0.0, 0.1)" # Ejemplo de límites para prismático
     ```
 
     Puedes cargar e inspeccionar el robot de esta manera:
 
     >>> import numpy as np
-    >>> from class_robot_structure import Robot, Link, cargar_robot_desde_yaml
+    >>> from class_robot_structure import Robot, Link, cargar_robot_desde_yaml, limits, thetas_aleatorias
     >>> # Crear un robot.yaml ficticio para el ejemplo
     >>> yaml_content = '''
     ... robot:
@@ -54,24 +66,28 @@ Ejemplo:
     ...       link_orientation: [0, 0, 1]
     ...       joint_coords: [0, 0, 0]
     ...       joint_axis: [0, 0, 1]
+    ...       joint_limits: "(-3.14, 3.14)"
     ...     - id: link2
     ...       length: 0.5
     ...       type: prismatic
     ...       link_orientation: [1, 0, 0]
     ...       joint_coords: [1, 0, 0]
     ...       joint_axis: [1, 0, 0]
+    ...       joint_limits: "(0.0, 1.0)"
     ... '''
     >>> with open("robot_example.yaml", "w") as f:
     ...     f.write(yaml_content)
     >>> robot = cargar_robot_desde_yaml("robot_example.yaml") # doctest: +SKIP
-    Ejes helicoidales del robot 'example_robot': Los ejes helicoidales se calcularán al crear el robot.
-    Robot 'example_robot' creado.
     >>> print(robot) # doctest: +SKIP
-    Robot 'example_robot' con 2 eslabones.
-        El Eslabón 'link1' (revolute), coordenadas: [0. 0. 0.], eje: [0. 0. 1.], longitud: 1.0
-        El Eslabón 'link2' (prismatic), coordenadas: [1. 0. 0.], eje: [1. 0. 0.], longitud: 0.5
-    >>> print(robot.get_ejes_helicoidales()) # doctest: +SKIP
-    [array([ 0.,  0.,  1., -0.,  0.,  0.]), array([0., 0., 0., 1., 0., 0.])]
+    >>> print(robot.ejes_helicoidales) # doctest: +SKIP
+    >>> print(robot.limits_dict) # doctest: +SKIP
+    >>> config_valida, msg = limits(robot, [0.5, 0.2]) # doctest: +SKIP
+    >>> print(f"Configuración válida: {config_valida}, Mensaje: {msg}") # doctest: +SKIP
+    >>> config_invalida, msg = limits(robot, [4.0, 0.2]) # doctest: +SKIP
+    >>> print(f"Configuración válida: {config_invalida}, Mensaje: {msg}") # doctest: +SKIP
+    >>> random_thetas, random_thetas_dict = thetas_aleatorias(robot) # doctest: +SKIP
+    >>> print(f"Thetas aleatorias: {random_thetas}") # doctest: +SKIP
+    >>> print(f"Thetas aleatorias (dict): {random_thetas_dict}") # doctest: +SKIP
 """
 
 import numpy as np
@@ -214,6 +230,7 @@ class Link:
         
         return eje*self.length
 
+""" Funciones auxiliares """
 
 def cargar_robot_desde_yaml(path="robot.yaml"):
     """
