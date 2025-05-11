@@ -412,12 +412,20 @@ def limitar_thetas(robot: Robot, thetas):
 # Ejemplo de uso
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
-    
-    print("Ejes helicoidales del robot:")
-    print(robot.ejes_helicoidales)
-    #print(robot.get_ejes_helicoidales())
-    print(f"\nLímites de las articulaciones: {robot.limits_dict}")
     print(f"\n{robot}")
+
+    print("\nEjes helicoidales del robot:")
+    for i in range(len(robot.links)):
+        eje_helicoidal = robot.ejes_helicoidales[i]
+        array_str = np.array2string(
+            eje_helicoidal,
+            suppress_small=True,
+            separator=', ',
+            formatter={'float_kind': lambda x: f"{x:10.4f}"}
+        )
+        print(f"\t{array_str}")
+
+    print(f"\nLímites de las articulaciones: {robot.limits_dict}")
 
     print("\nObtener_eje_de_giro")
     for i in range(len(robot.links)):

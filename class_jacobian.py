@@ -265,24 +265,60 @@ def elipsoide_manipulabilidad(J, articulaciones_idx=[1, 2], puntos=100):
     giro = np.array(giro)                       # Convertir la lista de vectores de velocidad del efector final a un array NumPy.
     return xx, yy, giro                         # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de manipulabilidad (giro).
 
-def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
-    """ Calcula el elipsoide de fuerza a partir de la Jacobiana. """
-    J_num = np.array(J).astype(np.float64)      # Convertir la matriz Jacobiana simbólica (SymPy) a un array NumPy para operaciones numéricas
-    J_T_inv = np.linalg.inv(J_num.T)            # Calcular la inversa de la transpuesta de la Jacobiana numérica. Esta matriz relaciona los pares articulares con las fuerzas/momentos en el efector final.
-    u = np.linspace(0, np.pi / 2, puntos)       # Generar un vector de ángulos 'u' desde 0 hasta pi/2, con 'puntos' divisiones. Se usa para parametrizar un cuarto de círculo unitario.
-    x = np.cos(u)                               # Calcular las coordenadas X del cuarto de círculo unitario.
-    y = np.sin(u)                               # Calcular las coordenadas Y del cuarto de círculo unitario.
-    xx = np.concatenate([x, -x, -x, x])         # Extender las coordenadas X para formar un círculo completo (reflejando en los ejes).
-    yy = np.concatenate([y, y, -y, -y])         # Extender las coordenadas Y para formar un círculo completo (reflejando en los ejes).
+# def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
+#     """ Calcula el elipsoide de fuerza a partir de la Jacobiana. """
+#     J_num = np.array(J).astype(np.float64)      # Convertir la matriz Jacobiana simbólica (SymPy) a un array NumPy para operaciones numéricas
+#     J_T_inv = np.linalg.inv(J_num.T)            # Calcular la inversa de la transpuesta de la Jacobiana numérica. Esta matriz relaciona los pares articulares con las fuerzas/momentos en el efector final.
+#     u = np.linspace(0, np.pi / 2, puntos)       # Generar un vector de ángulos 'u' desde 0 hasta pi/2, con 'puntos' divisiones. Se usa para parametrizar un cuarto de círculo unitario.
+#     x = np.cos(u)                               # Calcular las coordenadas X del cuarto de círculo unitario.
+#     y = np.sin(u)                               # Calcular las coordenadas Y del cuarto de círculo unitario.
+#     xx = np.concatenate([x, -x, -x, x])         # Extender las coordenadas X para formar un círculo completo (reflejando en los ejes).
+#     yy = np.concatenate([y, y, -y, -y])         # Extender las coordenadas Y para formar un círculo completo (reflejando en los ejes).
 
-    llave = []                                  # Inicializar una lista para almacenar los vectores de fuerza/momento resultantes (llave de torsión).
-    for i in range(len(xx)):                    # Iterar sobre cada punto (xx[i], yy[i]) del círculo unitario.
-        tau = np.zeros(J.shape[1])              # Crear un vector de pares articulares (tau) inicializado a ceros, con la misma longitud que el número de columnas de J (número de articulaciones).
-        tau[articulaciones_idx[0]] = xx[i]      # Asignar las coordenadas del círculo unitario (xx[i], yy[i]) a los pares de las articulaciones especificadas por 'articulaciones_idx'.
-        tau[articulaciones_idx[1]] = yy[i]      # Esto simula aplicar un par unitario distribuido entre estas dos articulaciones.
-        llave.append(J_T_inv @ tau)             # Calcular la llave de torsión (fuerza/momento) resultante en el efector final usando la relación F = (J^T)^-1 * tau.
-    llave = np.array(llave)                     # Convertir la lista de vectores de llave de torsión a un array NumPy.
-    return xx, yy, llave                        # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de fuerza (llave).
+#     llave = []                                  # Inicializar una lista para almacenar los vectores de fuerza/momento resultantes (llave de torsión).
+#     for i in range(len(xx)):                    # Iterar sobre cada punto (xx[i], yy[i]) del círculo unitario.
+#         tau = np.zeros(J.shape[1])              # Crear un vector de pares articulares (tau) inicializado a ceros, con la misma longitud que el número de columnas de J (número de articulaciones).
+#         tau[articulaciones_idx[0]] = xx[i]      # Asignar las coordenadas del círculo unitario (xx[i], yy[i]) a los pares de las articulaciones especificadas por 'articulaciones_idx'.
+#         tau[articulaciones_idx[1]] = yy[i]      # Esto simula aplicar un par unitario distribuido entre estas dos articulaciones.
+#         llave.append(J_T_inv @ tau)             # Calcular la llave de torsión (fuerza/momento) resultante en el efector final usando la relación F = (J^T)^-1 * tau.
+#     llave = np.array(llave)                     # Convertir la lista de vectores de llave de torsión a un array NumPy.
+#     return xx, yy, llave                        # Devolver las coordenadas del círculo unitario (xx, yy) y los puntos del elipsoide de fuerza (llave).
+
+def elipsoide_fuerza(J, articulaciones_idx=[1, 2], puntos=100):
+    """
+    Calcula el elipsoide de fuerza a partir de la Jacobiana.
+    Es retrocompatible: usa la inversa si J^T es cuadrada e invertible,
+    y la pseudo-inversa en el caso general (robots redundantes o no cuadradas).
+    """
+    J_num = np.array(J).astype(np.float64)
+    JT = J_num.T
+
+    # Intentamos usar la inversa clásica si es posible
+    try:
+        if JT.shape[0] == JT.shape[1]:
+            J_T_inv = np.linalg.inv(JT)
+        else:
+            raise np.linalg.LinAlgError("No cuadrada")  # Forzar pseudo-inversa
+    except np.linalg.LinAlgError:
+        # Usamos pseudo-inversa si no es cuadrada o no es invertible
+        J_T_inv = np.linalg.pinv(JT)
+
+    # Generar círculo unitario
+    u = np.linspace(0, np.pi / 2, puntos)
+    x = np.cos(u)
+    y = np.sin(u)
+    xx = np.concatenate([x, -x, -x, x])
+    yy = np.concatenate([y, y, -y, -y])
+
+    llave = []
+    for i in range(len(xx)):
+        tau = np.zeros(J_num.shape[1])
+        tau[articulaciones_idx[0]] = xx[i]
+        tau[articulaciones_idx[1]] = yy[i]
+        llave.append(J_T_inv @ tau)
+
+    return xx, yy, np.array(llave)
+
 
 def graficar_elipsoides(xx, yy, giro, llave, name=None, indices=(1, 3), limitplot=8, point_size=2):
     """
