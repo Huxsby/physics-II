@@ -91,7 +91,7 @@ def calcular_transformaciones(robot, thetas):
     
     return transformaciones
 
-def plot_robot(robot, thetas, ax=None, show=True, animation_speed=200, view_angles=None):
+def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_speed=200, view_angles=None):
     """
     Visualiza un robot manipulador en 3D.
     
@@ -99,14 +99,18 @@ def plot_robot(robot, thetas, ax=None, show=True, animation_speed=200, view_angl
         robot: Objeto Robot que contiene los eslabones.
         thetas: Lista de valores articulares o lista de listas para animación.
         ax (matplotlib.axes.Axes, optional): Ejes de matplotlib para dibujar. Si es None, se crea uno nuevo.
-        show (bool, optional): Si es True, se muestra la figura. Si es False, se devuelve la figura y los ejes.
+        show (bool, optional): Si es True, se muestra la figura. Si es False, se devuelve la figura y los ejes 
+                               (y el objeto de animación si es una animación).
         animation_speed (int, optional): Velocidad de la animación en ms entre frames.
         view_angles (tuple, optional): Tupla (elevación, azimut) para la vista 3D.
+        trayectoria (list or numpy.ndarray, optional): Un array de puntos (Nx3) que representan
+                                                       una trayectoria a dibujar. Si se proporciona, 
+                                                       se dibuja en la visualización estática o en cada frame de la animación.
         
     Returns:
-        tuple o None: Si show es False, devuelve (fig, ax), de lo contrario None.
+        tuple o None: Si show es False, devuelve (fig, ax) para visualización estática, 
+                      o (fig, ax, anim) para animación. De lo contrario None.
     """
-    # Comprobar si estamos haciendo animación o una visualización estática
     animacion = isinstance(thetas[0], (list, np.ndarray)) and hasattr(thetas[0], "__len__")
     
     if not ax:
@@ -115,87 +119,88 @@ def plot_robot(robot, thetas, ax=None, show=True, animation_speed=200, view_angl
     else:
         fig = ax.figure
     
-    # Configurar la vista
     if view_angles:
         ax.view_init(elev=view_angles[0], azim=view_angles[1])
     else:
-        ax.view_init(elev=30, azim=60)
+        ax.view_init(elev=30, azim=60) 
     
-    # Configurar límites y etiquetas
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.set_title('Visualización del Robot Manipulador')
-    
-    # Si no es animación, dibujar el robot en la configuración dada
+
+    def _draw_provided_trajectory(ax_to_plot_on, trajectory_points):
+        if trajectory_points is not None:
+            try:
+                path_data = np.asarray(trajectory_points)
+                if path_data.ndim == 2 and path_data.shape[1] == 3 and path_data.shape[0] > 0:
+                    ax_to_plot_on.plot(path_data[:, 0], path_data[:, 1], path_data[:, 2], 
+                                       color='cyan', linestyle='--', linewidth=1.5, label='Trayectoria Proporcionada')
+                # Optionally, add a legend if label is used: ax_to_plot_on.legend()
+            except Exception as e:
+                # Non-critical error, so print a warning
+                print(f"Advertencia: No se pudo dibujar la trayectoria proporcionada. Error: {e}")
+
     if not animacion:
         _plot_frame(robot, thetas, ax)
-        
-        # Ajustar límites de los ejes
+        _draw_provided_trajectory(ax, trayectoria)
         _adjust_axis_limits(ax)
         
         if show:
             plt.tight_layout()
             plt.show()
-            return None
         return fig, ax
     
-    # Si es animación, configurar la función de animación
     num_frames = len(thetas)
-    
-    # Inicializar listas de líneas, puntos y vectores
-    lines = []
-    points = []
-    vectors_x = []
-    vectors_y = []
-    vectors_z = []
-    
-    # Determinar los límites máximos para todos los frames
-    max_limits = _get_animation_limits(robot, thetas)
-    ax.set_xlim(max_limits['x'])
-    ax.set_ylim(max_limits['y'])
-    ax.set_zlim(max_limits['z'])
-    
-    # Función para inicializar la animación
+    max_limits = _get_animation_limits(robot, thetas) # Consider enhancing this to include 'trayectoria' points for limit calculation
+
     def init():
-        # Inicializar con el primer frame
+        ax.clear() # Clear axis before drawing the first frame
+        # Set view, labels, title, limits for the first frame (as update will also do this)
+        if view_angles:
+            ax.view_init(elev=view_angles[0], azim=view_angles[1])
+        else:
+            ax.view_init(elev=30, azim=60)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Visualización del Robot Manipulador - Frame 1/{num_frames}')
+        ax.set_xlim(max_limits['x'])
+        ax.set_ylim(max_limits['y'])
+        ax.set_zlim(max_limits['z'])
+
         _plot_frame(robot, thetas[0], ax)
+        _draw_provided_trajectory(ax, trayectoria)
         return []
     
-    # Función para actualizar cada frame
-    def update(frame):
+    def update(frame_index):
         ax.clear()
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-        ax.set_title(f'Visualización del Robot Manipulador - Frame {frame+1}/{num_frames}')
+        ax.set_title(f'Visualización del Robot Manipulador - Frame {frame_index+1}/{num_frames}')
         
-        # Mantener los límites constantes
         ax.set_xlim(max_limits['x'])
         ax.set_ylim(max_limits['y'])
         ax.set_zlim(max_limits['z'])
         
-        # Establecer los ángulos de vista
         if view_angles:
             ax.view_init(elev=view_angles[0], azim=view_angles[1])
         else:
             ax.view_init(elev=30, azim=60)
         
-        # Dibujar el robot en la configuración actual
-        _plot_frame(robot, thetas[frame], ax)
+        _plot_frame(robot, thetas[frame_index], ax)
+        _draw_provided_trajectory(ax, trayectoria)
         
         return []
     
-    # Crear la animación
     anim = FuncAnimation(fig, update, frames=num_frames, init_func=init,
                          interval=animation_speed, blit=True)
     
     if show:
         plt.tight_layout()
         plt.show()
-        return None
     return fig, ax, anim
-
 def _plot_frame(robot, thetas, ax):
     """Función interna para dibujar un solo frame del robot."""
     transformaciones = calcular_transformaciones(robot, thetas)
