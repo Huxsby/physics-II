@@ -219,6 +219,30 @@ def ejemplo_cinematica_inversa_circular(robot: Robot):
     anim.save("trayectoria_circular.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
     plt.close()
 
+# Ejemplo 8: Visualización de configuración singular
+def ejemplo_configuracion_singular(robot: Robot):
+    # Configuración singular específica
+    # {t0: 0, t1: -1.57079632679490, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0}
+    # Corresponde a theta2 = -pi/2, y el resto 0.
+    # Asumiendo que el robot tiene 7 articulaciones como en otros ejemplos.
+    # Si el robot.yaml tiene un número diferente de articulaciones, esto necesitará ajuste.
+    thetas_singular = [0, -np.pi/2, 0, 0, 0, 0, 0]
+    
+    # Asegurar que los ángulos estén dentro de los límites (aunque para singularidad, esto es más conceptual)
+    # Si el robot tiene menos de 7 articulaciones, ajustar la longitud de thetas_singular
+    if len(robot.links) < len(thetas_singular):
+        thetas_singular = thetas_singular[:len(robot.links)]
+    elif len(robot.links) > len(thetas_singular):
+        # Si el robot tiene más articulaciones, rellenar con ceros
+        thetas_singular.extend([0] * (len(robot.links) - len(thetas_singular)))
+
+    thetas_singular_np = np.array(thetas_singular)
+    thetas_singular_np = thetas_limite(robot, thetas_singular_np)
+    
+    # Visualizar el robot
+    print(f"Visualizando robot en configuración singular: {np.round(thetas_singular_np, 3)}")
+    plot_robot(robot, thetas_singular_np)
+
 if __name__ == "__main__":
     # Cargar el robot desde un archivo YAML
     robot = cargar_robot_desde_yaml("robot.yaml")
@@ -240,8 +264,11 @@ if __name__ == "__main__":
     
     print("\n6. Ejemplo de cinemática directa")
     ejemplo_cinematica_directa(robot)
-    
+
+    print("\n7. Ejemplo de configuración singular")
+    ejemplo_configuracion_singular(robot)
+
     # Cargar el robot Niryo desde un archivo YAML, errores persistentes en Cinematica Inversa para Prismaticas
     robot = cargar_robot_desde_yaml("niryo-robot.yaml")
-    print("\n7. Ejemplo de cinemática inversa con trayectoria circular, con robot Niryo")
+    print("\n8. Ejemplo de cinemática inversa con trayectoria circular, con robot Niryo")
     ejemplo_cinematica_inversa_circular(robot)
