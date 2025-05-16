@@ -91,6 +91,26 @@ def calcular_transformaciones(robot, thetas):
     
     return transformaciones
 
+def guardar_animacion(anim, nombre_archivo):
+    """
+    Guarda la animación en un archivo. Implementa un manejo de errores para ffmpeg y Pillow. El resultado final será un archivo nombre_archivo.mp4 en 1080p (Linux) o .gif (Windows).
+    """
+    if anim:
+        print("Guardando animación...")
+    try:
+        anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
+    except Exception as e:
+        print(f"\t\033[31mError al guardar la animación con ffmpeg: {e}\033[0m")
+        print("\t\tIntentando guardar la animación como GIF con Pillow...")
+        try:
+            anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=30)
+            print("\t\tAnimación guardada como 'animacion_dos_configuraciones.gif' usando Pillow.")
+        except Exception as e:
+            print(f"\t\t\033[31mError al guardar la animación '{nombre_archivo}' con Pillow: {e}\033[0m")
+            print(f"\t\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'. Asegúrate de tener ffmpeg o Pillow instalado.\033[0m")
+    else:
+        print(f"\t\033[92mAnimación guardada como '{nombre_archivo}' usando ffmpeg.\033[0m")
+
 def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_speed=200, view_angles=None):
     """
     Visualiza un robot manipulador en 3D.
@@ -100,16 +120,16 @@ def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_sp
         thetas: Lista de valores articulares o lista de listas para animación.
         ax (matplotlib.axes.Axes, optional): Ejes de matplotlib para dibujar. Si es None, se crea uno nuevo.
         show (bool, optional): Si es True, se muestra la figura. Si es False, se devuelve la figura y los ejes 
-                               (y el objeto de animación si es una animación).
+                                (y el objeto de animación si es una animación).
         animation_speed (int, optional): Velocidad de la animación en ms entre frames.
         view_angles (tuple, optional): Tupla (elevación, azimut) para la vista 3D.
         trayectoria (list or numpy.ndarray, optional): Un array de puntos (Nx3) que representan
-                                                       una trayectoria a dibujar. Si se proporciona, 
-                                                       se dibuja en la visualización estática o en cada frame de la animación.
+                                                        una trayectoria a dibujar. Si se proporciona, 
+                                                        se dibuja en la visualización estática o en cada frame de la animación.
         
     Returns:
         tuple o None: Si show es False, devuelve (fig, ax) para visualización estática, 
-                      o (fig, ax, anim) para animación. De lo contrario None.
+                        o (fig, ax, anim) para animación. De lo contrario None.
     """
     animacion = isinstance(thetas[0], (list, np.ndarray)) and hasattr(thetas[0], "__len__")
     
@@ -135,7 +155,7 @@ def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_sp
                 path_data = np.asarray(trajectory_points)
                 if path_data.ndim == 2 and path_data.shape[1] == 3 and path_data.shape[0] > 0:
                     ax_to_plot_on.plot(path_data[:, 0], path_data[:, 1], path_data[:, 2], 
-                                       color='cyan', linestyle='--', linewidth=1.5, label='Trayectoria Proporcionada')
+                                        color='cyan', linestyle='--', linewidth=1.5, label='Trayectoria Proporcionada')
                 # Optionally, add a legend if label is used: ax_to_plot_on.legend()
             except Exception as e:
                 # Non-critical error, so print a warning
@@ -195,7 +215,7 @@ def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_sp
         return []
     
     anim = FuncAnimation(fig, update, frames=num_frames, init_func=init,
-                         interval=animation_speed, blit=True)
+                            interval=animation_speed, blit=True)
     
     if show:
         plt.tight_layout()
@@ -222,7 +242,7 @@ def _plot_frame(robot, thetas, ax):
         # Dibujar la articulación
         if link.tipo == "revolute":
             # Articulación revoluta - círculo rojo
-            ax.scatter([p2[0]], [p2[1]], [p2[2]], color='r', s=100, marker='o')
+            ax.scatter([p2[0]], [p2[1]], [p2[2]], color='r', s=50, marker='o') # Adjust size here
             
             # Dibujar el eje de rotación como un vector
             rot_axis = np.array(link.joint_axis)
@@ -234,12 +254,12 @@ def _plot_frame(robot, thetas, ax):
             
             # Dibujar el eje de rotación
             ax.quiver(p2[0], p2[1], p2[2], 
-                     rot_axis_global[0], rot_axis_global[1], rot_axis_global[2], 
-                     color='g', arrow_length_ratio=0.3)
+                        rot_axis_global[0], rot_axis_global[1], rot_axis_global[2], 
+                        color='g', arrow_length_ratio=0.3)
             
         elif link.tipo == "prismatic":
             # Articulación prismática - cuadrado verde
-            ax.scatter([p2[0]], [p2[1]], [p2[2]], color='g', s=100, marker='s')
+            ax.scatter([p2[0]], [p2[1]], [p2[2]], color='g', s=50, marker='s') # Adjust size here
             
             # Dibujar el eje prismático como un vector
             trans_axis = np.array(link.joint_axis)
@@ -250,9 +270,10 @@ def _plot_frame(robot, thetas, ax):
             trans_axis_global = R @ trans_axis
             
             # Dibujar el eje prismático
-            ax.quiver(p2[0], p2[1], p2[2], 
-                     trans_axis_global[0], trans_axis_global[1], trans_axis_global[2], 
-                     color='b', arrow_length_ratio=0.3)
+            # Dibujar la extensión de la prismática en verde
+            p_extend = p2 + thetas[i] * trans_axis_global  # thetas[i] es la cantidad que se extiende
+            ax.plot([p2[0], p_extend[0]], [p2[1], p_extend[1]], [p2[2], p_extend[2]],
+                    color='g', linestyle='-', linewidth=3)
     
     # Dibujar el punto final (efector final)
     ax.scatter([positions[-1][0]], [positions[-1][1]], [positions[-1][2]], color='k', s=150, marker='*')
@@ -277,16 +298,16 @@ def _draw_coordinate_system(ax, T, scale=0.1):
     
     # Dibujar los ejes X, Y, Z
     ax.quiver(origin[0], origin[1], origin[2], 
-             x_axis[0], x_axis[1], x_axis[2], 
-             color='r', arrow_length_ratio=0.3)
+                x_axis[0], x_axis[1], x_axis[2], 
+                color='r', arrow_length_ratio=0.3)
     
     ax.quiver(origin[0], origin[1], origin[2], 
-             y_axis[0], y_axis[1], y_axis[2], 
-             color='g', arrow_length_ratio=0.3)
+                y_axis[0], y_axis[1], y_axis[2], 
+                color='g', arrow_length_ratio=0.3)
     
     ax.quiver(origin[0], origin[1], origin[2], 
-             z_axis[0], z_axis[1], z_axis[2], 
-             color='b', arrow_length_ratio=0.3)
+                z_axis[0], z_axis[1], z_axis[2], 
+                color='b', arrow_length_ratio=0.3)
 
 def _adjust_axis_limits(ax):
     """Ajusta los límites de los ejes para mantener proporciones iguales."""

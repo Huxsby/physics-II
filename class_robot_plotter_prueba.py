@@ -3,14 +3,14 @@ Ejemplos de uso para la visualización del robot manipulador
 """
 
 from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, Robot
-from class_robot_plotter import plot_robot
+from class_robot_plotter import plot_robot, guardar_animacion
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
 from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta
 from class_rotaciones import Rp2Trans, Euler2R
 from class_helicoidales import calcular_M_generalizado
-
+from class_jacobian import calcular_jacobiana
 # Ejemplo 1: Visualización simple
 def ejemplo_visualizacion_simple(robot: Robot):
     # Generar una configuración de ángulos en posición neutral
@@ -64,7 +64,7 @@ def ejemplo_multiples_vistas(robot: Robot):
     plt.show()
 
 # Ejemplo 4: Animación entre dos configuraciones
-def ejemplo_animacion(robot: Robot):
+def ejemplo_animacion(robot: Robot, nombre_archivo="animacion_dos_configuraciones"):
     # Generar dos configuraciones aleatorias
     thetas_inicio, _ = thetas_aleatorias(robot)
     thetas_fin, _ = thetas_aleatorias(robot)
@@ -92,10 +92,7 @@ def ejemplo_animacion(robot: Robot):
     print(f"Animando movimiento con {num_frames} frames...")
     fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos_trayectoria)
     
-    if anim:
-        print("Guardando animación en 'animacion_dos_configuraciones.mp4'...")
-        anim.save("animacion_dos_configuraciones.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
-        print("Animación guardada.")
+    guardar_animacion(anim, nombre_archivo) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
     plt.close(fig)
 
 # Ejemplo 5: Visualización con trayectoria
@@ -138,7 +135,7 @@ def ejemplo_cinematica_directa(robot: Robot):
     plot_robot(robot, thetas)
 
 # Ejemplo 7: Cinemática inversa con trayectoria circular
-def ejemplo_cinematica_inversa_circular(robot: Robot):
+def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectoria_circular"):
     # Cargar el robot y matriz M
     M = calcular_M_generalizado(robot)
     
@@ -171,8 +168,9 @@ def ejemplo_cinematica_inversa_circular(robot: Robot):
     # Initial guess for the first point can be zeros or a neutral configuration
 
     # Calcular
-    initial_ik_guess = np.zeros(len(robot.links)) 
-    thetas_iniciales_trayectoria = CinematicaInversa(robot, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0])
+    initial_ik_guess = np.zeros(len(robot.links))
+    Jacobiana_tuple = calcular_jacobiana(robot)
+    thetas_iniciales_trayectoria = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0])
 
     if thetas_iniciales_trayectoria:
         ik_initial_guess_thetas = thetas_iniciales_trayectoria[-1] # Use the last iteration of the first point's solution
@@ -186,14 +184,14 @@ def ejemplo_cinematica_inversa_circular(robot: Robot):
         # in case of initial IK failure.
         # thetas_anim.append(ik_initial_guess_thetas) 
 
-    input(f"Presione Enter para continuar con la animación... {ik_initial_guess_thetas}")
+    print(f"Punto inicial cinemática inversa de la animación: {ik_initial_guess_thetas}")
 
     for punto_idx, punto in enumerate(puntos): # Using enumerate for clearer logging on failure
         # Orientación fija (ejemplo: orientación hacia abajo)
         # Tsd = Rp2Trans(Euler2R(0, np.pi, 0), punto)
         
         # Use the solution from the previous point (or initial guess) as the 'thetas_actuales' for the IK solver.
-        thetas_follower = CinematicaInversa(robot, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0])
+        thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0])
         
         if thetas_follower: # Assumes thetas_follower is a list of configurations (iterations) on success.
             thetas_anim.extend(thetas_follower)  # Add all iterations to the animation.
@@ -216,10 +214,47 @@ def ejemplo_cinematica_inversa_circular(robot: Robot):
     # Visualizar y guardar animación
     print("Animando trayectoria circular...")
     fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos)
-    anim.save("trayectoria_circular.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
+    guardar_animacion(anim, nombre_archivo) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
     plt.close()
 
-# Ejemplo 8: Visualización de configuración singular
+# Ejemplo 8: Animación de articulaciones prismáticas
+def ejemplo_animacion_prismatica(robot: Robot):
+    # Encuentra los índices de las articulaciones prismáticas
+    prismatic_joint_indices = [i for i, link in enumerate(robot.links) if link.tipo == "prismatic"]
+    
+    if not prismatic_joint_indices:
+        print("El robot no tiene articulaciones prismáticas.")
+        return
+    
+    # Genera una configuración base con todas las articulaciones en cero
+    thetas = np.zeros(len(robot.links))
+    
+    # Define el número de frames para la animación
+    num_frames = 50
+    
+    # Crea una lista para almacenar las configuraciones de cada frame
+    thetas_anim = []
+    
+    # Para cada frame, ajusta la posición de las articulaciones prismáticas
+    for i in range(num_frames):
+        frame_thetas = np.copy(thetas)  # Comienza con la configuración base
+        
+        for joint_index in prismatic_joint_indices:
+            # Obtiene los límites de la articulación prismática
+            lower_limit, upper_limit = robot.links[joint_index].joint_limits
+            
+            # Calcula el valor de la articulación prismática para este frame
+            # Esto crea una animación lineal desde el límite inferior hasta el superior
+            t = i / (num_frames - 1)
+            frame_thetas[joint_index] = lower_limit + t * (upper_limit - lower_limit)
+        
+        thetas_anim.append(frame_thetas)
+    
+    # Visualiza la animación
+    print(f"Animando articulaciones prismáticas con {num_frames} frames...")
+    plot_robot(robot, thetas_anim, animation_speed=50, show=True)
+
+# Ejemplo 9: Visualización de configuración singular
 def ejemplo_configuracion_singular(robot: Robot):
     # Configuración singular específica
     # {t0: 0, t1: -1.57079632679490, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0}
@@ -268,7 +303,14 @@ if __name__ == "__main__":
     print("\n7. Ejemplo de configuración singular")
     ejemplo_configuracion_singular(robot)
 
-    # Cargar el robot Niryo desde un archivo YAML, errores persistentes en Cinematica Inversa para Prismaticas
-    robot = cargar_robot_desde_yaml("niryo-robot.yaml")
-    print("\n8. Ejemplo de cinemática inversa con trayectoria circular, con robot Niryo")
-    ejemplo_cinematica_inversa_circular(robot)
+    # Ejemplo de animación de articulaciones prismáticas
+    print("\n8. Ejemplo de animación de articulaciones prismáticas")
+    ejemplo_animacion_prismatica(robot)
+
+    print("\n9. Ejemplo de cinemática inversa con trayectoria circular")
+    ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
+
+    # Probando con el robot Niryo
+    print("\n9.Probando con el robot Niryo")
+    robot = cargar_robot_desde_yaml("robot-niryo.yaml")
+    ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")

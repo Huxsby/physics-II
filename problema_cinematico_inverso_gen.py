@@ -81,7 +81,7 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
 def CinematicaDirecta(ejes, thetas, M):
     return calcular_T_robot(ejes, thetas, M)
 
-def CinematicaInversa(robot: Robot, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
+def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
     tiempo = time.time()
     if robot is None:
@@ -107,7 +107,7 @@ def CinematicaInversa(robot: Robot, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1],
     print(f"\nExtrayendo dastos del robot:")
     S = robot.ejes_helicoidales; print("Ejes helicoidales del robot:", S)
     print("\nMatriz Jacobiana del robot:")
-    J, thetas_s = calcular_jacobiana(robot); mostrar_jacobiana_resumida(J)
+    J, thetas_s = Jacobiana_tuple; mostrar_jacobiana_resumida(J)
     
     thetas_follower = []                                    # Lista para almacenar los ángulos de las articulaciones por los que ha pasado el robot en cada iteración.
     Tsb = CinematicaDirecta(S, thetas_actuales, M)          # Resuelve la Cinemática Directa para thetas_actuales
@@ -182,7 +182,8 @@ def main():
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
     
     robot = cargar_robot_desde_yaml('robot.yaml')
-    CinematicaInversa(robot)
+    Jacobiana_tuple = calcular_jacobiana(robot)
+    CinematicaInversa(robot, Jacobiana_tuple)
 
 if __name__=="__main__" :
     main()
