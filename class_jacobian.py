@@ -55,42 +55,44 @@ def Adjunta(T: sp.Matrix):
 """ Funciones de cálculo de la Jacobiana """
 
 def calcular_jacobiana(robot: Robot):
-    """ Calcula la Jacobiana simbólica de un robot dado. """
-    tiempo = time.time()  # Iniciar temporizador
-    w = []; q = []
-    for link in robot.links:
-        w.append(link.joint_axis)   # Definimos ejes de rotación de las articulaciones en la posición cero del robot
-        q.append(link.joint_coords) # Definimos los vectores que van del centro de cada eje al centro del siguiente
+    """ Calcula la Jacobiana simbólica de un robot dado usando los ejes helicoidales del robot. """
+    tiempo = time.time()
+    S_list = robot.ejes_helicoidales  # Lista de ejes helicoidales [w1,v1], [w2,v2], ...
+    n = len(S_list)
+    thetas_s = sp.symbols(f't0:{n}')  # Variables simbólicas para cada articulación
 
-    # Coordenadas de las articulaciones
-    n = len(w)  # Número de articulaciones
-    thetas_s = sp.symbols(f't0:{n}')  # t0, t1, ..., tn-1
+    # Inicializar la lista de columnas de la Jacobiana
+    J_cols = []
 
-    # Calculamos las matrices de rotación a partir de los ejes w, utilizando la fórmula de Rodrigues
-    R = []
-    for i in range(0,len(robot.links),1):
-        wmat = VecToso3(w[i])
-        R.append(sp.eye(3)+sp.sin(thetas_s[i])*wmat+(1-sp.cos(thetas_s[i]))*(wmat*wmat))
+    # Transformación acumulada hasta la articulación i-1
+    T = sp.eye(4)
 
-    # Aplicamos rotaciones a los vectores q y w para llevarlos a la configuración deseada
-    qs = []; ws = []; Ri = R[0]
-    qs.append(sp.Matrix(q[0]))
-    ws.append(sp.Matrix(w[0]))
-    for i in range(1,len(robot.links),1):
-        ws.append(Ri*sp.Matrix(w[i]))
-        qs.append(Ri*sp.Matrix(q[i])+qs[i-1])
-        Ri = Ri*R[i]
+    for i in range(n):
+        S = sp.Matrix(S_list[i])
+        w = S[:3, 0]
+        v = S[3:6, 0]
 
-    # Calculamos las velocidades lineales, los vectores giro correspondientes y la matriz Jacobiana
-    vs = []; Ji = []    # Ji equivale a Si (cada eje helicoidal)
-    i = 0
-    vs.append(qs[i].cross(ws[i]))
-    Ji.append(ws[i].row_insert(3,vs[i]))
-    Jacobian = Ji[0]
-    for i in range(1,len(robot.links),1):
-        vs.append(qs[i].cross(ws[i]))
-        Ji.append(ws[i].row_insert(3,vs[i]))
-        Jacobian = Jacobian.col_insert(i,Ji[i])
+        # Para la columna i, calculamos la adjunta de la transformación hasta i-1 aplicada a S_i
+        if i > 0:
+            # Producto de exponentiales hasta la articulación i-1
+            for j in range(i):
+                S_j = sp.Matrix(S_list[j])
+                T = T * MatrixExp6sp(S_j, thetas_s[j])
+        else:
+            T = sp.eye(4)
+
+        # Calcular la adjunta de T
+        Ad_T = Adjunta(T)
+        # Columna de la Jacobiana: Ad_T * S_i
+        J_col = Ad_T * S
+        J_cols.append(J_col)
+
+        # Reiniciar T para la siguiente columna
+        T = sp.eye(4)
+
+    # Construir la matriz Jacobiana juntando las columnas
+    Jacobian = sp.Matrix.hstack(*J_cols)
+
     print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - tiempo:.4f} segundos\033[0m")
     return Jacobian, thetas_s
 
