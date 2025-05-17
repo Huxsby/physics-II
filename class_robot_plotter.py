@@ -93,23 +93,36 @@ def calcular_transformaciones(robot, thetas):
 
 def guardar_animacion(anim, nombre_archivo):
     """
-    Guarda la animación en un archivo. Implementa un manejo de errores para ffmpeg y Pillow. El resultado final será un archivo nombre_archivo.mp4 en 1080p (Linux) o .gif (Windows).
+    Guarda la animación en un archivo, intentando primero con ffmpeg y luego con Pillow si falla.
+    El resultado final será un archivo nombre_archivo.mp4 (preferido) o .gif (si ffmpeg falla).
     """
-    if anim:
-        print("Guardando animación...")
+    if not anim:
+        print("No hay animación para guardar.")
+        return
+
+    print("Guardando animación...")
+    
     try:
-        anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=30, dpi=225) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
+        _guardar_animacion_ffmpeg(anim, nombre_archivo)
     except Exception as e:
-        print(f"\t\033[31mError al guardar la animación con ffmpeg: {e}\033[0m")
-        print("\t\tIntentando guardar la animación como GIF con Pillow...")
+        print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
         try:
-            anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=30)
-            print("\t\tAnimación guardada como 'animacion_dos_configuraciones.gif' usando Pillow.")
+            _guardar_animacion_pillow(anim, nombre_archivo)
         except Exception as e:
-            print(f"\t\t\033[31mError al guardar la animación '{nombre_archivo}' con Pillow: {e}\033[0m")
-            print(f"\t\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'. Asegúrate de tener ffmpeg o Pillow instalado.\033[0m")
-    else:
-        print(f"\t\033[92mAnimación guardada como '{nombre_archivo}' usando ffmpeg.\033[0m")
+            print(f"\t\033[31mError al guardar con Pillow: {e}\033[0m")
+            print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
+
+def _guardar_animacion_ffmpeg(anim, nombre_archivo):
+    """Intenta guardar la animación como MP4 usando ffmpeg."""
+    print("\tIntentando guardar la animación como MP4 con ffmpeg...")
+    anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=30, dpi=225)  # dpi=225 para 1080p
+    print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.mp4' usando ffmpeg.\033[0m")
+
+def _guardar_animacion_pillow(anim, nombre_archivo):
+    """Intenta guardar la animación como GIF usando Pillow."""
+    print("\tIntentando guardar la animación como GIF con Pillow...")
+    anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=30)
+    print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.gif' usando Pillow.\033[0m")
 
 def plot_robot(robot, thetas, ax=None, show=True, trayectoria=None, animation_speed=200, view_angles=None):
     """

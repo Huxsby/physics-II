@@ -2,15 +2,16 @@
 Ejemplos de uso para la visualización del robot manipulador
 """
 
-from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, Robot
-from class_robot_plotter import plot_robot, guardar_animacion
-import numpy as np
-import scipy
-import matplotlib.pyplot as plt
-from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta
-from class_rotaciones import Rp2Trans, Euler2R
-from class_helicoidales import calcular_M_generalizado
-from class_jacobian import calcular_jacobiana
+from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, Robot      # Para cargar el robot desde un archivo YAML
+from class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
+import numpy as np                                                                                      # Para la manipulación de matrices
+import matplotlib.pyplot as plt                                                                         # Para la visualización
+from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
+from class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
+from class_helicoidales import calcular_M_generalizado                                                  # Para la matriz de transformación homogénea
+from class_jacobian import calcular_jacobiana                                                           # Para la matriz jacobiana
+import os                                                                                               # Para limpiar la pantalla en Windows/Linux
+
 # Ejemplo 1: Visualización simple
 def ejemplo_visualizacion_simple(robot: Robot):
     # Generar una configuración de ángulos en posición neutral
@@ -278,39 +279,101 @@ def ejemplo_configuracion_singular(robot: Robot):
     print(f"Visualizando robot en configuración singular: {np.round(thetas_singular_np, 3)}")
     plot_robot(robot, thetas_singular_np)
 
-if __name__ == "__main__":
+def menu_plotter():
     # Cargar el robot desde un archivo YAML
+    def limpiar_pantalla():
+        """Limpia la pantalla de la consola."""
+        input("\033[93mPresione Enter para continuar...\033[0m")
+        os.system('cls' if os.name == 'nt' else 'clear')
+
     robot = cargar_robot_desde_yaml("robot.yaml")
-
-    print("\n1. Ejemplo de visualización simple")
-    ejemplo_visualizacion_simple(robot)
     
-    print("\n2. Ejemplo de configuración personalizada")
-    ejemplo_configuracion_personalizada(robot)
-    
-    print("\n3. Ejemplo de múltiples vistas")
-    ejemplo_multiples_vistas(robot)
-    
-    print("\n4. Ejemplo de animación entre dos configuraciones")
-    ejemplo_animacion(robot)
-    
-    print("\n5. Ejemplo de trayectoria con múltiples puntos")
-    ejemplo_trayectoria(robot)
-    
-    print("\n6. Ejemplo de cinemática directa")
-    ejemplo_cinematica_directa(robot)
+    while True:
+        print("\n" + "="*90)    # Separador
+        print(" "*32 + "MENÚ DE EJEMPLOS DE VISUALIZACIÓN")
+        print("="*90)   # Separador
+        print("1. Visualización simple")
+        print("2. Configuración personalizada")
+        print("3. Múltiples vistas")
+        print("4. Animación entre dos configuraciones")
+        print("5. Trayectoria con múltiples puntos")
+        print("6. Cinemática directa")
+        print("7. Configuración singular")
+        print("8. Animación de articulaciones prismáticas")
+        print("9. Cinemática inversa con trayectoria circular (robot.yaml)")
+        print("10. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
+        print("11. Probar todos los graficos y animaciones")
+        print("-"*90)   # Separador
+        print("0. Salir")
 
-    print("\n7. Ejemplo de configuración singular")
-    ejemplo_configuracion_singular(robot)
+        opcion = input("Seleccione un ejemplo (0-11): ")
 
-    # Ejemplo de animación de articulaciones prismáticas
-    print("\n8. Ejemplo de animación de articulaciones prismáticas")
-    ejemplo_animacion_prismatica(robot)
+        if opcion == '1':
+            print("Ejecutando: Visualización simple")
+            ejemplo_visualizacion_simple(robot)
+  
+        elif opcion == '2':
+            print("Ejecutando: Configuración personalizada")
+            ejemplo_configuracion_personalizada(robot)
+   
+        elif opcion == '3':
+            print("Ejecutando: Múltiples vistas")
+            ejemplo_multiples_vistas(robot)
+    
+        elif opcion == '4':
+            print("Ejecutando: Animación entre dos configuraciones")
+            ejemplo_animacion(robot)
+    
+        elif opcion == '5':
+            print("Ejecutando: Trayectoria con múltiples puntos")
+            ejemplo_trayectoria(robot)
+    
+        elif opcion == '6':
+            print("Ejecutando: Cinemática directa")
+            ejemplo_cinematica_directa(robot)
+        
+        elif opcion == '7':
+            print("Ejecutando: Configuración singular")
+            ejemplo_configuracion_singular(robot)
+       
+        elif opcion == '8':
+            print("Ejecutando: Animación de articulaciones prismáticas")
+            ejemplo_animacion_prismatica(robot)
+        
+        elif opcion == '9':
+            print("Ejecutando: Cinemática inversa con trayectoria circular (robot.yaml)")
+            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
+        
+        elif opcion == '10':
+            print("Ejecutando: Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
+            robot = cargar_robot_desde_yaml("robot-niryo.yaml")
+            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
+            robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
+        
+        elif opcion == '11':
+            print("Ejecutando: Probar todos los graficos y animaciones")
+            ejemplo_visualizacion_simple(robot)
+            ejemplo_configuracion_personalizada(robot)
+            ejemplo_multiples_vistas(robot)
+            ejemplo_animacion(robot)
+            ejemplo_trayectoria(robot)
+            ejemplo_cinematica_directa(robot)
+            ejemplo_configuracion_singular(robot)
+            ejemplo_animacion_prismatica(robot)
+            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
+            robot = cargar_robot_desde_yaml("robot-niryo.yaml")
+            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
+            robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
+            
+        elif opcion == '0':
+            print("Saliendo del programa.")
+            limpiar_pantalla()
+            break # Fin del bucle
+        
+        else:
+            print("Opción no válida. Intente de nuevo.")
+        
+        limpiar_pantalla()
 
-    print("\n9. Ejemplo de cinemática inversa con trayectoria circular")
-    ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
-
-    # Probando con el robot Niryo
-    print("\n9.Probando con el robot Niryo")
-    robot = cargar_robot_desde_yaml("robot-niryo.yaml")
-    ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
+if __name__ == "__main__":
+    menu_plotter()

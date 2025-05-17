@@ -390,6 +390,7 @@ def menu_helicoidales():
         print("3. Visualizar eje helicoidal")
         print("4. Validar transformaciones helicoidales")
         print("5. Calcular T del robot.")
+        print("-"*90)   # Separador
         print("0. Volver al menú principal")
         print("-"*90)
         
