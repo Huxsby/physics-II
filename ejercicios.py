@@ -1,16 +1,17 @@
-""" Matrices de transformación homogénea y rotaciones en 3D."""
 """
- - Importar las funciones en el archivo SEM3_1_Rotaciones.py (ejercicios.py)
- - 
+Programa principal para probar los codigos de rotaciones y cinemática inversa y funciones auxiliares para las prácticas.
 """
-#import sympy as sp                                  # Para cálculos simbólicos
+
+#import sympy as sp                                 # Para cálculos simbólicos
 import numpy as np                                  # Para cálculos numéricos
 import os                                           # (Limpiar pantalla)
 from class_datos import Datos                       # Clase para organizar la toma de datos
 from class_rotaciones import *                      # Funciones de rotación
 from class_helicoidales import *                    # Funciones de helicoidales y su menu()
 import class_robot_structure as robot_structure     # Clase y funciones para leer el archivo robot.yaml
-from class_jacobian import *                       # Funciones para calcular la Jacobiana
+from class_jacobian import *                        # Funciones para calcular la Jacobiana
+from class_robot_plotter_prueba import menu_plotter # Funcion de mmenu() de las funciones para graficar el robot, casos de prueba y animaciones.
+from problema_cinematico_inverso_gen import menu_cinematica_inversa # Funcion de mmenu() de cinemática inversa, casos de prueba y animaciones.
 
 # Comparar rotaciones
 def comparar_rotaciones(w , θ):
@@ -34,7 +35,6 @@ def menu():
         print("="*90)   # Separador
         print("Nota. Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
         print("="*90)   # Separador
-        # Añadir content
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
         print("3. Comparar rotaciones con fórmula generar vs Rodrigues.")
@@ -50,6 +50,8 @@ def menu():
         print("10. Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
         print("-"*90)   # Separador
         print("11. Comparar configuraciones random.")
+        print("12. Múltiples graficaciones y animcaciones para robot.yaml.")
+        print("13. Problema cinemático inverso.")
         print("-"*90)   # Separador
         print("0. Salir.")
 
@@ -102,7 +104,6 @@ def menu():
             else:
                 # Obtener vector del usuario y normalizarlo
                 eje = np.array(Datos(tipo="vector", mensaje="Ingrese el vector de rotación (separado por comas o espacios): ").valor)
-                
                 u_eje = eje / np.linalg.norm(eje)
                 if list(eje) != list(u_eje):
                     print(f"\tEje no unitario, normalizando {eje} -> {u_eje}")  # Normalizar a vector unitario
@@ -129,7 +130,7 @@ def menu():
             print("Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
             print("NOTA: Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
             menu_helicoidales()
-            #limpiar_pantalla()
+            # limpiar_pantalla()
 
         elif opcion == "8":                             # 8. Pruebas de matrices de 4x4
             print("Lectura de archivo YAML (robot.yaml)")
@@ -153,13 +154,11 @@ def menu():
             imprimir_matriz(M, "M")
 
             # Valores de las articulaciones
-            
             thetas = [0.7,0.3,0.3,0.4,0.5,0.8]
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
             T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
-
             print("Matriz de transformación homogénea T:")
             imprimir_matriz(T, "T")
             
@@ -167,7 +166,6 @@ def menu():
             R = T[:3,:3]
             p = T[:3,3]
             RPY = R2Euler(R)
-
             print("Coordenadas (x,y,z) del TCP:", p)
             print("Los angulos de Euler (Roll Pitch Yaw) son:", RPY,'\n') 
             limpiar_pantalla()
@@ -196,30 +194,34 @@ def menu():
             thetas_dic_limit = {f"t{i}": limit_conf[i] for i in range(len(robot.links))}
             J_num_limit = J_sym.subs(thetas_dic_limit).evalf(chop=True)
             vol_EM_limit, vol_EF_limit = calcular_volumen_elipsoides(J_num_limit)
-            print(f"Configuración Límite Positiva: {limit_conf}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
+            print(f"Configuración Límite Positiva: {np.round(limit_conf, 2)}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
 
             # Configuración singular propuesta
             singular_config = np.array([0, 0, 1.43617532221234, 0, 0, 0, 0])
             thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(len(robot.links))}
             J_num_singular = J_sym.subs(thetas_dic_singular).evalf(chop=True)
             vol_EM_singular, vol_EF_singular = calcular_volumen_elipsoides(J_num_singular)
-            print(f"Configuración Singular Propuesta: {singular_config}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
+            print(f"Configuración Singular Propuesta: {np.round(singular_config, 2)}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
 
-            negative_limits = get_limits_negative(robot)
-            positive_limits = get_limits_positive(robot)
+            # negative_limits = get_limits_negative(robot)
+            # positive_limits = get_limits_positive(robot)
             print("\nComparando configuraciones random 8 veces...")
             for vueltas in range(8):
                 random_config, thetas_dic_random = thetas_aleatorias(robot)
-
                 J_num_random = J_sym.subs(thetas_dic_random).evalf(chop=True)
                 vol_EM_random, vol_EF_random = calcular_volumen_elipsoides(J_num_random)
                 print(f"Random Config {vueltas+1}: {np.round(random_config, 2)}\tVol EM: {vol_EM_random:.2e}\tVol EF: {vol_EF_random:.2e}")
             limpiar_pantalla()
             
-        elif opcion == "12":
+        elif opcion == "12":                           # 12. Graficar robot.yaml
             print("Graficando robot.yaml...")
-            robot = cargar_robot_desde_yaml("robot.yaml")
+            menu_plotter()
+            # limpiar_pantalla()
             
+        elif opcion == "13":                           # 13. Problema cinemático inverso
+            print("Problema cinemático inverso.")
+            menu_cinematica_inversa()
+            limpiar_pantalla()
 
         elif opcion == "0":                             # 0. Salir
             print("Saliendo...", end=" ")
