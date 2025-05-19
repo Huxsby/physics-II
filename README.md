@@ -33,6 +33,8 @@ Este repositorio contén materiais e recursos relacionados coa materia **Física
 
 - **Proxectos de simulación**: Exemplos de simulacións por ordenador que permiten profundizar no entendemento dos fenómenos físicos relacionados coa robótica.
 
+- **Playlist de vídeos**: Podes encontrar unha playlist de vídeos sobre os temas tratados no libro "Modern Robotics" aquí: [Modern Robotics, All Videos](https://www.youtube.com/playlist?list=PLggLP4f-rq02vX0OQQ5vrCxbJrzamYDfx)
+
 ## Metodoloxía de ensino
 
 A docencia de Física II combina clases expositivas, interactivas e prácticas de laboratorio. As clases teóricas impártense con apoio de material multimedia, mentres que as prácticas de laboratorio realízanse mediante simulacións por ordenador utilizando diferentes programas con librerías específicas de robótica (FreeCAD e CoppeliaSIM ou equivalentes) e códigos en Python. A metodoloxía de ensino está descrita no apartado 5.1 da memoria da titulación e nas directrices para o desenvolvemento dunha docencia presencial segura.
