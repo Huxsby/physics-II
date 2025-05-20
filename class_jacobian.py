@@ -2,21 +2,19 @@ import sympy as sp
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-
 from class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 
 # Función que convierte un eje de rotación en matriz antisimétrica 3x3 (so3)
-def VecToso3(w): return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
+def VecToso3(w):
+    """ Convierte un vector de 3 elementos en una matriz antisimétrica 3x3 (espacio vectorial so(3)). """
+    return sp.Matrix([[0,-w[2],w[1]], [w[2],0,-w[0]], [-w[1],w[0],0]])
 
 def VecToso3sp(v: sp.Matrix):
+    """ Convierte un vector simbólico de 3 elementos en una matriz antisimétrica 3x3 (espacio vectorial so(3)). """
     v = sp.Matrix(v)
-    return sp.Matrix([
-        [0, -v[2], v[1]],
-        [v[2], 0, -v[0]],
-        [-v[1], v[0], 0]
-    ])
+    return sp.Matrix([[0, -v[2], v[1]],[v[2], 0, -v[0]],[-v[1], v[0], 0]])
 
 def MatrixExp3sp(w: sp.Matrix, theta):
     """ Calcula la matriz exponencial de un vector w en SO(3) usando la fórmula de Rodrigues. """
@@ -28,8 +26,8 @@ def MatrixExp6sp(S: sp.Matrix, theta):
     """ Calcula la matriz exponencial de un elemento de Lie en SE(3) usando la fórmula de Rodrigues. """
     w = sp.Matrix(S[0:3])
     v = sp.Matrix(S[3:6])
+    
     omgmat = VecToso3sp(w)
-
     # Check for pure translation
     if w.norm() < 1e-5: # Use a small tolerance for floating point comparison
         # Simplified matrix exponential for pure translation
@@ -46,7 +44,6 @@ def Adjunta(T: sp.Matrix):
     R = T[0:3, 0:3]
     p = T[0:3, 3]
     p_skew = VecToso3sp(p)
-
     upper = R.row_join(sp.zeros(3))
     lower = (p_skew * R).row_join(R)
     return upper.col_join(lower)
@@ -57,28 +54,41 @@ def calcular_jacobiana(robot: Robot):
     """ Calcula la Jacobiana simbólica de un robot dado usando los ejes helicoidales del robot. """
     tiempo = time.time()
     S_list = robot.ejes_helicoidales  # Lista de ejes helicoidales [w1,v1], [w2,v2], ...
-    thetas_s = sp.symbols(f't0:{len(S_list)}')  # Variables simbólicas para cada articulación
-    J_cols = []      # Inicializar la lista de columnas de la Jacobiana
-    T = sp.eye(4)    # Transformación acumulada hasta la articulación i-1
+    n = len(S_list)
+    thetas_s = sp.symbols(f't0:{n}')  # Variables simbólicas para cada articulación
 
-    for i in range(len(S_list)):
+    # Inicializar la lista de columnas de la Jacobiana
+    J_cols = []
+
+    # Transformación acumulada hasta la articulación i-1
+    T = sp.eye(4)
+
+    for i in range(n):
         S = sp.Matrix(S_list[i])
-        # w = S[:3, 0]
-        # v = S[3:6, 0]
-        
-        if i > 0:                # Para la columna i, calculamos la adjunta de la transformación hasta i-1 aplicada a S_i
-            for j in range(i):   # Producto de exponentiales hasta la articulación i-1
+        w = S[:3, 0]
+        v = S[3:6, 0]
+
+        # Para la columna i, calculamos la adjunta de la transformación hasta i-1 aplicada a S_i
+        if i > 0:
+            # Producto de exponentiales hasta la articulación i-1
+            for j in range(i):
                 S_j = sp.Matrix(S_list[j])
                 T = T * MatrixExp6sp(S_j, thetas_s[j])
         else:
-            T = sp.eye(4)        # Para la primera columna, no hay transformaciones previas
+            T = sp.eye(4)
 
-        Ad_T = Adjunta(T)        # Calcular la adjunta de T
-        J_col = Ad_T * S         # Columna de la Jacobiana: Ad_T * S_i
-        J_cols.append(J_col)     # Añadir la columna a la lista de columnas
-        T = sp.eye(4)            # Reiniciar T para la siguiente columna
+        # Calcular la adjunta de T
+        Ad_T = Adjunta(T)
+        # Columna de la Jacobiana: Ad_T * S_i
+        J_col = Ad_T * S
+        J_cols.append(J_col)
 
-    Jacobian = sp.Matrix.hstack(*J_cols)    # Construir la matriz Jacobiana juntando las columnas
+        # Reiniciar T para la siguiente columna
+        T = sp.eye(4)
+
+    # Construir la matriz Jacobiana juntando las columnas
+    Jacobian = sp.Matrix.hstack(*J_cols)
+
     print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - tiempo:.4f} segundos\033[0m")
     return Jacobian, thetas_s
 
@@ -94,7 +104,8 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     
     # Ordenar free_vars por nombre para consistencia, útil si las soluciones se comparan/muestran
     free_vars = sorted([s for s in jacobian.free_symbols if s not in substitutions], key=lambda x: str(x.name))
-
+    print(f"\t\033[93mBuscando configuraciones singulares para {free_vars}...\033[0m")
+    mostrar_jacobiana_resumida(J_sub, msg="\t\033[93mJacobiana sustituida:\033[0m")
     all_solutions = []
 
     # Verificar si la Jacobiana tiene suficientes filas
@@ -109,10 +120,8 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     if J_sub.cols >= 6:
         try:
             sub_matrix1 = J_sub[:6, :6]
-            print(f"\t\033[96mFormando Det1 con columnas 0,1,2,3,4,5.\033[0m")
-            mostrar_jacobiana_resumida(sub_matrix1, msg="\tSubmatriz Det1 (6x6):", max_chars=20)
             det1 = sub_matrix1.det()
-            print(f"\tExpresión del Determinante 1: {det1}") # Descomentar para depuración
+            # print(f"\tExpresión del Determinante 1: {det1}") # Descomentar para depuración
             solutions1 = sp.solve(det1, free_vars, dict=True)
             
             if not isinstance(solutions1, list): # sp.solve puede devolver un solo dict
@@ -148,9 +157,7 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
         try:
             sub_matrix2 = J_sub.extract(list(range(6)), col_indices_det2)
             det2 = sub_matrix2.det()
-            print(f"\tExpresión del Determinante 2: {det1}") # Descomentar para depuración
-            mostrar_jacobiana_resumida(sub_matrix2, msg="\tSubmatriz Det2 (6x6):", max_chars=20)
-            print(f"\tExpresión del Determinante 2: {det2}") # Descomentar para depuración
+            # print(f"\tExpresión del Determinante 2: {det2}") # Descomentar para depuración
             solutions2 = sp.solve(det2, free_vars, dict=True)
 
             if not isinstance(solutions2, list):
@@ -330,19 +337,14 @@ def graficar_elipsoides(xx, yy, giro, llave, name=None, indices=(1, 3), limitplo
     plt.show()
 
 def calcular_volumen_elipsoides(J):
-    """ 
-    Calcula el volumen de los elipsoides de manipulabilidad y fuerza a partir de la Jacobiana.
-    El volumen del elipsoide es proporcional al producto de los autovalores, que coincide
-    con el determinante de la matriz A ⇒ V ∝ √(λ1·λ2·(...)·λm) = √det(A)=√det(J.T)
-    """
-    vol_EM = vol_EF =  sp.sqrt((J*sp.Transpose(J)).det()) # Volumen del elipsoide de manipulabilidad
+    """ Calcula el volumen de los elipsoides de manipulabilidad y fuerza a partir de la Jacobiana. """
+    vol_EM = vol_EF =  (J*sp.Transpose(J)).det() # Volumen del elipsoide de manipulabilidad
     return vol_EM, vol_EF
 
 """ Funciones de validación """
 
-def prueba_jacobiana():
+def prueba_jacobiana(robot: Robot):
     """ Función de prueba para calcular y mostrar la Jacobiana de un robot. """
-    robot = cargar_robot_desde_yaml("robot-niryo.yaml") # Carga del robot
     Jacobian, thetas_s = calcular_jacobiana(robot) # Calcular Jacobiana Simbólica
 
     # Mostrar Jacobiana simbólica de forma resumida
@@ -396,33 +398,23 @@ def prueba_jacobiana():
 
     # --- Prueba 6: Buscar singularidades ---
     print("\n--- Búsqueda de configuraciones singulares ---")
-    
-    # Restricciones para el primer caso
-    subs1 = {thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0}
-    sol1 = find_singular_configurations(Jacobian, subs1)
-    # Resultado esperado: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
+    subs1 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 1}    # Restricciones para el primer caso
+    sol1 = find_singular_configurations(Jacobian, subs1)                # Para el Niryo One el resultado esperado es: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
 
-    # Restricciones para el segundo caso
-    subs2 = {thetas_s[1]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0}
-    sol2 = find_singular_configurations(Jacobian, subs2)
-    # Resultado esperado: [{t2: -1.70541733137745},
-                # {t2: -1.57079632679490},
-                # {t2: 1.43617532221234},
-                # {t2: 1.57079632679490}]
+    subs2 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 1}    # Restricciones para el segundo caso
+    sol2 = find_singular_configurations(Jacobian, subs2)                # Para el Niryo One el resultado esperado es: [{t2: -1.70541733137745}, {t2: -1.57079632679490}, {t2: 1.43617532221234}, {t2: 1.57079632679490}]
 
     print("\nConfiguraciones singulares:")
-    print(f"Caso 1 (t2=t3=t4=0): {sol1}")
-    print(f"Caso 2 (t1=t3=t4=0): {sol2}")
+    print(f"Caso 1 ({subs1}): {sol1}")
+    print(f"Caso 2 ({subs2}): {sol2}")
     return sol1, sol2
 
-def prueba_elipsoides(sol1, sol2):
+def prueba_elipsoides(sol1, sol2, robot: Robot):
     """ Función de prueba para calcular y graficar los elipsoides de manipulabilidad y fuerza. """
-    robot = cargar_robot_desde_yaml("robot.yaml")
     J_sym, thetas_s = calcular_jacobiana(robot)
 
     random_config, thetas_dic_random = thetas_aleatorias(robot)
 
-    Jal = J_sym.subs(thetas_dic_random)
     Jal = J_sym.subs(thetas_dic_random)
     Jp0 = J_sym.subs({thetas_s[0]:0, thetas_s[1]:0, thetas_s[2]:0, thetas_s[3]:0, thetas_s[4]:0, thetas_s[5]:0})
 
@@ -430,8 +422,9 @@ def prueba_elipsoides(sol1, sol2):
     # A partir de la Jacobiana podemos calcular los elipsoides de manipulabilidad y fuerza en 2 dimensiones, si
     # restringimos las velocidades de las articulaciones a sólo 2 grados de libertad:
 
-    vol_EM, _ = calcular_volumen_elipsoides(Jal)
+    vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
     print(f"\n\033[93m--- Elipsoides de una configuración aleatoria (validada) ({random_config})---\033[0m")
+    # mostrar_jacobiana_resumida(Jal)
     print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
     print("\tGraficando elipsoides... configuración aleatoria")
     xx, yy, giro = elipsoide_manipulabilidad(Jal)
@@ -452,7 +445,7 @@ def prueba_elipsoides(sol1, sol2):
         valid, msg = limits(robot, complete_config)
         if valid:
             valid_config = complete_config
-            msg = f"Configuración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m {msg}"
+            msg = f"\tConfiguración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m {msg}"
             break
         else:
             print(f"\tConfiguración inválida en \033[35mCaso 1: \033[36m{complete_config}\033[0m {msg}")
@@ -466,19 +459,19 @@ def prueba_elipsoides(sol1, sol2):
             valid, msg = limits(robot, complete_config)
             if valid:
                 valid_config = complete_config
-                msg = f"Configuración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m {msg}"
+                msg = f"\tConfiguración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m {msg}"
                 break
             else:
                 print(f"\tConfiguración inválida en \033[35mCaso 2: \033[36m{complete_config}\033[0m {msg}")
 
     if valid_config:
         print(msg)
-        print(msg)
         Jal = J_sym.subs(valid_config)
-        vol_EM, _ = calcular_volumen_elipsoides(Jal)
+        vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
         print(f"\n--- Volúmenes de los elipsoides ({valid_config}) ---")
         print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
         print(f"\tGraficando elipsoides... configuración singular válida para {robot.name}")
+        xx, yy, giro = elipsoide_manipulabilidad(Jal)
         _, _, llave = elipsoide_fuerza(Jal)
         graficar_elipsoides(xx, yy, giro, llave, name=valid_config)
     else:
@@ -494,5 +487,6 @@ def prueba_elipsoides(sol1, sol2):
     print("\n\n\033[93m--- Fin de la prueba ---\033[0m")
 
 if __name__ == "__main__":
-    sol1, sol2 = prueba_jacobiana()
-    prueba_elipsoides(sol1, sol2)
+    robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
+    sol1, sol2 = prueba_jacobiana(robot)
+    prueba_elipsoides(sol1, sol2, robot)
