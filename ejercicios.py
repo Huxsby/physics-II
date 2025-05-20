@@ -146,7 +146,7 @@ def menu():
         elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
             print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
-            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
+            robot = robot_structure.cargar_robot_desde_yaml("robot-niryo.yaml")
             print("\nEjes helicoidales del robot:", robot.ejes_helicoidales, '\n')
             # Calcular M (posición cero)
             M = calcular_M_generalizado(robot)

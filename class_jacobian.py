@@ -92,7 +92,7 @@ def calcular_jacobiana(robot: Robot):
     print(f"\t\033[92mTiempo de cálculo de la Jacobiana del robot {robot.name}: {time.time() - tiempo:.4f} segundos\033[0m")
     return Jacobian, thetas_s
 
-def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
+def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict, show=True):
     """
     Calcula las configuraciones singulares de una Jacobiana simbólica
     basándose en el determinante de dos submatrices específicas:
@@ -104,24 +104,26 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     
     # Ordenar free_vars por nombre para consistencia, útil si las soluciones se comparan/muestran
     free_vars = sorted([s for s in jacobian.free_symbols if s not in substitutions], key=lambda x: str(x.name))
-    print(f"\t\033[93mBuscando configuraciones singulares para {free_vars}...\033[0m")
-    mostrar_jacobiana_resumida(J_sub, msg="\t\033[93mJacobiana sustituida:\033[0m")
+    if show:
+        print(f"\t\033[93mBuscando configuraciones singulares para {free_vars}...\033[0m")
+        mostrar_jacobiana_resumida(J_sub, msg="\t\033[93mJacobiana sustituida:\033[0m")
     all_solutions = []
 
     # Verificar si la Jacobiana tiene suficientes filas
     if J_sub.rows < 6:
-        print(f"\t\033[91mLa Jacobiana sustituida tiene {J_sub.rows} filas, se necesitan al menos 6 para este análisis.\033[0m")
-        print(f"\t\033[92mTiempo total de procesamiento: {time.time() - tiempo_total_start:.4f}s\033[0m")
+        if show:
+            print(f"\t\033[91mLa Jacobiana sustituida tiene {J_sub.rows} filas, se necesitan al menos 6 para este análisis.\033[0m")
+            print(f"\t\033[92mTiempo total de procesamiento: {time.time() - tiempo_total_start:.4f}s\033[0m")
         return []
 
     # --- Determinante 1: Primeras 6 filas, primeras 6 columnas ---
-    print(f"\n\t--- Analizando Determinante 1 (submatriz 6x6 de las primeras 6 columnas) ---")
+    if show: print(f"\n\t--- Analizando Determinante 1 (submatriz 6x6 de las primeras 6 columnas) ---")
     tiempo_det1_start = time.time()
     if J_sub.cols >= 6:
         try:
             sub_matrix1 = J_sub[:6, :6]
             det1 = sub_matrix1.det()
-            # print(f"\tExpresión del Determinante 1: {det1}") # Descomentar para depuración
+            # if show: print(f"\tExpresión del Determinante 1: {det1}") # Descomentar para depuración
             solutions1 = sp.solve(det1, free_vars, dict=True)
             
             if not isinstance(solutions1, list): # sp.solve puede devolver un solo dict
@@ -131,15 +133,16 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
             solutions1 = [s for s in solutions1 if isinstance(s, dict)]
 
             all_solutions.extend(solutions1)
-            msg_color = "\033[92m" if solutions1 else "\033[96m"
-            print(f"\t{msg_color}Soluciones para Det1 ({len(solutions1)} encontradas): {solutions1 if solutions1 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
+            if show:
+                msg_color = "\033[92m" if solutions1 else "\033[96m"
+                print(f"\t{msg_color}Soluciones para Det1 ({len(solutions1)} encontradas): {solutions1 if solutions1 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
         except Exception as e:
             print(f"\t\033[91mError calculando/resolviendo Det1: {e}. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
     else:
         print(f"\t\033[93mOmitiendo Det1: J_sub tiene {J_sub.cols} columnas, se necesitan al menos 6. Tiempo: {time.time() - tiempo_det1_start:.4f}s\033[0m")
 
     # --- Determinante 2: Primeras 6 filas, primeras 5 columnas + última columna ---
-    print(f"\n\t--- Analizando Determinante 2 (submatriz 6x6 de las primeras 5 columnas y la última) ---")
+    if show: print(f"\n\t--- Analizando Determinante 2 (submatriz 6x6 de las primeras 5 columnas y la última) ---")
     tiempo_det2_start = time.time()
     if J_sub.cols >= 6: # Se necesitan al menos 6 columnas para formar esta submatriz 6x6
         col_indices_det2 = list(range(5))  # Columnas 0, 1, 2, 3, 4
@@ -150,9 +153,9 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
 
         if J_sub.cols == 6:
             # En este caso, col_indices_det2 será [0,1,2,3,4,5], idéntica a la submatriz de Det1
-            print(f"\t\033[96mNota: Para la forma de J_sub {J_sub.shape}, Det2 es idéntico a Det1 (columnas: {col_indices_det2}). Se re-evaluará como solicitado.\033[0m")
+            if show: print(f"\t\033[96mNota: Para la forma de J_sub {J_sub.shape}, Det2 es idéntico a Det1 (columnas: {col_indices_det2}). Se re-evaluará como solicitado.\033[0m")
         else:
-            print(f"\t\033[96mFormando Det2 con columnas: {col_indices_det2}.\033[0m")
+            if show: print(f"\t\033[96mFormando Det2 con columnas: {col_indices_det2}.\033[0m")
             
         try:
             sub_matrix2 = J_sub.extract(list(range(6)), col_indices_det2)
@@ -166,8 +169,9 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
             solutions2 = [s for s in solutions2 if isinstance(s, dict)]
 
             all_solutions.extend(solutions2)
-            msg_color = "\033[92m" if solutions2 else "\033[96m"
-            print(f"\t{msg_color}Soluciones para Det2 ({len(solutions2)} encontradas): {solutions2 if solutions2 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
+            if show: 
+                msg_color = "\033[92m" if solutions2 else "\033[96m"
+                print(f"\t{msg_color}Soluciones para Det2 ({len(solutions2)} encontradas): {solutions2 if solutions2 else 'Ninguna'}. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
         except Exception as e:
             print(f"\t\033[91mError calculando/resolviendo Det2: {e}. Tiempo: {time.time() - tiempo_det2_start:.4f}s\033[0m")
     else: # J_sub.cols < 6
@@ -188,6 +192,42 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict):
     print(f"\n\tSe encontraron {len(final_unique_solutions)} configuraciones singulares únicas de las evaluadas.")
     print(f"\t\033[92mTiempo total de procesamiento para find_singular_configurations: {time.time() - tiempo_total_start:.4f}s\033[0m")
     return final_unique_solutions
+
+def validate_singular_configurations(jacobian: sp.Matrix, substitutions: dict, robot: Robot):
+    """
+    Valida las configuraciones singulares de una Jacobiana simbólica
+    basándose en el determinante de dos submatrices específicas:
+    1. Jacobiana[primeras 6 filas, primeras 6 columnas]
+    2. Jacobiana[primeras 6 filas, primeras 5 columnas + última columna]
+    Además, verifica si la configuración está dentro de los límites del robot.
+    """
+    singular_configs = find_singular_configurations(jacobian, substitutions)
+    
+    # Validar cada configuración singular
+    valid_configs = []
+    for config in singular_configs:
+        # Evaluar la Jacobiana con la configuración actual
+        J_eval = jacobian.subs(config)
+        # Calcular el determinante (volumen) de la Jacobiana evaluada
+        try:
+            det_value = J_eval.det()
+        except Exception as e:
+            print(f"\t\033[91mError al calcular el determinante para la configuración {config}: {e}\033[0m")
+            continue  # Saltar a la siguiente configuración si hay un error
+
+        # Comprobar si el determinante es cero (singularidad) o menor que 1e-20
+        if abs(det_value) < 1e-20:
+            # Verificar si la configuración está dentro de los límites del robot
+            valid, msg = limits(robot, config)
+            if valid:
+                print(f"\t\033[92mConfiguración singular {config} ACEPTADA (det ≈ 0) y dentro de los límites del robot.\033[0m {msg}")
+                valid_configs.append(config)
+            else:
+                print(f"\t\033[93mConfiguración singular {config} (det ≈ 0) RECHAZADA: fuera de los límites del robot.\033[0m {msg}")
+        else:
+            print(f"\t\033[96mConfiguración {config} RECHAZADA: no es singular (det != 0).\033[0m")
+
+    return valid_configs
 
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
@@ -343,6 +383,46 @@ def calcular_volumen_elipsoides(J):
 
 """ Funciones de validación """
 
+def prueba_singularidades(Jacobian, thetas_s, show=True):
+    """ Función de prueba para buscar configuraciones singulares en la Jacobiana. """
+
+    print("\n--- Búsqueda de configuraciones singulares ---")
+    
+    all_solutions = []
+    for i in range(len(thetas_s)):
+        print(f"\n--- Búsqueda de singularidades con t{i} variable ---")
+        subs = {theta: 0 for j, theta in enumerate(thetas_s) if i != j}  # Restringir todas las thetas excepto la i-ésima
+        print(f"Sustituciones: {subs}")
+        singular_configs = find_singular_configurations(Jacobian, subs, show)
+        print(f"\tConfiguraciones singulares encontradas para t{i}: {singular_configs}")
+
+        # Convertir soluciones parciales a configuraciones completas
+        for config in singular_configs:
+            complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
+            complete_config.update(config)  # Actualizar con la solución actual
+            all_solutions.append(complete_config)
+
+    # Eliminar soluciones duplicadas (mismo método que en find_singular_configurations)
+    unique_sols_tuples = set()
+    final_unique_solutions = []
+    if all_solutions:
+        for sol_dict in all_solutions:
+            if isinstance(sol_dict, dict):
+                # Crear una representación canónica (tupla ordenada de items) para la unicidad
+                sol_tuple = tuple(sorted(sol_dict.items(), key=lambda item: str(item[0])))
+                if sol_tuple not in unique_sols_tuples:
+                    unique_sols_tuples.add(sol_tuple)
+                    final_unique_solutions.append(sol_dict)
+
+    # Convertir la lista de diccionarios a una lista de arrays de NumPy
+    final_unique_solutions_arrays = []
+    for config in final_unique_solutions:
+        # Crear un array de NumPy con los valores de las thetas en el orden correcto
+        config_array = np.array([config[theta] for theta in thetas_s], dtype=np.float64)
+        final_unique_solutions_arrays.append(config_array)
+
+    return final_unique_solutions_arrays
+
 def prueba_jacobiana(robot: Robot):
     """ Función de prueba para calcular y mostrar la Jacobiana de un robot. """
     Jacobian, thetas_s = calcular_jacobiana(robot) # Calcular Jacobiana Simbólica
@@ -397,19 +477,14 @@ def prueba_jacobiana(robot: Robot):
     input("Presiona Enter...")
 
     # --- Prueba 6: Buscar singularidades ---
-    print("\n--- Búsqueda de configuraciones singulares ---")
-    subs1 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 1}    # Restricciones para el primer caso
-    sol1 = find_singular_configurations(Jacobian, subs1)                # Para el Niryo One el resultado esperado es: [{t1: -1.57079632679490}, {t1: 1.57079632679490}]
+    final_unique_solutions = prueba_singularidades(Jacobian, thetas_s)
+    print("\nConfiguraciones singulares únicas encontradas:")
+    for sol in final_unique_solutions:
+        print(sol)
+    
+    return final_unique_solutions
 
-    subs2 = {theta: 0 for i, theta in enumerate(thetas_s) if i != 1}    # Restricciones para el segundo caso
-    sol2 = find_singular_configurations(Jacobian, subs2)                # Para el Niryo One el resultado esperado es: [{t2: -1.70541733137745}, {t2: -1.57079632679490}, {t2: 1.43617532221234}, {t2: 1.57079632679490}]
-
-    print("\nConfiguraciones singulares:")
-    print(f"Caso 1 ({subs1}): {sol1}")
-    print(f"Caso 2 ({subs2}): {sol2}")
-    return sol1, sol2
-
-def prueba_elipsoides(sol1, sol2, robot: Robot):
+def prueba_elipsoides(robot: Robot, final_unique_solutions):
     """ Función de prueba para calcular y graficar los elipsoides de manipulabilidad y fuerza. """
     J_sym, thetas_s = calcular_jacobiana(robot)
 
@@ -431,62 +506,93 @@ def prueba_elipsoides(sol1, sol2, robot: Robot):
     _, _, llave = elipsoide_fuerza(Jal)
     graficar_elipsoides(xx, yy, giro, llave, name=random_config)
 
-    input("\nPresiona Enter para continuar con la búsqueda de configuraciones válidas...")
-    # Buscar el primer caso válido en sol1 o sol2
-    valid_config = None
-    msg = ""
-
-    print(f"\n\033[93m--- Buscando configuraciones válidas (Probaremos a gráficar la primera que sea compatible con {robot.name}) ---\033[0m")
-    # Caso 1: t2=t3=t4=0
-    for config in sol1:
-        complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
-        complete_config.update(config)  # Actualizar con la solución actual de sol1
-        print(f"\tProbando configuración completa en \033[35mCaso 1: \033[36m{complete_config}\033[0m")
-        valid, msg = limits(robot, complete_config)
-        if valid:
-            valid_config = complete_config
-            msg = f"\tConfiguración válida encontrada en \033[35mCaso 1: \033[32m{valid_config}\033[0m {msg}"
-            break
-        else:
-            print(f"\tConfiguración inválida en \033[35mCaso 1: \033[36m{complete_config}\033[0m {msg}")
-
-    # Caso 2: t1=t3=t4=0
-    if not valid_config:  # Solo buscar en el caso 2 si no se encontró una configuración válida en el caso 1
-        for config in sol2:
-            complete_config = {theta: 0 for theta in thetas_s}  # Inicializar todas las thetas en 0
-            complete_config.update(config)  # Actualizar con la solución actual de sol2
-            print(f"\tProbando configuración completa en \033[35mCaso 2: \033[36m{complete_config}\033[0m")
-            valid, msg = limits(robot, complete_config)
-            if valid:
-                valid_config = complete_config
-                msg = f"\tConfiguración válida encontrada en \033[35mCaso 2: \033[32m{valid_config}\033[0m {msg}"
-                break
-            else:
-                print(f"\tConfiguración inválida en \033[35mCaso 2: \033[36m{complete_config}\033[0m {msg}")
-
-    if valid_config:
-        print(msg)
-        Jal = J_sym.subs(valid_config)
-        vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
-        print(f"\n--- Volúmenes de los elipsoides ({valid_config}) ---")
-        print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
-        print(f"\tGraficando elipsoides... configuración singular válida para {robot.name}")
-        xx, yy, giro = elipsoide_manipulabilidad(Jal)
-        _, _, llave = elipsoide_fuerza(Jal)
-        graficar_elipsoides(xx, yy, giro, llave, name=valid_config)
-    else:
-        print("\tNo se encontró una configuración válida en los casos analizados.")
-
     print("\n\033[93m--- Elipsoides configuración nula (θs=0) ---\033[0m")
+    Jp0 = J_sym.subs({theta: 0 for theta in thetas_s})
+    vol_EM, vol_EF = calcular_volumen_elipsoides(Jp0)
     print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
     print(f"\tGraficando elipsoides... configuración θs=0")
     # mostrar_jacobiana_resumida(Jp0)
     xx, yy, giro = elipsoide_manipulabilidad(Jp0)
     _, _, llave = elipsoide_fuerza(Jp0)
     graficar_elipsoides(xx, yy, giro, llave, name="(θs=0)")
+
+    # Buscar el primer caso válido en sol1 o sol2
+    valid_config = None
+    msg = ""
+
+    print(f"\n\033[93m--- Buscando configuraciones válidas (Probaremos a gráficar la primera que sea compatible con {robot.name}) ---\033[0m")
+    
+    # Inicializar variable para configuración válida
+    valid_config = None
+    valid_config_dict = None
+
+    # Depuración: Mostrar número de soluciones a probar
+    print(f"\tEvaluando {len(final_unique_solutions)} configuraciones potencialmente singulares")
+    
+    # Probar cada configuración
+    for config in final_unique_solutions:
+        # Format the configuration as a clean comma-separated list with rounded values
+        config_str = "[" + ", ".join([f"{val:.4f}" for val in config]) + "]"
+        print(f"\n\t\033[36mProbando configuración: {config_str}\033[0m")
+        
+        # Create and format the configuration dictionary more cleanly
+        config_dict = {thetas_s[i]: float(config[i]) for i in range(len(thetas_s))}
+        config_dict_str = "{" + ", ".join([f"{theta}: {val:.4f}" for theta, val in config_dict.items()]) + "}"
+        print(f"\tDiccionario de configuración: {config_dict_str}")
+        
+        # Verificar límites
+        try:
+            valid, msg = limits(robot, config)
+            status = "\033[32m✅ Válida\033[0m" if valid else "\033[31m❌ Inválida\033[0m"
+            print(f"\tResultado validación: {status}")
+            if valid:
+                valid_config = config
+                valid_config_dict = config_dict
+                print(f"\t\033[32mConfiguración válida encontrada: {config_str}\033[0m")
+                print(f"\t\033[32m{msg}\033[0m")
+                break
+            else:
+                print(f"\t\033[31mMotivo rechazo: {msg}\033[0m")
+        except Exception as e:
+            print(f"\t\033[91mError al validar configuración: {e}\033[0m")
+
+    # Verificar si encontramos una configuración válida
+    if valid_config is not None:
+        # Format the valid configuration as a clean comma-separated list
+        print(f"\n\033[92m--- Usando configuración válida: {np.round(valid_config, 2)} ---\033[0m")
+        try:
+            # Sustituir valores en la Jacobiana usando el diccionario
+            Jsing = J_sym.subs(valid_config_dict)
+            
+            # Calcular volúmenes
+            try:
+                vol_EM, vol_EF = calcular_volumen_elipsoides(Jsing)
+                # Format the volume with scientific notation, 4 decimal places
+                vol_str = f"{float(vol_EM):.4e}"
+                print(f"\t\033[96mVolumen de elipsoides: {vol_str}\033[0m")
+            except Exception as e:
+                print(f"\t\033[91mError al calcular volúmenes: {e}\033[0m")
+                vol_EM = vol_EF = "Error en cálculo"
+            
+            # Calcular elipsoides
+            xx, yy, giro = elipsoide_manipulabilidad(Jsing)
+            _, _, llave = elipsoide_fuerza(Jsing)
+            
+            print(f"\t\033[96mGraficando elipsoides...\033[0m")
+            graficar_elipsoides(xx, yy, giro, llave, name=f"Configuración singular {np.round(valid_config, 2)}")
+            
+            # Mostrar Jacobiana para depuración
+            print(f"\t\033[96mJacobiana en configuración singular:\033[0m")
+            mostrar_jacobiana_resumida(Jsing)
+            
+        except Exception as e:
+            print(f"\t\033[91mError al procesar configuración válida: {e}\033[0m")
+    else:
+        print("\n\t\033[91mNo se encontró ninguna configuración válida entre las analizadas.\033[0m")
+
     print("\n\n\033[93m--- Fin de la prueba ---\033[0m")
 
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
-    sol1, sol2 = prueba_jacobiana(robot)
-    prueba_elipsoides(sol1, sol2, robot)
+    final_unique_solutions = prueba_jacobiana(robot)
+    prueba_elipsoides(robot, final_unique_solutions)
