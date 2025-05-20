@@ -2,14 +2,14 @@
 Ejemplos de uso para la visualización del robot manipulador
 """
 
-from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, Robot      # Para cargar el robot desde un archivo YAML
+from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, filtrar_configuraciones, Robot      # Para cargar el robot desde un archivo YAML
 from class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
 import numpy as np                                                                                      # Para la manipulación de matrices
 import matplotlib.pyplot as plt                                                                         # Para la visualización
 from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
 from class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
 from class_helicoidales import calcular_M_generalizado                                                  # Para la matriz de transformación homogénea
-from class_jacobian import calcular_jacobiana                                                           # Para la matriz jacobiana
+from class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
 import os                                                                                               # Para limpiar la pantalla en Windows/Linux
 
 # Ejemplo 1: Visualización simple
@@ -279,6 +279,71 @@ def ejemplo_configuracion_singular(robot: Robot):
     print(f"Visualizando robot en configuración singular: {np.round(thetas_singular_np, 3)}")
     plot_robot(robot, thetas_singular_np)
 
+# Ejemplo 10: Visualizar multiples configuraciones en subplots
+def ejemplo_multiples_configuraciones_subplots(robot: Robot):
+    # Generar múltiples configuraciones aleatorias
+    num_configuraciones = 4  # Limit to 4 for a 2x2 grid
+    all_thetas = []
+    
+    for _ in range(num_configuraciones):
+        thetas, _ = thetas_aleatorias(robot)
+        all_thetas.append(thetas)
+    
+    # Crear una figura y subplots
+    fig = plt.figure(figsize=(12, 10))
+    
+    # Define el ángulo de vista que quieres usar para todos los subplots
+    view_angles = (30, 45)  # Elevación y azimut
+    
+    # Iterar a través de las configuraciones y crear subplots
+    for i, thetas in enumerate(all_thetas):
+        ax = fig.add_subplot(2, 2, i+1, projection='3d')  # Grid de 2x2
+        plot_robot(robot, thetas, ax=ax, show=False, view_angles=view_angles)
+        ax.set_title(f'Configuración {i+1}')
+    
+    plt.tight_layout()
+    plt.show()
+
+# Ejemplo 11: Prueba de singularidades
+def ejemplo_prueba_singularidades(robot: Robot):
+    # Calcular la Jacobiana
+    Jacobian, thetas_s = calcular_jacobiana(robot)
+    
+    # Encontrar configuraciones singulares
+    singular_configurations = prueba_singularidades(Jacobian, thetas_s, show=False)
+    
+    singular_configurations = filtrar_configuraciones(robot, singular_configurations)
+
+    if singular_configurations:
+        print("\nConfiguraciones singulares encontradas:")
+        
+        # Determine grid dimensions based on number of configurations
+        num_configs = len(singular_configurations)
+        rows = int(np.ceil(np.sqrt(num_configs)))
+        cols = int(np.ceil(num_configs / rows))
+        
+        # Create figure for subplots
+        fig = plt.figure(figsize=(cols*4, rows*4))
+        
+        # Set default view angle for all subplots
+        view_angles = (30, 45)  # Elevation and azimuth
+        
+        # Plot each singular configuration in a subplot
+        for i, config in enumerate(singular_configurations):
+            print(f"\tConfiguración {i+1}: {np.round(config, 2)}")
+            # Convert symbolic values to float
+            theta_values = [float(val) for val in config]
+            
+            # Create subplot
+            ax = fig.add_subplot(rows, cols, i+1, projection='3d')
+            plot_robot(robot, theta_values, ax=ax, show=False, view_angles=view_angles)
+            ax.set_title(f'Configuración singular {i+1} {np.round(config, 2)}')
+        
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("\nNo se encontraron configuraciones singulares.")
+
 def menu_plotter():
     # Cargar el robot desde un archivo YAML
     def limpiar_pantalla():
@@ -302,11 +367,12 @@ def menu_plotter():
         print("8. Animación de articulaciones prismáticas")
         print("9. Cinemática inversa con trayectoria circular (robot.yaml)")
         print("10. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
-        print("11. Probar todos los graficos y animaciones")
+        print("11. Prueba de singularidades (robot.yaml)")
+        print("12. Probar todos los graficos y animaciones")
         print("-"*90)   # Separador
         print("0. Salir")
 
-        opcion = input("Seleccione un ejemplo (0-11): ")
+        opcion = input("Seleccione un ejemplo (0-12): ")
 
         if opcion == '1':
             print("Ejecutando: Visualización simple")
@@ -351,6 +417,10 @@ def menu_plotter():
             robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
         
         elif opcion == '11':
+            print("Ejecutando: Prueba de singularidades")
+            ejemplo_prueba_singularidades(robot)
+
+        elif opcion == '12':
             print("Ejecutando: Probar todos los graficos y animaciones")
             ejemplo_visualizacion_simple(robot)
             ejemplo_configuracion_personalizada(robot)
@@ -364,6 +434,7 @@ def menu_plotter():
             robot = cargar_robot_desde_yaml("robot-niryo.yaml")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
             robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
+            ejemplo_prueba_singularidades(robot)
             
         elif opcion == '0':
             print("Saliendo del programa.")
