@@ -154,7 +154,10 @@ def menu():
             imprimir_matriz(M, "M")
 
             # Valores de las articulaciones
-            thetas = [0.7,0.3,0.3,0.4,0.5,0.8]
+            thetas = [0.7, 0.3, 0.3, 0.4, 0.5, 0.8]
+            
+            thetas = Datos(tipo="configuración", robot=robot)
+            
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T

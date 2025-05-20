@@ -32,19 +32,20 @@ Ejemplo de uso:
 """
 
 import numpy as np
+from class_robot_structure import limits, Robot
 
 class Datos:
     """
     Clase para organizar la toma de datos con el formato deseado.
     """
-    def __init__(self, tipo, mensaje=None):
+    def __init__(self, tipo, mensaje=None, robot=None):
         """
         Constructor de la clase Datos.
 
         Parámetros:
-        - tipo (str): Tipo de dato a solicitar ("vector", "eje", "angulo", "cordenadas_exponenciales").
+        - tipo (str): Tipo de dato a solicitar ("vector", "eje", "angulo", "cordenadas_exponenciales", "configuración").
         - mensaje (str, opcional): Mensaje personalizado para solicitar el dato.
-            Si no se proporciona, se usa un mensaje predeterminado según el tipo.
+        - robot (Robot, opcional): Instancia de Robot para validar configuraciones.
         """
         # Mensajes predeterminados según el tipo
         if mensaje is None:
@@ -56,16 +57,31 @@ class Datos:
                 mensaje = "Ingrese el ángulo de rotación (º): "
             elif tipo == "cordenadas_exponenciales":
                 mensaje = "Ingrese las coordenadas exponenciales (separadas por comas o espacios): "
+            elif tipo == "configuración":
+                mensaje = "Ingrese los valores de las articulaciones (separados por comas o espacios): "
             else:
                 mensaje = "Ingrese el dato: "
         
         self.tipo = tipo
         self.mensaje = mensaje
+        self.robot = robot
         self.valor = self.tomar_dato()
 
     def __str__(self):
         """ Método para representar el objeto como una cadena. """
         return str(self.valor)
+    
+    def __iter__(self):
+        """ Método para permitir la iteración sobre el objeto. """
+        return iter(self.valor)
+    
+    def __getitem__(self, key):
+        """ Método para permitir el acceso a los elementos del objeto como si fuera una lista. """
+        return self.valor[key]
+    
+    def __len__(self):
+        """ Método para permitir el uso de len() en el objeto. """
+        return len(self.valor)
     
     def obtener_valor(self):
         """ Devuelve el valor almacenado. """
@@ -114,6 +130,24 @@ class Datos:
                     return vector
                 except ValueError as e:
                     print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3,4,5,6 o 1 2 3 4 5 6).")
+        
+        elif self.tipo == "configuración":
+            if self.robot is None:
+                raise ValueError("Para el tipo 'configuración' debe proporcionar el argumento 'robot'.")
+            while True:
+                try:
+                    input_thetas = input(self.mensaje)
+                    thetas = np.array([float(x) for x in input_thetas.replace(',', ' ').split()])
+                    if len(thetas) != len(self.robot.links):
+                        print(f"Error: Debe ingresar {len(self.robot.links)} valores (uno por cada articulación)")
+                        continue
+                    valido, msg = limits(self.robot, thetas)
+                    if not valido:
+                        print(f"Configuración inválida: {msg}")
+                        continue
+                    return thetas
+                except ValueError:
+                    print("Error: Ingrese solo valores numéricos separados por comas o espacios")
         
         else:
             print("Tipo de dato no válido.")

@@ -179,11 +179,11 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     return thetas_follower
 
 def menu_cinematica_inversa():
-    """Resolución del problema cinemático inverso para el Robot Niryo One."""
+    """Resolución del problema cinemático inverso generalizado."""
     
     robot = cargar_robot_desde_yaml('robot.yaml')
     Jacobiana_tuple = calcular_jacobiana(robot)
-    CinematicaInversa(robot, Jacobiana_tuple)
+    CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
 
 if __name__ == "__main__":
     menu_cinematica_inversa()
