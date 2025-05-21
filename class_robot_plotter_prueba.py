@@ -311,8 +311,7 @@ def ejemplo_prueba_singularidades(robot: Robot):
     
     # Encontrar configuraciones singulares
     singular_configurations = prueba_singularidades(Jacobian, thetas_s, show=False)
-    
-    singular_configurations = filtrar_configuraciones(robot, singular_configurations)
+    singular_configurations = filtrar_configuraciones(robot, singular_configurations) # Filtrar configuraciones fuera de límites
 
     if singular_configurations:
         print("\nConfiguraciones singulares encontradas:")
@@ -346,9 +345,9 @@ def ejemplo_prueba_singularidades(robot: Robot):
 
 def menu_plotter():
     # Cargar el robot desde un archivo YAML
-    def limpiar_pantalla():
+    def limpiar_pantalla(stop=True):
         """Limpia la pantalla de la consola."""
-        input("\033[93mPresione Enter para continuar...\033[0m")
+        if stop: input("\033[93mPresione Enter para continuar...\033[0m")
         os.system('cls' if os.name == 'nt' else 'clear')
 
     robot = cargar_robot_desde_yaml("robot.yaml")

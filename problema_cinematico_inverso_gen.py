@@ -81,7 +81,7 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
 def CinematicaDirecta(ejes, thetas, M):
     return calcular_T_robot(ejes, thetas, M)
 
-def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10):
+def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_pet=1.00000000e-10, error_vel_lineal=1.00000000e-10, show=True):
     """Resolución del problema cinemático inverso para el Robot Niryo One."""
     tiempo = time.time()
     if robot is None:
@@ -159,22 +159,38 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
         # OR the norm of the linear velocity (Vs[3:6]) exceeds error_vel_lineal.
         err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > error_oet or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > error_vel_lineal
         # Print the error status with color: red if True (error exists), green if False (converged)
-        print(f"\tIter ({i:02d}) Vector giro: \033[36m{np.round(Vs.tolist(), 8)}\033[0m", f"Error: {(f'\033[31m{err}' if err else f'\033[32m{err} ⭢  Solución valida')}\033[0m")
+        # Format each value in Vs based on its magnitude, with scientific notation for small values
+        
+        # Usar el error de convergencia como umbral para imprimir ceros
+        if show:
+            cero_umbral = min(error_oet, error_vel_lineal)
+            ancho = 12  # Ancho fijo para todos los elementos
+            formatted_values = []
+            for x in Vs:
+                if abs(x) < cero_umbral:  # Cero según el error de convergencia
+                    formatted_values.append(f"\033[90m{'0.00000000':>{ancho}}\033[36m") # Color gris para ceros
+                elif abs(x) < 1e-4:  # Pequeño pero no cero - notación científica alineada
+                    formatted_values.append(f"{x:>{ancho}.4e}")
+                else:  # Números grandes - notación fija alineada
+                    formatted_values.append(f"{x:>{ancho}.8f}")
+            vector_str = "[" + ", ".join(formatted_values) + "]"
+            print(f"\tIter ({i:02d}) Vector giro: \033[36m{vector_str}\033[0m", f"Error: {(f'\033[31m{err}' if err else f'\033[32m{err} ⭢  Solución valida')}\033[0m")
+    
     print(f"\t\033[92mTiempo de cálculo total de la cinemática inversa: {time.time() - tiempo:.4f} segundos\033[0m")
     
-    # Imprime el resultado final de la cinemática inversa.
-    print(f"\nCoordenadas de las articulaciones:\n {thetas_actuales.tolist()}")
-    print("Error en w:", np.round(np.linalg.norm([Vs[0], Vs[1], Vs[2]]),8))
-    print("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
-    print("Número de iteraciones:", i)
+    if show: # Imprime el resultado final de la cinemática inversa.
+        print(f"\nCoordenadas de las articulaciones:\n {thetas_actuales.tolist()}")
+        print("Error en w:", np.round(np.linalg.norm([Vs[0], Vs[1], Vs[2]]),8))
+        print("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
+        print("Número de iteraciones:", i)
 
-    Tsd_re = calcular_T_robot(robot.ejes_helicoidales, thetas_actuales, M)
-    print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
-    print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
-    
-    print(f"\nLas thetas por las que ha pasado el robot son:")
-    for i in range(len(thetas_follower)):
-        print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
+        Tsd_re = calcular_T_robot(robot.ejes_helicoidales, thetas_actuales, M)
+        print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
+        print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
+        
+        print(f"\nLas thetas por las que ha pasado el robot son:")
+        for i in range(len(thetas_follower)):
+            print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
     
     return thetas_follower
 

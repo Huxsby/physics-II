@@ -376,9 +376,9 @@ def validar_transformaciones_helicoidales():
 # Añadir al menú principal
 def menu_helicoidales():
     """Menú interactivo para operaciones con ejes helicoidales."""
-    def limpiar_pantalla():
+    def limpiar_pantalla(stop=True):
         """Limpia la pantalla de la consola."""
-        input("\033[93mPresione Enter para continuar...\033[0m")
+        if stop: input("\033[93mPresione Enter para continuar...\033[0m")
         os.system('cls' if os.name == 'nt' else 'clear')
 
     while True:

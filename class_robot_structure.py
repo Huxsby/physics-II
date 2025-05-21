@@ -316,7 +316,14 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
 
 def limits(robot: Robot, θ):
     """
-    Function to limit the angles of the Niryo One robot.
+    Function to check if joint angles are within the robot's defined limits.
+    
+    Args:
+        robot (Robot): The robot with defined joint limits.
+        θ (list or dict): The joint angles to check.
+        
+    Returns:
+        tuple: (bool, str) - Boolean indicating if all joints are within limits and a message.
     """
     if robot.limits_dict is None or len(robot.limits_dict) == 0:
         return True, "No limits defined for the robot."
@@ -332,7 +339,6 @@ def limits(robot: Robot, θ):
         
         if joint_key not in robot.limits_dict:
             print(f"Warning: Limits for {joint_key} not found in robot.limits_dict.")
-            # Depending on desired behavior, either skip or treat as out of limits
             return False, f"Limits for {joint_key} not defined."
 
         lower_limit = robot.limits_dict[joint_key][0]
@@ -346,7 +352,8 @@ def limits(robot: Robot, θ):
             # This print executes if the joint is out of limits
             # print(f"Details for out-of-limit Joint {i+1}: Value={current_value}, LowerLimit={lower_limit}, UpperLimit={upper_limit}")
             # print(f"Comparison results: Value < LowerLimit is {current_value < lower_limit}, Value > UpperLimit is {current_value > upper_limit}")
-            return False, f"Joint {i+1} out of limits: {current_value} not in ({lower_limit}, {upper_limit})"
+            return False, f"Joint {i+1} out of limits: {current_value} not within range of ({lower_limit}, {upper_limit})"
+    
     return True, "All joints within limits"
 
 def get_limits_positive(robot: Robot):
