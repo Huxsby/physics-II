@@ -193,41 +193,39 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict, show=
     print(f"\t\033[92mTiempo total de procesamiento para find_singular_configurations: {time.time() - tiempo_total_start:.4f}s\033[0m")
     return final_unique_solutions
 
-def validate_singular_configurations(jacobian: sp.Matrix, substitutions: dict, robot: Robot):
-    """
-    Valida las configuraciones singulares de una Jacobiana simbólica
-    basándose en el determinante de dos submatrices específicas:
-    1. Jacobiana[primeras 6 filas, primeras 6 columnas]
-    2. Jacobiana[primeras 6 filas, primeras 5 columnas + última columna]
-    Además, verifica si la configuración está dentro de los límites del robot.
-    """
-    singular_configs = find_singular_configurations(jacobian, substitutions)
-    
-    # Validar cada configuración singular
-    valid_configs = []
-    for config in singular_configs:
-        # Evaluar la Jacobiana con la configuración actual
-        J_eval = jacobian.subs(config)
-        # Calcular el determinante (volumen) de la Jacobiana evaluada
-        try:
-            det_value = J_eval.det()
-        except Exception as e:
-            print(f"\t\033[91mError al calcular el determinante para la configuración {config}: {e}\033[0m")
-            continue  # Saltar a la siguiente configuración si hay un error
-
-        # Comprobar si el determinante es cero (singularidad) o menor que 1e-20
-        if abs(det_value) < 1e-20:
-            # Verificar si la configuración está dentro de los límites del robot
-            valid, msg = limits(robot, config)
-            if valid:
-                print(f"\t\033[92mConfiguración singular {config} ACEPTADA (det ≈ 0) y dentro de los límites del robot.\033[0m {msg}")
-                valid_configs.append(config)
-            else:
-                print(f"\t\033[93mConfiguración singular {config} (det ≈ 0) RECHAZADA: fuera de los límites del robot.\033[0m {msg}")
-        else:
-            print(f"\t\033[96mConfiguración {config} RECHAZADA: no es singular (det != 0).\033[0m")
-
-    return valid_configs
+# En desuso
+# def validate_singular_configurations(jacobian: sp.Matrix, substitutions: dict, robot: Robot):
+#     """
+#     Valida las configuraciones singulares de una Jacobiana simbólica
+#     basándose en el determinante de dos submatrices específicas:
+#     1. Jacobiana[primeras 6 filas, primeras 6 columnas]
+#     2. Jacobiana[primeras 6 filas, primeras 5 columnas + última columna]
+#     Además, verifica si la configuración está dentro de los límites del robot.
+#     """
+#     singular_configs = find_singular_configurations(jacobian, substitutions)
+#     # Validar cada configuración singular
+#     valid_configs = []
+#     for config in singular_configs:
+#         # Evaluar la Jacobiana con la configuración actual
+#         J_eval = jacobian.subs(config)
+#         # Calcular el determinante (volumen) de la Jacobiana evaluada
+#         try:
+#             det_value = J_eval.det()
+#         except Exception as e:
+#             print(f"\t\033[91mError al calcular el determinante para la configuración {config}: {e}\033[0m")
+#             continue  # Saltar a la siguiente configuración si hay un error
+#         # Comprobar si el determinante es cero (singularidad) o menor que 1e-20
+#         if abs(det_value) < 1e-20:
+#             # Verificar si la configuración está dentro de los límites del robot
+#             valid, msg = limits(robot, config)
+#             if valid:
+#                 print(f"\t\033[92mConfiguración singular {config} ACEPTADA (det ≈ 0) y dentro de los límites del robot.\033[0m {msg}")
+#                 valid_configs.append(config)
+#             else:
+#                 print(f"\t\033[93mConfiguración singular {config} (det ≈ 0) RECHAZADA: fuera de los límites del robot.\033[0m {msg}")
+#         else:
+#             print(f"\t\033[96mConfiguración {config} RECHAZADA: no es singular (det != 0).\033[0m")
+#     return valid_configs
 
 def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
@@ -543,7 +541,7 @@ def prueba_elipsoides(robot: Robot, final_unique_solutions):
         # Verificar límites
         try:
             valid, msg = limits(robot, config)
-            status = "\033[32m✅ Válida\033[0m" if valid else "\033[31m❌ Inválida\033[0m"
+            status = "\033[32mVálida\033[0m" if valid else "\033[31mInválida\033[0m"
             print(f"\tResultado validación: {status}")
             if valid:
                 valid_config = config

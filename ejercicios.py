@@ -23,9 +23,9 @@ def comparar_rotaciones(w , θ):
 
 # Menú interactivo
 def menu():
-    def limpiar_pantalla():
+    def limpiar_pantalla(stop=True):
         """Limpia la pantalla de la consola."""
-        input("\033[93mPresione Enter para continuar...\033[0m")
+        if stop: input("\033[93mPresione Enter para continuar...\033[0m")
         os.system('cls' if os.name == 'nt' else 'clear')
 
     """Menú interactivo para seleccionar acciones."""
@@ -33,7 +33,7 @@ def menu():
         print("\n" + "="*90)    # Separador
         print(" "*37 + "MENÚ DE OPCIONES")
         print("="*90)   # Separador
-        print("Nota. Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
+        print(" Notas:\n - Por defecto el robot cargado será robot.yaml.\n - Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
         print("="*90)   # Separador
         print("1. Rotar un vector entorno a un eje específico (x,y,z).")    
         print("2. Rotar un vector entorno a un eje genérico.")
@@ -126,7 +126,7 @@ def menu():
             limpiar_pantalla()
 
         elif opcion == "7":                             # 7. Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4
-            os.system('cls' if os.name == 'nt' else 'clear')  # Limpiar pantalla
+            limpiar_pantalla(stop = False)
             print("Pruebas de ejes helicoidales, vectores de 6 elementos y matrices de 4x4.")
             print("NOTA: Los vectores que se tomen como ejes serán convertidos a unitarios automáticamente.")
             menu_helicoidales()
@@ -145,19 +145,24 @@ def menu():
 
         elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
             print("Calcular la matriz de transformación homogénea del robot.")
-            # Cargar robot y ejes helicoidales
-            robot = robot_structure.cargar_robot_desde_yaml("robot-niryo.yaml")
+            robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")             # Cargar robot y ejes helicoidales
             print("\nEjes helicoidales del robot:", robot.ejes_helicoidales, '\n')
-            # Calcular M (posición cero)
-            M = calcular_M_generalizado(robot)
+            M = calcular_M_generalizado(robot)                                              # Calcular M (posición cero)
             print("Matriz M (posición cero):")
             imprimir_matriz(M, "M")
 
             # Valores de las articulaciones
-            thetas = [0.7, 0.3, 0.3, 0.4, 0.5, 0.8]
-            
-            thetas = Datos(tipo="configuración", robot=robot)
-            
+            # thetas = [0.7, 0.3, 0.3, 0.4, 0.5, 0.8]
+            print("Limites de las articulaciones (theta):\n", robot.limits_dict)
+            thetas = Datos(tipo="configuración", robot=robot).valor
+            valid, msg = limits(robot, thetas)
+            print("Configuración de las articulaciones:", thetas, valid, msg)
+            if not valid:
+                print(f"Error: {msg}")
+                print("Los límites de las articulaciones son: ", robot.limits_dict)
+                input("Presione Enter para continuar...")
+                continue
+
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
@@ -166,19 +171,17 @@ def menu():
             imprimir_matriz(T, "T")
             
             # Descomponer T en R y p, y calcular ángulos de Euler
-            R = T[:3,:3]
-            p = T[:3,3]
-            RPY = R2Euler(R)
+            R = T[:3,:3]; p = T[:3,3]; RPY = R2Euler(R)
             print("Coordenadas (x,y,z) del TCP:", p)
             print("Los angulos de Euler (Roll Pitch Yaw) son:", RPY,'\n') 
             limpiar_pantalla()
 
         elif opcion == "10":                            # 10. Calcular la matriz Jacobiana del robot
             print("Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
-            prueba_jacobiana()
-            limpiar_pantalla()
-            prueba_elipsoides()
-            limpiar_pantalla()
+            robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
+            final_unique_solutions = prueba_jacobiana(robot); limpiar_pantalla()
+            prueba_elipsoides(robot, final_unique_solutions); limpiar_pantalla()
+
         
         elif opcion == "11":                            # 11. Comparar configuraciones random 8 veces
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
@@ -199,7 +202,7 @@ def menu():
             vol_EM_limit, vol_EF_limit = calcular_volumen_elipsoides(J_num_limit)
             print(f"Configuración Límite Positiva: {np.round(limit_conf, 2)}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
 
-            # Configuración singular propuesta
+            # Configuración singular propuesta el Niryo One
             singular_config = np.array([0, 0, 1.43617532221234, 0, 0, 0, 0])
             thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(len(robot.links))}
             J_num_singular = J_sym.subs(thetas_dic_singular).evalf(chop=True)
@@ -218,13 +221,11 @@ def menu():
             
         elif opcion == "12":                           # 12. Graficar robot.yaml
             print("Graficando robot.yaml...")
-            menu_plotter()
-            # limpiar_pantalla()
+            menu_plotter() #; limpiar_pantalla()
             
         elif opcion == "13":                           # 13. Problema cinemático inverso
             print("Problema cinemático inverso.")
-            menu_cinematica_inversa()
-            limpiar_pantalla()
+            menu_cinematica_inversa(); limpiar_pantalla()
 
         elif opcion == "0":                             # 0. Salir
             print("Saliendo...", end=" ")
@@ -232,8 +233,8 @@ def menu():
             break
         
         else:                                           # Opción no válida
-            print("Opción no válida, intente nuevamente.")
-            limpiar_pantalla()
+            # print("Opción no válida, intente nuevamente.")
+            limpiar_pantalla(stop=False)
 
 if __name__ == "__main__":
     menu()
