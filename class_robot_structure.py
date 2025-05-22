@@ -314,7 +314,26 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
     robot.limits_dict = {f'joint_{i+1}': link.joint_limits for i, link in enumerate(robot.links) if link.joint_limits is not None}
     return robot
 
-def limits(robot: Robot, θ):
+def print_ejes_helicoidales(robot: Robot):
+    """
+    Imprime los ejes helicoidales de cada eslabón del robot.
+    
+    Args:
+        robot (Robot): El robot cuyas articulaciones se van a imprimir.
+    """
+
+    print("\nEjes helicoidales del robot:")
+    for i in range(len(robot.links)):
+        eje_helicoidal = robot.ejes_helicoidales[i]
+        array_str = np.array2string(
+            eje_helicoidal,
+            suppress_small=True,
+            separator=', ',
+            formatter={'float_kind': lambda x: f"{x:10.4f}"}
+        )
+        print(f"\tS{i+1}: {array_str}")
+
+def limits(robot: Robot, θs):
     """
     Function to check if joint angles are within the robot's defined limits.
     
@@ -329,12 +348,12 @@ def limits(robot: Robot, θ):
         return True, "No limits defined for the robot."
     
     # If θ is a dictionary, extract its values as a list
-    if isinstance(θ, dict):
-        θ = list(θ.values())
+    if isinstance(θs, dict):
+        θs = list(θs.values())
     
     # Check if each joint angle is within its limits
-    for i in range(len(θ)):
-        current_value = θ[i]
+    for i in range(len(θs)):
+        current_value = θs[i]
         joint_key = f'joint_{i+1}'
         
         if joint_key not in robot.limits_dict:
@@ -357,14 +376,31 @@ def limits(robot: Robot, θ):
     return True, "All joints within limits"
 
 def get_limits_positive(robot: Robot):
+    """ Devuelve los límites positivos de las articulaciones del robot. """
     positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(len(robot.links))]
     return np.array(positive_limits)
 
 def get_limits_negative(robot: Robot):
+    """ Devuelve los límites negativos de las articulaciones del robot. """
     negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(len(robot.links))]
     return np.array(negative_limits)
 
 def thetas_aleatorias(robot: Robot):
+    """
+    robot (Robot): El robot con los límites definidos.
+    Returns:
+    tuple: Una tupla que contiene:
+        - numpy.ndarray: Un array con los ángulos aleatorios generados.
+        - dict: Un diccionario donde las claves son los nombres de las articulaciones ('t0', 't1', etc.)
+          y los valores son los ángulos correspondientes.
+    Notas:
+    - Si el robot no tiene límites definidos (robot.limits_dict es None o vacío), 
+      se generarán ángulos aleatorios entre -2π y 2π.
+    - Si el robot tiene límites definidos, la función seguirá generando configuraciones 
+      aleatorias hasta encontrar una que cumpla con todos los límites.
+    - La función utiliza las funciones auxiliares get_limits_negative, get_limits_positive y limits
+      para validar que la configuración generada sea válida.
+    """
     if robot.limits_dict is None or len(robot.limits_dict) == 0:
         random_config = np.zeros(len(robot.links))
         for i in range(len(robot.links)):
@@ -439,20 +475,8 @@ def filtrar_configuraciones(robot: Robot, configuraciones):
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
     print(f"\n{robot}")
-
-    print("\nEjes helicoidales del robot:")
-    for i in range(len(robot.links)):
-        eje_helicoidal = robot.ejes_helicoidales[i]
-        array_str = np.array2string(
-            eje_helicoidal,
-            suppress_small=True,
-            separator=', ',
-            formatter={'float_kind': lambda x: f"{x:10.4f}"}
-        )
-        print(f"\t{array_str}")
-
     print(f"\nLímites de las articulaciones: {robot.limits_dict}")
-
+    print_ejes_helicoidales(robot)
     print("\nObtener_eje_de_giro")
     for i in range(len(robot.links)):
         robot.links[i].obtener_eje_de_giro()

@@ -13,16 +13,8 @@ from class_jacobian import *                        # Funciones para calcular la
 from class_robot_plotter_prueba import menu_plotter # Funcion de mmenu() de las funciones para graficar el robot, casos de prueba y animaciones.
 from problema_cinematico_inverso_gen import menu_cinematica_inversa # Funcion de mmenu() de cinemática inversa, casos de prueba y animaciones.
 
-# Comparar rotaciones
-def comparar_rotaciones(w , θ):
-    w = np.array(w) / np.linalg.norm(w) # Normalizar el vector
-    R1 = RotGen(w , θ)
-    R2 = RotRodrigues(w , θ)
-    diferencia = np.linalg.norm(R1 - R2)
-    return R1 , R2 , diferencia
-
 # Menú interactivo
-def menu():
+def menu_principal():
     def limpiar_pantalla(stop=True):
         """Limpia la pantalla de la consola."""
         if stop: input("\033[93mPresione Enter para continuar...\033[0m")
@@ -72,10 +64,13 @@ def menu():
             limpiar_pantalla()
         
         elif opcion == "3":                             # 3. Comparar rotaciones
-            R1 , R2 , diff = comparar_rotaciones(Datos(tipo="vector").valor, Datos(tipo="angulo").valor)
-            imprimir_matriz(R1 , "R (Definición Explícita)")
-            imprimir_matriz(R2 , "R (Rodrigues)")
-            print("Diferencia entre métodos:", round(diff , 4))
+            w = Datos(tipo="vector", mensaje="Eje de rotación: ").valor; θ = Datos(tipo="angulo").valor
+            w = np.array(w) / np.linalg.norm(w)     # Normalizar el vector
+            R1 = RotGen(w , θ); R2 = RotRodrigues(w , θ)
+            diferencia = np.linalg.norm(R1 - R2)    # Comparar rotaciones
+            
+            imprimir_matriz(R1 , "R (Definición Explícita)"); imprimir_matriz(R2 , "R (Rodrigues)")
+            print("\nDiferencia entre métodos:", round(diferencia , 4))
             limpiar_pantalla()
 
         elif opcion == "4":                             # 4. Visualizar rotación
@@ -136,7 +131,7 @@ def menu():
             print("Lectura de archivo YAML (robot.yaml)")
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")
             print(robot)
-            print("\nEjes helicoidales del robot:", robot.ejes_helicoidales)
+            print_ejes_helicoidales(robot)
             print("\nObtener_eje_de_giro")
             for i in range(len(robot.links)):
                 robot.links[i].obtener_eje_de_giro()
@@ -146,7 +141,7 @@ def menu():
         elif opcion == "9":                             # 9. Calcular la matriz de transformación homogénea
             print("Calcular la matriz de transformación homogénea del robot.")
             robot = robot_structure.cargar_robot_desde_yaml("robot.yaml")             # Cargar robot y ejes helicoidales
-            print("\nEjes helicoidales del robot:", robot.ejes_helicoidales, '\n')
+            print_ejes_helicoidales(robot)
             M = calcular_M_generalizado(robot)                                              # Calcular M (posición cero)
             print("Matriz M (posición cero):")
             imprimir_matriz(M, "M")
@@ -156,18 +151,15 @@ def menu():
             print("Limites de las articulaciones (theta):\n", robot.limits_dict)
             thetas = Datos(tipo="configuración", robot=robot).valor
             valid, msg = limits(robot, thetas)
-            print("Configuración de las articulaciones:", thetas, valid, msg)
             if not valid:
                 print(f"Error: {msg}")
                 print("Los límites de las articulaciones son: ", robot.limits_dict)
                 input("Presione Enter para continuar...")
                 continue
-
-            print("Valores de las articulaciones:", thetas, "\n")
-
+            
             # Calcular T
             T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
-            print("Matriz de transformación homogénea T:")
+            print("\nMatriz de transformación homogénea T:")
             imprimir_matriz(T, "T")
             
             # Descomponer T en R y p, y calcular ángulos de Euler
@@ -209,8 +201,6 @@ def menu():
             vol_EM_singular, vol_EF_singular = calcular_volumen_elipsoides(J_num_singular)
             print(f"Configuración Singular Propuesta: {np.round(singular_config, 2)}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
 
-            # negative_limits = get_limits_negative(robot)
-            # positive_limits = get_limits_positive(robot)
             print("\nComparando configuraciones random 8 veces...")
             for vueltas in range(8):
                 random_config, thetas_dic_random = thetas_aleatorias(robot)
@@ -237,4 +227,4 @@ def menu():
             limpiar_pantalla(stop=False)
 
 if __name__ == "__main__":
-    menu()
+    menu_principal()

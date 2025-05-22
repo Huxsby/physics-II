@@ -496,7 +496,7 @@ def prueba_elipsoides(robot: Robot, final_unique_solutions):
     # restringimos las velocidades de las articulaciones a sólo 2 grados de libertad:
 
     vol_EM, vol_EF = calcular_volumen_elipsoides(Jal)
-    print(f"\n\033[93m--- Elipsoides de una configuración aleatoria (validada) ({random_config})---\033[0m")
+    print(f"\n\033[93m--- Elipsoides de una configuración aleatoria (validada) ({np.round(random_config, 4)})---\033[0m")
     # mostrar_jacobiana_resumida(Jal)
     print(f"\tVolumen del elipsoide de manipulabilidad y fuerza: {vol_EM}") # Volumen del elipsoide de fuerza y manipulabilidad son el mismo (volumen de la matriz J*J^T)
     print("\tGraficando elipsoides... configuración aleatoria")

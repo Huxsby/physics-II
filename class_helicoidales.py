@@ -325,9 +325,9 @@ def validar_transformaciones_helicoidales():
     ]
     
     for i, (S, theta, descripcion) in enumerate(casos_prueba, 1):
-        print(f"\n{'='*50}")
+        print(f"\n{'='*90}")
         print(f"CASO {i}: {descripcion}")
-        print(f"{'='*50}")
+        print(f"{'='*90}")
         
         # Convertir a array numpy
         S = np.array(S)
@@ -369,9 +369,9 @@ def validar_transformaciones_helicoidales():
         # Verificar que el error es pequeño
         assert error < 1e-10, f"Error de reconstrucción significativo en caso {i}"
     
-    print("\n" + "="*50)
+    print("\n" + "="*90)
     print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
-    print("="*50)
+    print("="*90)
 
 # Añadir al menú principal
 def menu_helicoidales():
@@ -484,7 +484,6 @@ def menu_helicoidales():
             print("Calcular la matriz de transformación homogénea del robot.")
             # Cargar robot y ejes helicoidales
             robot = cargar_robot_desde_yaml("robot.yaml")
-            ejes_helicoidales = robot.ejes_helicoidales
 
             # Calcular M (posición cero)
             M = calcular_M_generalizado(robot)
@@ -496,7 +495,7 @@ def menu_helicoidales():
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
-            T = calcular_T_robot(ejes_helicoidales, thetas, M)
+            T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
 
             print("Matriz de transformación homogénea T:")
             imprimir_matriz(T, "T")
