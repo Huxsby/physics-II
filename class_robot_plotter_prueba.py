@@ -15,7 +15,7 @@ import os                                                                       
 # Ejemplo 1: Visualización simple
 def ejemplo_visualizacion_simple(robot: Robot):
     # Generar una configuración de ángulos en posición neutral
-    thetas = np.zeros(len(robot.links))
+    thetas = np.zeros(robot.num_links)
     
     # Visualizar el robot
     print("Visualizando robot en posición neutral...")
@@ -169,7 +169,7 @@ def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectori
     # Initial guess for the first point can be zeros or a neutral configuration
 
     # Calcular
-    initial_ik_guess = np.zeros(len(robot.links))
+    initial_ik_guess = np.zeros(robot.num_links)
     Jacobiana_tuple = calcular_jacobiana(robot)
     thetas_iniciales_trayectoria = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0])
 
@@ -180,7 +180,7 @@ def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectori
     else:
         print(f"Advertencia: Cinemática Inversa falló para el punto inicial ({initial_point}). "
               "Usando configuración cero como punto de partida.")
-        ik_initial_guess_thetas = np.zeros(len(robot.links))
+        ik_initial_guess_thetas = np.zeros(robot.num_links)
         # Optionally, add the zero configuration if you want the animation to start from there
         # in case of initial IK failure.
         # thetas_anim.append(ik_initial_guess_thetas) 
@@ -228,7 +228,7 @@ def ejemplo_animacion_prismatica(robot: Robot):
         return
     
     # Genera una configuración base con todas las articulaciones en cero
-    thetas = np.zeros(len(robot.links))
+    thetas = np.zeros(robot.num_links)
     
     # Define el número de frames para la animación
     num_frames = 50
@@ -266,11 +266,11 @@ def ejemplo_configuracion_singular(robot: Robot):
     
     # Asegurar que los ángulos estén dentro de los límites (aunque para singularidad, esto es más conceptual)
     # Si el robot tiene menos de 7 articulaciones, ajustar la longitud de thetas_singular
-    if len(robot.links) < len(thetas_singular):
-        thetas_singular = thetas_singular[:len(robot.links)]
-    elif len(robot.links) > len(thetas_singular):
+    if robot.num_links < len(thetas_singular):
+        thetas_singular = thetas_singular[:robot.num_links]
+    elif robot.num_links > len(thetas_singular):
         # Si el robot tiene más articulaciones, rellenar con ceros
-        thetas_singular.extend([0] * (len(robot.links) - len(thetas_singular)))
+        thetas_singular.extend([0] * (robot.num_links - len(thetas_singular)))
 
     thetas_singular_np = np.array(thetas_singular)
     thetas_singular_np = thetas_limite(robot, thetas_singular_np)

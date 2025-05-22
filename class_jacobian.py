@@ -227,15 +227,15 @@ def find_singular_configurations(jacobian: sp.Matrix, substitutions: dict, show=
 #             print(f"\t\033[96mConfiguración {config} RECHAZADA: no es singular (det != 0).\033[0m")
 #     return valid_configs
 
-def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
+import os
+
+def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=None):
     """ Muestra la matriz Jacobiana de forma resumida, limitando el número de caracteres por elemento. """
     print(f"{msg}", sep="")
-    # Si la entrada es numérica (numpy array), usarla directamente
     if isinstance(Jacobian, np.ndarray):
         matrix_data = Jacobian
         rows, cols = matrix_data.shape
         is_symbolic = False
-    # Si es simbólica (sympy Matrix), convertir a texto
     elif isinstance(Jacobian, sp.Matrix):
         matrix_data = Jacobian
         rows, cols = matrix_data.shape
@@ -244,36 +244,62 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
         print("Error: La entrada debe ser una matriz SymPy o un array NumPy.")
         return
 
-    # Convertir elementos a texto y truncar si es necesario
+    # Calcular max_chars automáticamente si no se pasa
+    if max_chars is None:
+        try:
+            term_width = os.get_terminal_size().columns
+            # Deja un margen para los bordes y espacios
+            max_chars = max(8, (term_width - (cols - 1) * 2 - 4) // cols)
+        except OSError:
+            max_chars = 20  # Valor por defecto si no hay terminal
+
     matrix_text = []
     for i in range(rows):
         row_text = []
         for j in range(cols):
             if is_symbolic:
-                elem = str(matrix_data[i, j])
+                elem_sym = matrix_data[i, j]
+                def limpiar_coef(expr):
+                    if expr.is_Mul:
+                        c, rest = expr.as_coeff_Mul()
+                        if abs(float(c) - round(float(c))) < 1e-8:
+                            c = int(round(float(c)))
+                        if c == 1:
+                            return rest
+                        elif c == -1:
+                            return -rest
+                        else:
+                            return sp.Mul(c, rest, evaluate=False)
+                    elif expr.is_Number:
+                        if abs(float(expr) - round(float(expr))) < 1e-8:
+                            return int(round(float(expr)))
+                        else:
+                            return round(float(expr), 3)
+                    return expr
+                elem_clean = elem_sym.replace(lambda x: x.is_Mul or x.is_Number, limpiar_coef)
+                elem = str(elem_clean)
             else:
-                # Formatear números flotantes
-                elem = f"{matrix_data[i, j]:.3f}" # 3 decimales por defecto
+                val = matrix_data[i, j]
+                if abs(val - round(val)) < 1e-8:
+                    elem = str(int(round(val)))
+                else:
+                    elem = f"{val:.3f}"
             if len(elem) > max_chars:
                 elem = elem[:max_chars] + "..."
             row_text.append(elem)
         matrix_text.append(row_text)
 
-    # Calcular el ancho máximo de cada columna para alinear
     col_widths = [max(len(matrix_text[r][c]) for r in range(rows)) for c in range(cols)]
 
-    # Imprimir la matriz formateada con bordes
     print()
     for i in range(rows):
         formatted_row = []
         for j in range(cols):
             elem = matrix_text[i][j]
-            # Alinear a la derecha para números, izquierda para simbólicos/truncados
             if not is_symbolic or "..." in elem:
-                 formatted_row.append(elem.ljust(col_widths[j]))
+                formatted_row.append(elem.ljust(col_widths[j]))
             else:
-                 formatted_row.append(elem.rjust(col_widths[j]))
-
+                formatted_row.append(elem.rjust(col_widths[j]))
         row_str = "  ".join(formatted_row)
         if i == 0:
             print(f"⎡ {row_str} ⎤")
@@ -281,7 +307,7 @@ def mostrar_jacobiana_resumida(Jacobian: sp.Matrix, msg="", max_chars=20):
             print(f"⎣ {row_str} ⎦")
         else:
             print(f"⎢ {row_str} ⎥")
-
+            
 """ Funciones de calculo de elipsoides de manipulabilidad y fuerza"""
 
 def elipsoide_manipulabilidad(J, articulaciones_idx=[1, 2], puntos=100):

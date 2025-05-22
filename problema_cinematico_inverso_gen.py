@@ -7,8 +7,8 @@ import time
 
 from class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales
 from class_helicoidales import calcular_M_generalizado, calcular_T_robot
-from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida
-from class_rotaciones import Rp2Trans, Euler2R, R2Euler
+from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
+from class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinemático inverso
 
@@ -75,7 +75,7 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
                                                                     # 2: [13.507635282249646, -3.4211564466914752, -2.421332532622629, 23.863200132904787, -7.292415453429542, -17.80694589480073*]
 # def CinematicaDirecta(robot, M,S,t):
 #     T=np.eye(4)
-#     for i in range(0,len(robot.links),1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
+#     for i in range(0,robot.num_links,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
 #     return np.dot(T,M)
 
 def CinematicaDirecta(ejes, thetas, M):
@@ -120,7 +120,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     if robot is None:
         raise ValueError("El robot no está definido. Por favor, carga un robot válido.")
     if thetas_actuales is None:
-        thetas_actuales = [0]*len(robot.links)
+        thetas_actuales = [0]*robot.num_links
 
     # Casting inputs a tipos apropiados
     thetas_actuales = np.array([np.float64(theta) for theta in thetas_actuales])
@@ -134,7 +134,8 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
 
     # Calculamos la Matriz de Transformación Homogénea a partir de posiciones y ángulos
     Tsd = Rp2Trans(orientation, p_xyz)
-    print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
+    # print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
+    imprimir_matriz(Tsd, "Matriz de transformación homogénea objetivo Tsd")
     print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{np.round(orientation, 8)}\n{np.round(p_xyz, 8)}")
     print(f"\nExtrayendo dastos del robot:")
     S = robot.ejes_helicoidales; print_ejes_helicoidales(robot)
@@ -222,12 +223,17 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
         print("Número de iteraciones:", i)
         
         # Recalcular la matriz de transformación homogénea final Tsd_re
-        print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
-        print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
-       
+        # print("\nMatriz de transformación homogénea final Tsd re-calculada:\n", np.round(Tsd_re, 3))
+        imprimir_matriz(Tsd_re, "Matriz de transformación homogénea final Tsd re-calculada")
+        # print("\nMatriz de transformación homogénea final Tsd original:\n", np.round(Tsd, 3))
+        imprimir_matriz(Tsd, "Matriz de transformación homogénea final Tsd original")
+        
         print(f"\nLas thetas por las que ha pasado el robot son:")
         for i in range(len(thetas_follower)):
-            print(f"\t{np.round(thetas_follower[i], 4).tolist()}")
+            J_vol = J.subs(thetalist_s)
+            vol_EM, vol_EF = calcular_volumen_elipsoides(J_vol)  # Guardamos los elipsoides para ver si se cruza cerca de una singularidad.
+            print(f"\t{np.round(thetas_follower[i], 4).tolist()}\t Vólumen elipsoide: {vol_EM}")
+            if vol_EM < 1e-20: print("\t\t\033[91mCuidado, el elipsoide es muy pequeño, puede haber una singularidad\033[0m"); input("Presione Enter para continuar...")
     
     return thetas_follower
 
