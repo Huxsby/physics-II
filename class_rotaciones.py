@@ -194,52 +194,52 @@ def RotarVector(v, eje, θ):
 
 # Visualización de rotación
 def Visualizar_Rotacion(vector, eje):
-        """
-        Visualizar la rotación de un vector entorno a un eje especificado.
-        """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+    """
+    Visualizar la rotación de un vector entorno a un eje especificado.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
-        # Dibujar el vector original en rojo
-        ax.quiver(0, 0, 0, vector[0], vector[1], vector[2], color='r', label='Original')
+    # Dibujar el vector original en rojo
+    ax.quiver(0, 0, 0, vector[0], vector[1], vector[2], color='r', label='Original')
 
-        # Visualizar el eje de rotación con una línea verde
-        if isinstance(eje, np.ndarray) or isinstance(eje, list):
-            eje_norm = np.array(eje) / np.linalg.norm(eje)
-            ax.quiver(0, 0, 0, eje_norm[0]*5, eje_norm[1]*5, eje_norm[2]*5,  color='g', label='Eje de rotación')
-        elif eje in ["x", "y", "z"]:
-            if eje == "x":
-                ax.quiver(0, 0, 0, 5, 0, 0, color='g', label='Eje X')
-            elif eje == "y":
-                ax.quiver(0, 0, 0, 0, 5, 0, color='g', label='Eje Y')
-            elif eje == "z":
-                ax.quiver(0, 0, 0, 0, 0, 5, color='g', label='Eje Z')
+    # Visualizar el eje de rotación con una línea verde
+    if isinstance(eje, np.ndarray) or isinstance(eje, list):
+        eje_norm = np.array(eje) / np.linalg.norm(eje)
+        ax.quiver(0, 0, 0, eje_norm[0]*5, eje_norm[1]*5, eje_norm[2]*5,  color='g', label='Eje de rotación')
+    elif eje in ["x", "y", "z"]:
+        if eje == "x":
+            ax.quiver(0, 0, 0, 5, 0, 0, color='g', label='Eje X')
+        elif eje == "y":
+            ax.quiver(0, 0, 0, 0, 5, 0, color='g', label='Eje Y')
+        elif eje == "z":
+            ax.quiver(0, 0, 0, 0, 0, 5, color='g', label='Eje Z')
 
-        # Rotar el vector en incrementos de 5 grados y dibujar cada vector rotado con gradiente de color
-        total_steps = 360 // 5
-        cmap = plt.cm.rainbow  # Use rainbow for a full color cycle
+    # Rotar el vector en incrementos de 5 grados y dibujar cada vector rotado con gradiente de color
+    total_steps = 360 // 5
+    cmap = plt.cm.rainbow  # Use rainbow for a full color cycle
+    
+    for i, angulo in enumerate(range(0, 360, 5)):
+        angulo_rad = np.radians(angulo)
+        vector_rotado = RotarVector(vector, eje, angulo_rad)
         
-        for i, angulo in enumerate(range(0, 360, 5)):
-            angulo_rad = np.radians(angulo)
-            vector_rotado = RotarVector(vector, eje, angulo_rad)
-            
-            # Calculate color based on progress through rotation (0 to 1)
-            color = cmap(i / total_steps)
-            
-            # Dibujar el vector rotado
-            ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color=color)
+        # Calculate color based on progress through rotation (0 to 1)
+        color = cmap(i / total_steps)
+        
+        # Dibujar el vector rotado
+        ax.quiver(0, 0, 0, vector_rotado[0], vector_rotado[1], vector_rotado[2], color=color)
 
-        # Establecer los límites de la gráfica
-        ax.set_xlim([-10, 10])
-        ax.set_ylim([-10, 10])
-        ax.set_zlim([0, 8])
+    # Establecer los límites de la gráfica
+    ax.set_xlim([-10, 10])
+    ax.set_ylim([-10, 10])
+    ax.set_zlim([0, 8])
 
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.legend()  # Mostrar leyenda
-        plt.title("Rotación de vector")
-        plt.show()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()  # Mostrar leyenda
+    plt.title("Rotación de vector")
+    plt.show()
 
 # Función para validar el sistema de rotaciones
 def validar_rotaciones():
