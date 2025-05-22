@@ -108,7 +108,11 @@ class Robot:
 
     def __str__(self):
         """ Retorna una representación en cadena del objeto Robot, incluyendo su nombre y los eslabones."""
-        return f"\nRobot '{self.name}' con {len(self.links)} eslabones. \n\t" + "\n\t".join([str(link) for link in self.links])
+        return f"\nRobot '{self.name}' con {self.num_links} eslabones. \n\t" + "\n\t".join([str(link) for link in self.links])
+
+    def __len__(self):
+        """ Retorna la cantidad de eslabones en el robot. """
+        return self.num_links
 
     def add_link(self, new_link):
         """ Agrega un nuevo eslabón al robot.  Verifica que el nuevo eslabón no tenga un ID duplicado y que su tipo """
@@ -323,7 +327,7 @@ def print_ejes_helicoidales(robot: Robot):
     """
 
     print("\nEjes helicoidales del robot:")
-    for i in range(len(robot.links)):
+    for i in range(robot.num_links):
         eje_helicoidal = robot.ejes_helicoidales[i]
         array_str = np.array2string(
             eje_helicoidal,
@@ -377,12 +381,12 @@ def limits(robot: Robot, θs):
 
 def get_limits_positive(robot: Robot):
     """ Devuelve los límites positivos de las articulaciones del robot. """
-    positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(len(robot.links))]
+    positive_limits = [robot.limits_dict[f'joint_{i+1}'][1] for i in range(robot.num_links)]
     return np.array(positive_limits)
 
 def get_limits_negative(robot: Robot):
     """ Devuelve los límites negativos de las articulaciones del robot. """
-    negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(len(robot.links))]
+    negative_limits = [robot.limits_dict[f'joint_{i+1}'][0] for i in range(robot.num_links)]
     return np.array(negative_limits)
 
 def thetas_aleatorias(robot: Robot):
@@ -402,10 +406,10 @@ def thetas_aleatorias(robot: Robot):
       para validar que la configuración generada sea válida.
     """
     if robot.limits_dict is None or len(robot.limits_dict) == 0:
-        random_config = np.zeros(len(robot.links))
-        for i in range(len(robot.links)):
+        random_config = np.zeros(robot.num_links)
+        for i in range(robot.num_links):
             random_config[i] = np.random.uniform(-2*np.pi, 2*np.pi)
-        return random_config, {f"t{i}": random_config[i] for i in range(len(robot.links))}
+        return random_config, {f"t{i}": random_config[i] for i in range(robot.num_links)}
     
     negative_limits = get_limits_negative(robot)
     positive_limits = get_limits_positive(robot)
@@ -418,7 +422,7 @@ def thetas_aleatorias(robot: Robot):
         # Validar la configuración generada
         valid, msg = limits(robot, random_config)
         if valid:
-            return random_config, {f"t{i}": random_config[i] for i in range(len(robot.links))}
+            return random_config, {f"t{i}": random_config[i] for i in range(robot.num_links)}
         else:
             print(f"Configuración random {np.round(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
 
@@ -478,5 +482,5 @@ if __name__ == "__main__":
     print(f"\nLímites de las articulaciones: {robot.limits_dict}")
     print_ejes_helicoidales(robot)
     print("\nObtener_eje_de_giro")
-    for i in range(len(robot.links)):
+    for i in range(robot.num_links):
         robot.links[i].obtener_eje_de_giro()

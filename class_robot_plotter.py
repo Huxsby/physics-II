@@ -62,7 +62,7 @@ def calcular_transformaciones(robot, thetas):
     Returns:
         list: Lista de matrices de transformación homogénea 4x4 para cada eslabón.
     """
-    n_links = len(robot.links)
+    n_links = robot.num_links
     T = np.eye(4)  # Transformación inicial (identidad)
     transformaciones = [T.copy()]  # Guardar la transformación inicial
     

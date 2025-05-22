@@ -133,7 +133,7 @@ def menu_principal():
             print(robot)
             print_ejes_helicoidales(robot)
             print("\nObtener_eje_de_giro")
-            for i in range(len(robot.links)):
+            for i in range(robot.num_links):
                 robot.links[i].obtener_eje_de_giro()
 
             limpiar_pantalla()
@@ -181,22 +181,22 @@ def menu_principal():
             print("Comparando configuraciones...")
 
             # Configuración cero
-            zero_config = np.zeros(len(robot.links))
-            thetas_dic_zero = {f"t{i}": zero_config[i] for i in range(len(robot.links))}
+            zero_config = np.zeros(robot.num_links)
+            thetas_dic_zero = {f"t{i}": zero_config[i] for i in range(robot.num_links)}
             J_num_zero = J_sym.subs(thetas_dic_zero).evalf(chop=True)
             vol_EM_zero, vol_EF_zero = calcular_volumen_elipsoides(J_num_zero)
             print(f"Configuración Cero: {zero_config}\tVol EM: {vol_EM_zero:.2e}\tVol EF: {vol_EF_zero:.2e}")
 
             # Configuración limite positiva
             limit_conf = get_limits_positive(robot)
-            thetas_dic_limit = {f"t{i}": limit_conf[i] for i in range(len(robot.links))}
+            thetas_dic_limit = {f"t{i}": limit_conf[i] for i in range(robot.num_links)}
             J_num_limit = J_sym.subs(thetas_dic_limit).evalf(chop=True)
             vol_EM_limit, vol_EF_limit = calcular_volumen_elipsoides(J_num_limit)
             print(f"Configuración Límite Positiva: {np.round(limit_conf, 2)}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
 
             # Configuración singular propuesta el Niryo One
             singular_config = np.array([0, 0, 1.43617532221234, 0, 0, 0, 0])
-            thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(len(robot.links))}
+            thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(robot.num_links)}
             J_num_singular = J_sym.subs(thetas_dic_singular).evalf(chop=True)
             vol_EM_singular, vol_EF_singular = calcular_volumen_elipsoides(J_num_singular)
             print(f"Configuración Singular Propuesta: {np.round(singular_config, 2)}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")

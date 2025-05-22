@@ -49,7 +49,7 @@ def visualizar_robot_3d_actualizado(robot: Robot, angulos=None):
     
     # Si no se proporcionan ángulos, asumimos que todos son cero
     if angulos is None:
-        angulos = [0] * len(robot.links)
+        angulos = [0] * robot.num_links
     
     # Matriz de transformación acumulada
     T_acum = np.eye(4)
@@ -116,7 +116,7 @@ def visualizar_robot_3d_actualizado(robot: Robot, angulos=None):
         T_acum = np.dot(T_acum, T)
         
         # Calculamos el vector del eslabón
-        if i < len(robot.links) - 1:
+        if i < robot.num_links - 1:
             next_joint_coords = np.array(robot.links[i+1].joint_coords)
             end_point = T_acum[:3, 3] + np.dot(T_acum[:3, :3], next_joint_coords)
         else:
