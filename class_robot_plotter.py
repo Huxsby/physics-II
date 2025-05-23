@@ -396,7 +396,7 @@ if __name__ == "__main__":
     
     # Generar una configuración aleatoria
     thetas, _ = thetas_aleatorias(robot)
-    print(f"Configuración aleatoria: {np.round(thetas, 3)}")
+    print(f"Configuración aleatoria: {str_config(thetas, 3)}")
     
     # Visualizar el robot en una configuración estática
     plot_robot(robot, thetas)

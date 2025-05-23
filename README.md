@@ -35,6 +35,12 @@ Este repositorio contén materiais e recursos relacionados coa materia **Física
 
 - **Playlist de vídeos**: Podes encontrar unha playlist de vídeos sobre os temas tratados no libro "Modern Robotics" aquí: [Modern Robotics, All Videos](https://www.youtube.com/playlist?list=PLggLP4f-rq02vX0OQQ5vrCxbJrzamYDfx)
 
+- **Presentación sobre singularidades**: Presentación (47 min) sobre a optimización de traxectorias para robots: [Optimizing Robot Paths (by Coping with Robot Singularities)](https://youtu.be/tTtt7ztNjQo)
+
+- **Charla sobre singularidades en manipuladores**: Vídeo (20 min) que axuda a visualizar como as singularidades afectan aos graos de liberdade, elipsoide de manipulabilidade, velocidade do efector final, traxectorias, etc.: [Intro2Robotics Lecture 14a: Manipulator Singularities](https://youtu.be/n2nqs8ZW-4c)
+
+- **Visualización do espazo de traballo dun robot 2R**: Demostración interactiva que permite explorar a cinemática directa e inversa dun brazo robótico de dous enlaces: [Forward And Inverse Kinematics For Two Link Arm](https://demonstrations.wolfram.com/ForwardAndInverseKinematicsForTwoLinkArm/)
+
 ## Metodoloxía de ensino
 
 A docencia de Física II combina clases expositivas, interactivas e prácticas de laboratorio. As clases teóricas impártense con apoio de material multimedia, mentres que as prácticas de laboratorio realízanse mediante simulacións por ordenador utilizando diferentes programas con librerías específicas de robótica (FreeCAD e CoppeliaSIM ou equivalentes) e códigos en Python. A metodoloxía de ensino está descrita no apartado 5.1 da memoria da titulación e nas directrices para o desenvolvemento dunha docencia presencial segura.
@@ -60,6 +66,8 @@ O sistema de avaliación baséase na ponderación entre un exame final, a realiz
 - **Engineering Vibration**  
   Daniel J. Inman, 2014, ISBN: 978-0132871693.
 
-Para máis información sobre a materia, podes consultar a páxina oficial da USC:
+## Información oficial
+
+Para máis información sobre a materia, podes consultar a [páxina oficial da USC](https://www.usc.gal/gl/estudos/graos/enxenaria-arquitectura/grao-robotica-2a-edicion/20242025/fisica-ii-19943-19039-11-105693).
 
  

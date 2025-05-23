@@ -5,7 +5,7 @@ import numpy as np
 import sympy as sp
 import time
 
-from class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales
+from class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
 from class_helicoidales import calcular_M_generalizado, calcular_T_robot
 from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
 from class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
@@ -136,7 +136,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     Tsd = Rp2Trans(orientation, p_xyz)
     # print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
     imprimir_matriz(Tsd, "Matriz de transformación homogénea objetivo Tsd")
-    print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{np.round(orientation, 8)}\n{np.round(p_xyz, 8)}")
+    print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{str_config(orientation, 8)}\n{np.round(p_xyz, 8)}")
     print(f"\nExtrayendo dastos del robot:")
     S = robot.ejes_helicoidales; print_ejes_helicoidales(robot)
     print("\nMatriz Jacobiana del robot:")
@@ -232,7 +232,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
         for i in range(len(thetas_follower)):
             J_vol = J.subs(thetalist_s)
             vol_EM, vol_EF = calcular_volumen_elipsoides(J_vol)  # Guardamos los elipsoides para ver si se cruza cerca de una singularidad.
-            print(f"\t{np.round(thetas_follower[i], 4).tolist()}\t Vólumen elipsoide: {vol_EM}")
+            print(f"\t{str_config(thetas_follower[i], 4)}\t Vólumen elipsoide: {vol_EM}")
             if vol_EM < 1e-20: print("\t\t\033[91mCuidado, el elipsoide es muy pequeño, puede haber una singularidad\033[0m"); input("Presione Enter para continuar...")
     
     return thetas_follower

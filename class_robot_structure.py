@@ -424,7 +424,7 @@ def thetas_aleatorias(robot: Robot):
         if valid:
             return random_config, {f"t{i}": random_config[i] for i in range(robot.num_links)}
         else:
-            print(f"Configuración random {np.round(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
+            print(f"Configuración random {str_config(random_config, 2)} inválida debido a: {msg}. Intentando nuevamente.")
 
 def thetas_limite(robot: Robot, thetas, show=False):
     """
@@ -470,10 +470,44 @@ def filtrar_configuraciones(robot: Robot, configuraciones):
     for config in configuraciones:
         if limits(robot, config)[0]:
             configuraciones_validas.append(config)
-            print(f"\t\033[92mConfiguración válida: {np.round(config, 2)}\033[0m")
+            print(f"\t\033[92mConfiguración válida: {str_config(config, 2)}\033[0m")
         else:
-            print(f"\t\033[91mConfiguración inválida: {np.round(config, 2)}\033[0m")
+            print(f"\t\033[91mConfiguración inválida: {str_config(config, 2)}\033[0m")
     return configuraciones_validas
+
+def str_config(config, decimales=6):
+    """
+    Devuelve un string bonito para imprimir configuraciones numéricas con elementos uniformemente espaciados.
+    
+    Args:
+        config: La configuración numérica (array, lista, etc.)
+        decimales (int): Número de decimales a mostrar
+        
+    Returns:
+        str: String formateado con elementos uniformemente espaciados
+    """
+    try:
+        arr = np.round(np.array(config, dtype=float), decimales)
+        
+        # Handle empty array
+        if len(arr) == 0:
+            return "[]"
+        
+        # Format each element with fixed decimal places
+        formatted = [f"{val:.{decimales}f}" for val in arr]
+        
+        # Find maximum width of any formatted number
+        max_width = max(len(s) for s in formatted)
+        
+        # Pad each element to have the same width with one space on each side
+        aligned = [f" {s.rjust(max_width)} " for s in formatted]
+        
+        # Join the aligned elements
+        return "[" + ", ".join(aligned) + "]"
+    except (ValueError, TypeError):
+        # Return the original if conversion fails
+        return str(config)
+
 
 # Ejemplo de uso
 if __name__ == "__main__":

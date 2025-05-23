@@ -192,21 +192,21 @@ def menu_principal():
             thetas_dic_limit = {f"t{i}": limit_conf[i] for i in range(robot.num_links)}
             J_num_limit = J_sym.subs(thetas_dic_limit).evalf(chop=True)
             vol_EM_limit, vol_EF_limit = calcular_volumen_elipsoides(J_num_limit)
-            print(f"Configuración Límite Positiva: {np.round(limit_conf, 2)}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
+            print(f"Configuración Límite Positiva: {str_config(limit_conf, 2)}\tVol EM: {vol_EM_limit:.2e}\tVol EF: {vol_EF_limit:.2e}")
 
             # Configuración singular propuesta el Niryo One
             singular_config = np.array([0, 0, 1.43617532221234, 0, 0, 0, 0])
             thetas_dic_singular = {f"t{i}": singular_config[i] for i in range(robot.num_links)}
             J_num_singular = J_sym.subs(thetas_dic_singular).evalf(chop=True)
             vol_EM_singular, vol_EF_singular = calcular_volumen_elipsoides(J_num_singular)
-            print(f"Configuración Singular Propuesta: {np.round(singular_config, 2)}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
+            print(f"Configuración Singular Propuesta: {str_config(singular_config, 2)}\tVol EM: {vol_EM_singular:.2e}\tVol EF: {vol_EF_singular:.2e}")
 
             print("\nComparando configuraciones random 8 veces...")
             for vueltas in range(8):
                 random_config, thetas_dic_random = thetas_aleatorias(robot)
                 J_num_random = J_sym.subs(thetas_dic_random).evalf(chop=True)
                 vol_EM_random, vol_EF_random = calcular_volumen_elipsoides(J_num_random)
-                print(f"Random Config {vueltas+1}: {np.round(random_config, 2)}\tVol EM: {vol_EM_random:.2e}\tVol EF: {vol_EF_random:.2e}")
+                print(f"Random Config {vueltas+1}: {str_config(random_config, 2)}\tVol EM: {vol_EM_random:.2e}\tVol EF: {vol_EF_random:.2e}")
             limpiar_pantalla()
             
         elif opcion == "12":                           # 12. Graficar robot.yaml
