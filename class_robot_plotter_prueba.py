@@ -30,7 +30,7 @@ def ejemplo_configuracion_personalizada(robot: Robot):
     thetas = thetas_limite(robot, thetas)
     
     # Visualizar el robot
-    print(f"Visualizando robot con configuración personalizada: {np.round(thetas, 3)}")
+    print(f"Visualizando robot con configuración personalizada: {str_config(thetas, 3)}")
     plot_robot(robot, thetas)
 
 # Ejemplo 3: Visualización con múltiples vistas
@@ -70,8 +70,8 @@ def ejemplo_animacion(robot: Robot, nombre_archivo="animacion_dos_configuracione
     thetas_inicio, _ = thetas_aleatorias(robot)
     thetas_fin, _ = thetas_aleatorias(robot)
     
-    print(f"Configuración inicial: {np.round(thetas_inicio, 3)}")
-    print(f"Configuración final: {np.round(thetas_fin, 3)}")
+    print(f"Configuración inicial: {str_config(thetas_inicio, 3)}")
+    print(f"Configuración final: {str_config(thetas_fin, 3)}")
     
     # Generar frames para la animación
     num_frames = 50
@@ -132,7 +132,7 @@ def ejemplo_cinematica_directa(robot: Robot):
     thetas = thetas_limite(robot, thetas)
     
     # Visualizar el robot
-    print(f"Visualizando robot con cinemática directa: {np.round(thetas, 3)}")
+    print(f"Visualizando robot con cinemática directa: {str_config(thetas, 3)}")
     plot_robot(robot, thetas)
 
 # Ejemplo 7: Cinemática inversa con trayectoria circular
@@ -276,7 +276,7 @@ def ejemplo_configuracion_singular(robot: Robot):
     thetas_singular_np = thetas_limite(robot, thetas_singular_np)
     
     # Visualizar el robot
-    print(f"Visualizando robot en configuración singular: {np.round(thetas_singular_np, 3)}")
+    print(f"Visualizando robot en configuración singular: {str_config(thetas_singular_np, 3)}")
     plot_robot(robot, thetas_singular_np)
 
 # Ejemplo 10: Visualizar multiples configuraciones en subplots
@@ -329,14 +329,14 @@ def ejemplo_prueba_singularidades(robot: Robot):
         
         # Plot each singular configuration in a subplot
         for i, config in enumerate(singular_configurations):
-            print(f"\tConfiguración {i+1}: {np.round(config, 2)}")
+            print(f"\tConfiguración {i+1}: {str_config(config, 2)}")
             # Convert symbolic values to float
             theta_values = [float(val) for val in config]
             
             # Create subplot
             ax = fig.add_subplot(rows, cols, i+1, projection='3d')
             plot_robot(robot, theta_values, ax=ax, show=False, view_angles=view_angles)
-            ax.set_title(f'Configuración singular {i+1} {np.round(config, 2)}')
+            ax.set_title(f'Configuración singular {i+1} {str_config(config, 2)}')
         
         plt.tight_layout()
         plt.show()

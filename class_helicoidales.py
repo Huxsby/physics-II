@@ -49,7 +49,7 @@ def calcular_Sθ(S, theta):
     return S_theta
 
 ## Función validada
-def calcular_expSθ(S, theta):
+def calcular_exp_Sθ(S, theta):
     """
     Calcula la exponencial de la matriz e^([S]θ) para obtener la transformación homogénea. Nota T = e^([S]θ)
     
@@ -197,7 +197,7 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
         
         for i, t in enumerate(t_values):
             # Calcular matriz de transformación para ese punto
-            T_t = calcular_expSθ(S, t)
+            T_t = calcular_exp_Sθ(S, t)
             # El origen transformado es el punto en el eje helicoidal
             points[i] = T_t[:3, 3]
         
@@ -300,7 +300,7 @@ def calcular_T_robot(ejes, thetas, M):
     """ Calcula la matriz de transformación homogénea T con los ejes helicoidales y la matriz de transformación M, usando la fórmula del producto de exponenciales. """
     T = np.eye(4)
     for S, theta in zip(ejes, thetas): # ejes,thetas -> eje,theta
-        T_i = calcular_expSθ(S, theta) # e^[Sθ]
+        T_i = calcular_exp_Sθ(S, theta) # e^[Sθ]
         T = T @ T_i  # Multiplicación en orden: e^[S1θ1] * e^[S2θ2] * e^[S3θ3]
     T = T @ M  # Multiplicar por M al final
     return T
@@ -339,7 +339,7 @@ def validar_transformaciones_helicoidales():
         
         # 2. Calcular la exponencial para obtener T
         print("\n2. Matriz exponencial e^([S]θ):")
-        T = calcular_expSθ(S, theta)
+        T = calcular_exp_Sθ(S, theta)
         imprimir_matriz(T, "Matriz T = e^([S]θ)")
         
         # 3. Verificar propiedades de T
@@ -362,7 +362,7 @@ def validar_transformaciones_helicoidales():
         
         # 5. Verificar error de reconstrucción
         print("\n5. Error de reconstrucción:")
-        T_reconstructed = calcular_expSθ(S_recovered, theta_recovered)
+        T_reconstructed = calcular_exp_Sθ(S_recovered, theta_recovered)
         error = np.linalg.norm(T - T_reconstructed)
         print(f"Error de reconstrucción: {error:.6e}")
         
@@ -408,7 +408,7 @@ def menu_helicoidales():
             
             # Calcular matriz helicoidal y su exponencial
             S_theta = calcular_Sθ(S, theta)
-            T = calcular_expSθ(S, theta)
+            T = calcular_exp_Sθ(S, theta)
             
             print("\nEje helicoidal S:")
             print(f"omega = {omega}")
