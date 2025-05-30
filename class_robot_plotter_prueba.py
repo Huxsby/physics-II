@@ -2,7 +2,7 @@
 Ejemplos de uso para la visualización del robot manipulador
 """
 
-from class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, filtrar_configuraciones, Robot      # Para cargar el robot desde un archivo YAML
+from class_robot_structure import *                                                                     # Para cargar el robot desde un archivo YAML
 from class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
 import numpy as np                                                                                      # Para la manipulación de matrices
 import matplotlib.pyplot as plt                                                                         # Para la visualización

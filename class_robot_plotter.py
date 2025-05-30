@@ -15,6 +15,7 @@ Ejemplo de uso:
     >>> plot_robot(robot, thetas)
 """
 
+from class_robot_structure import str_config, Robot
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation

@@ -491,7 +491,7 @@ def menu_helicoidales():
             imprimir_matriz(M, "M")
 
             # Valores de las articulaciones
-            thetas = [0,0,0,0,0,0]
+            thetas = [0] * robot.num_links  # Inicializar con ceros
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
