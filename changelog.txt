@@ -35,6 +35,9 @@ P2  7. Ejercicios prácticos
      [x] 7.3 Elipsoides de Manipulabilidad y Fuerza (Generalizar el código)
      [x] 7.4 Cinemática Inversa
 
+BUGS
+    - En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml)
+
 # Info.
 
 Ejes helicoidales en problema_cinematico_directo.py (P1):
