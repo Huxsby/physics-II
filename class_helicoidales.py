@@ -248,51 +248,23 @@ def calcular_M_generalizado(robot: Robot):
 def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     """
     Calcula los ejes helicoidales en el sistema de referencia del efector final (body frame)
-    
-    Parámetros:
-    - robot: Objeto robot con información de sus eslabones y articulaciones
-    - M: Matriz de transformación homogénea 4x4 opcional. Si no se proporciona, se calcula.
-    
-    Retorna:
-    - beta: Lista de ejes helicoidales en el sistema de referencia del efector final
+    usando los ejes helicoidales almacenados en el robot.
     """
+    import numpy as np
+    from class_helicoidales import calcular_Sθ
+
     if M is None:
+        from class_helicoidales import calcular_M_generalizado
         M = calcular_M_generalizado(robot)
-    
     beta = []
     M_inv = np.linalg.inv(M)
-    
-    for link in robot.links:
-        # Crear eje helicoidal S = [ω, v] para cada articulación en el frame base
-        if link.tipo == "revolute":
-            # Articulación de rotación: S = [ω, -ω × q]
-            # donde ω es el eje de rotación y q es un punto en el eje
-            omega = np.array(link.joint_axis)
-            if np.linalg.norm(omega) > 1e-6:
-                omega = omega / np.linalg.norm(omega)
-            q = np.array(link.joint_coords)
-            v = -np.cross(omega, q)
-            S = np.concatenate([omega, v])
-        
-        elif link.tipo == "prismatic":
-            # Articulación prismática: S = [0, v]
-            # donde v es la dirección de traslación
-            v = np.array(link.joint_axis)
-            if np.linalg.norm(v) > 1e-6:
-                v = v / np.linalg.norm(v)
-            S = np.concatenate([np.zeros(3), v])
-        
-        # Transformar S al sistema de referencia del efector final usando la adjunta
-        S_matrix = calcular_Sθ(S, 1.0)  # Crear matriz asociada al eje
-        # Aplicar transformación adjunta: β = Ad_{M^{-1}}(S)
+    for S in robot.ejes_helicoidales:  # Usar los ejes helicoidales almacenados
+        S_matrix = calcular_Sθ(S, 1.0)
         beta_matrix = M_inv @ S_matrix @ M
-        
-        # Extraer eje helicoidal β del resultado
         omega_beta = np.array([beta_matrix[2, 1], beta_matrix[0, 2], beta_matrix[1, 0]])
         v_beta = beta_matrix[:3, 3]
         beta_i = np.concatenate([omega_beta, v_beta])
         beta.append(beta_i)
-    
     return beta
 
 # Funcion para calcular la matriz de transformación homogénea del robot
