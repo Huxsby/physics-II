@@ -1,8 +1,6 @@
 import numpy as np
-import os
-from class_datos import Datos
-from class_rotaciones import *
-from class_robot_structure import *
+from class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
+from class_robot_structure import Robot, cargar_robot_desde_yaml
 
 ## Función validada
 def calcular_Sθ(S, theta):
@@ -237,13 +235,14 @@ def visualizar_eje_helicoidal(S, theta, num_puntos=100):
     
     return points
 
-def calcular_M_generalizado(robot: Robot):
-    """ Calcula la matriz de transformación homogénea M del robot. """
-    M = np.eye(4)  # Matriz identidad inicial
-    for link in robot.links:
-        M[:3, 3] += link.joint_coords  # Sumar la posición de la articulación
+# Dentro de 'robot.M':
+# def calcular_M_generalizado(robot: Robot):
+#     """ Calcula la matriz de transformación homogénea M del robot. """
+#     M = np.eye(4)  # Matriz identidad inicial
+#     for link in robot.links:
+#         M[:3, 3] += link.joint_coords  # Sumar la posición de la articulación
         
-    return M
+#     return M
 
 def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     """
@@ -254,8 +253,7 @@ def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     from class_helicoidales import calcular_Sθ
 
     if M is None:
-        from class_helicoidales import calcular_M_generalizado
-        M = calcular_M_generalizado(robot)
+        M = robot.M
     beta = []
     M_inv = np.linalg.inv(M)
     for S in robot.ejes_helicoidales:  # Usar los ejes helicoidales almacenados
@@ -345,143 +343,5 @@ def validar_transformaciones_helicoidales():
     print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
     print("="*90)
 
-# Añadir al menú principal
-def menu_helicoidales():
-    """Menú interactivo para operaciones con ejes helicoidales."""
-    def limpiar_pantalla(stop=True):
-        """Limpia la pantalla de la consola."""
-        if stop: input("\033[93mPresione Enter para continuar...\033[0m")
-        os.system('cls' if os.name == 'nt' else 'clear')
-
-    while True:
-        print("\n" + "="*90)
-        print(" "*20 + "MENÚ DE OPERACIONES CON EJES HELICOIDALES" + " "*20)
-        print("="*90)
-        print("1. Crear eje helicoidal y calcular su matriz exponencial")
-        print("2. Calcular logaritmo de una matriz de transformación")
-        print("3. Visualizar eje helicoidal")
-        print("4. Validar transformaciones helicoidales")
-        print("5. Calcular T del robot.")
-        print("-"*90)   # Separador
-        print("0. Volver al menú principal")
-        print("-"*90)
-        
-        opcion = input("\nSeleccione una opción: ")
-        
-        if opcion == "1":
-            # Crear eje helicoidal y calcular su matriz exponencial
-            print("\nCreación de eje helicoidal:")
-            omega = Datos(tipo="vector", mensaje="Ingrese el vector de rotación omega (3 componentes): ").valor
-            v = Datos(tipo="vector", mensaje="Ingrese el vector de velocidad v (3 componentes): ").valor
-            theta = Datos(tipo="angulo").valor
-            
-            # Formar el vector S
-            S = np.concatenate([omega, v])
-            
-            # Calcular matriz helicoidal y su exponencial
-            S_theta = calcular_Sθ(S, theta)
-            T = calcular_exp_Sθ(S, theta)
-            
-            print("\nEje helicoidal S:")
-            print(f"omega = {omega}")
-            print(f"v = {v}")
-            print(f"theta = {theta}")
-            
-            imprimir_matriz(S_theta, "Matriz [S]θ")
-            imprimir_matriz(T, "Matriz de transformación T = e^([S]θ)")
-            limpiar_pantalla()
-
-        elif opcion == "2":
-            # Calcular logaritmo de una matriz de transformación
-            print("\nCálculo del logaritmo de una matriz de transformación:")
-            print("Para crear una matriz de transformación, ingrese:")
-            
-            # Crear matriz de rotación
-            eje_input = input("¿Desea usar un eje cartesiano (x/y/z) o un eje genérico (g)? ").lower()
-            if eje_input in ["x", "y", "z"]:
-                if eje_input == "x":
-                    eje = np.array([1, 0, 0])
-                elif eje_input == "y":
-                    eje = np.array([0, 1, 0])
-                else:  # z
-                    eje = np.array([0, 0, 1])
-            else:
-                eje = Datos(tipo="vector", mensaje="Ingrese el eje de rotación (3 componentes): ").valor
-                eje = eje / np.linalg.norm(eje)  # Normalizar
-            
-            angulo = Datos(tipo="angulo").valor
-            R = RotRodrigues(eje, angulo)
-            
-            # Crear vector de traslación
-            p = Datos(tipo="vector", mensaje="Ingrese el vector de traslación (3 componentes): ").valor
-            
-            # Formar matriz de transformación
-            T = np.eye(4)
-            T[:3, :3] = R
-            T[:3, 3] = p
-            
-            imprimir_matriz(T, "Matriz de transformación T")
-            
-            # Calcular logaritmo
-            theta, S = logaritmo_transformacion(T)
-            
-            print("\nLogaritmo de la transformación:")
-            print(f"theta = {theta}")
-            print(f"S = {S}")
-            print(f"omega = {S[:3]}")
-            print(f"v = {S[3:]}")
-            limpiar_pantalla()
-
-        elif opcion == "3":
-            # Visualizar eje helicoidal
-            print("\nVisualización de eje helicoidal:")
-            omega = Datos(tipo="vector", mensaje="Ingrese el vector de rotación omega (3 componentes): ").valor
-            v = Datos(tipo="vector", mensaje="Ingrese el vector de velocidad v (3 componentes): ").valor
-            theta = Datos(tipo="angulo").valor
-            
-            # Formar el vector S
-            S = np.concatenate([omega, v])
-            
-            # Visualizar
-            print("Generando visualización...")
-            visualizar_eje_helicoidal(S, theta)
-            limpiar_pantalla()
-
-        elif opcion == "4":
-            # Validar transformaciones helicoidales
-            validar_transformaciones_helicoidales()
-            limpiar_pantalla()
-
-        elif opcion == "5":
-            print("Calcular la matriz de transformación homogénea del robot.")
-            # Cargar robot y ejes helicoidales
-            robot = cargar_robot_desde_yaml("robot.yaml")
-
-            # Calcular M (posición cero)
-            M = calcular_M_generalizado(robot)
-            print("Matriz M (posición cero):")
-            imprimir_matriz(M, "M")
-
-            # Valores de las articulaciones
-            thetas = [0] * robot.num_links  # Inicializar con ceros
-            print("Valores de las articulaciones:", thetas, "\n")
-
-            # Calcular T
-            T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
-
-            print("Matriz de transformación homogénea T:")
-            imprimir_matriz(T, "T")
-
-            limpiar_pantalla()
-
-        elif opcion == "0":
-            print("Volviendo al menú principal...", end=" ")
-            limpiar_pantalla()
-            break
-            
-        else:
-            print("Opción no válida, intente nuevamente.")
-            limpiar_pantalla()
-
 if __name__ == "__main__":
-    menu_helicoidales()
+    validar_transformaciones_helicoidales()

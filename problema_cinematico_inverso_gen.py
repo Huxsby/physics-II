@@ -6,7 +6,7 @@ import sympy as sp
 import time
 
 from class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
-from class_helicoidales import calcular_M_generalizado, calcular_T_robot
+from class_helicoidales import calcular_T_robot
 from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
 from class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
@@ -130,27 +130,29 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     error_vel_lineal=float(error_vel_lineal)
 
     # Matriz de transformación homogénea en la posición cero del robot
-    M = calcular_M_generalizado(robot)
+    M = robot.M
 
     # Calculamos la Matriz de Transformación Homogénea a partir de posiciones y ángulos
     Tsd = Rp2Trans(orientation, p_xyz)
-    # print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
-    imprimir_matriz(Tsd, "Matriz de transformación homogénea objetivo Tsd")
-    print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{str_config(orientation, 8)}\n{np.round(p_xyz, 8)}")
-    print(f"\nExtrayendo dastos del robot:")
-    S = robot.ejes_helicoidales; print_ejes_helicoidales(robot)
-    print("\nMatriz Jacobiana del robot:")
-    J, thetas_s = Jacobiana_tuple; mostrar_jacobiana_resumida(J)
+    S = robot.ejes_helicoidales
+    J, thetas_s = Jacobiana_tuple
+    
+    if show:
+        # print("\nMatriz de transformación homogénea inical Tsd:\n", Tsd)
+        imprimir_matriz(Tsd, "Matriz de transformación homogénea objetivo Tsd")
+        print(f"\nVectores oritentation y p_xyz (distancia al objetivo):\n{str_config(orientation, 8)}\n{np.round(p_xyz, 8)}")
+        print(f"\nExtrayendo dastos del robot:")
+        print_ejes_helicoidales(robot)
+        print("\nMatriz Jacobiana del robot:")
+        mostrar_jacobiana_resumida(J)
+        print("\nIteraciones de la cinemática inversa:")
+        cero_umbral = min(error_oet, error_vel_lineal) # Precalcula el umbral de cero para la impresión del vector de giro.
     
     thetas_follower = []                                    # Lista para almacenar los ángulos de las articulaciones por los que ha pasado el robot en cada iteración.
     Tsb = CinematicaDirecta(S, thetas_actuales, M)          # Resuelve la Cinemática Directa para thetas_actuales
     Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), Tsd))        # vector Giro para ir a la posición deseada en {b}
     Vs = np.dot(Adjunta(Tsb), se3ToVec(Vb))                 # vector Giro en el SR de la base {s}
     
-
-    # Bucle principal del algoritmo de cinemática inversa iterativo.
-    print("\nIteraciones de la cinemática inversa:")
-    if show: cero_umbral = min(error_oet, error_vel_lineal) # Precalcula el umbral de cero para la impresión del vector de giro.
     # Condiciones del bucle: err = True (error) y i < MAXITERATIONS (máximo de iteraciones)
     i = 0; MAXITERATIONS = 20
     # Condición de convergencia: módulo de velocidad angular < error_oet y velocidad lineal < error_vel_lineal
@@ -232,7 +234,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
         for i in range(len(thetas_follower)):
             J_vol = J.subs(thetalist_s)
             vol_EM, vol_EF = calcular_volumen_elipsoides(J_vol)  # Guardamos los elipsoides para ver si se cruza cerca de una singularidad.
-            print(f"\t{str_config(thetas_follower[i], 4)}\t Vólumen elipsoide: {vol_EM}")
+            print(f"\t{str_config(thetas_follower[i], 4)}\t Volumen elipsoide: {vol_EM}")
             if vol_EM < 1e-20: print("\t\t\033[91mCuidado, el elipsoide es muy pequeño, puede haber una singularidad\033[0m"); input("Presione Enter para continuar...")
     
     return thetas_follower

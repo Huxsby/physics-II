@@ -8,7 +8,6 @@ import numpy as np                                                              
 import matplotlib.pyplot as plt                                                                         # Para la visualización
 from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
 from class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
-from class_helicoidales import calcular_M_generalizado                                                  # Para la matriz de transformación homogénea
 from class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
 import os                                                                                               # Para limpiar la pantalla en Windows/Linux
 
@@ -77,7 +76,7 @@ def ejemplo_animacion(robot: Robot, nombre_archivo="animacion_dos_configuracione
     num_frames = 50
     thetas_anim = []
     puntos_trayectoria = []
-    M = calcular_M_generalizado(robot)
+    M = robot.M
 
     for i in range(num_frames):
         t = i / (num_frames - 1)
@@ -135,90 +134,7 @@ def ejemplo_cinematica_directa(robot: Robot):
     print(f"Visualizando robot con cinemática directa: {str_config(thetas, 3)}")
     plot_robot(robot, thetas)
 
-# Ejemplo 7: Cinemática inversa con trayectoria circular
-def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectoria_circular"):
-    # Cargar el robot y matriz M
-    M = calcular_M_generalizado(robot)
-    
-    # Generar puntos en una trayectoria circular
-    num_puntos = 90
-    radio = 0.15
-    z = 0.3
-    angulos = np.linspace(0, 2*np.pi, num_puntos)
-    puntos = np.array([[radio*np.cos(theta), radio*np.sin(theta), z] for theta in angulos])
-    
-    # # Graficar la trayectoria deseada
-    # fig_traj = plt.figure()
-    # ax_traj = fig_traj.add_subplot(111, projection='3d')
-    # ax_traj.plot(puntos[:, 0], puntos[:, 1], puntos[:, 2], 'r--', label='Trayectoria Circular Deseada')
-    # ax_traj.set_xlabel('X')
-    # ax_traj.set_ylabel('Y')
-    # ax_traj.set_zlabel('Z')
-    # ax_traj.set_title('Trayectoria Circular Deseada')
-    # ax_traj.legend()
-    # plt.show()
-
-
-    # Calcular configuraciones articulares para cada punto
-    thetas_anim = []
-    # Initialize with a default guess (e.g., zero configuration).
-    # This will be updated with the last successful IK solution to provide continuity.
-    # Calculate initial thetas for the first point of the trajectory
-    # to ensure the animation starts smoothly.
-    initial_point = puntos[0]
-    # Initial guess for the first point can be zeros or a neutral configuration
-
-    # Calcular
-    initial_ik_guess = np.zeros(robot.num_links)
-    Jacobiana_tuple = calcular_jacobiana(robot)
-    thetas_iniciales_trayectoria = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0])
-
-    if thetas_iniciales_trayectoria:
-        ik_initial_guess_thetas = thetas_iniciales_trayectoria[-1] # Use the last iteration of the first point's solution
-        # Add the initial configuration to the animation to ensure the first point is visualized
-        thetas_anim.extend(thetas_iniciales_trayectoria) 
-    else:
-        print(f"Advertencia: Cinemática Inversa falló para el punto inicial ({initial_point}). "
-              "Usando configuración cero como punto de partida.")
-        ik_initial_guess_thetas = np.zeros(robot.num_links)
-        # Optionally, add the zero configuration if you want the animation to start from there
-        # in case of initial IK failure.
-        # thetas_anim.append(ik_initial_guess_thetas) 
-
-    print(f"Punto inicial cinemática inversa de la animación: {ik_initial_guess_thetas}")
-
-    for punto_idx, punto in enumerate(puntos): # Using enumerate for clearer logging on failure
-        # Orientación fija (ejemplo: orientación hacia abajo)
-        # Tsd = Rp2Trans(Euler2R(0, np.pi, 0), punto)
-        
-        # Use the solution from the previous point (or initial guess) as the 'thetas_actuales' for the IK solver.
-        thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0])
-        
-        if thetas_follower: # Assumes thetas_follower is a list of configurations (iterations) on success.
-            thetas_anim.extend(thetas_follower)  # Add all iterations to the animation.
-            ik_initial_guess_thetas = thetas_follower[-1] # Update the guess for the next point.
-        else:
-            # Handle cases where Inverse Kinematics fails to find a solution.
-            print(f"Advertencia: Cinemática Inversa falló para el punto {punto_idx} ({punto}). "
-                  f"La animación podría tener un salto o usar la configuración anterior como base para el siguiente punto.")
-            # ik_initial_guess_thetas remains unchanged, so the next IK attempt will start
-            # from the last known good configuration.
-            
-    # # Suavizar trayectoria si es necesario
-    # if len(thetas_anim) < 100:
-    #     print("Aplicando interpolación para suavizar...")
-    #     from scipy.interpolate import CubicSpline
-    #     t_original = np.linspace(0, 1, len(thetas_anim))
-    #     t_nuevo = np.linspace(0, 1, 100)
-    #     thetas_anim = CubicSpline(t_original, thetas_anim, axis=0)(t_nuevo)
-    
-    # Visualizar y guardar animación
-    print("Animando trayectoria circular...")
-    fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos)
-    guardar_animacion(anim, nombre_archivo) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
-    plt.close()
-
-# Ejemplo 8: Animación de articulaciones prismáticas
+# Ejemplo 7: Animación de articulaciones prismáticas
 def ejemplo_animacion_prismatica(robot: Robot):
     # Encuentra los índices de las articulaciones prismáticas
     prismatic_joint_indices = [i for i, link in enumerate(robot.links) if link.tipo == "prismatic"]
@@ -255,56 +171,87 @@ def ejemplo_animacion_prismatica(robot: Robot):
     print(f"Animando articulaciones prismáticas con {num_frames} frames...")
     plot_robot(robot, thetas_anim, animation_speed=50, show=True)
 
-# Ejemplo 9: Visualización de configuración singular
-def ejemplo_configuracion_singular(robot: Robot):
-    # Configuración singular específica
-    # {t0: 0, t1: -1.57079632679490, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0}
-    # Corresponde a theta2 = -pi/2, y el resto 0.
-    # Asumiendo que el robot tiene 7 articulaciones como en otros ejemplos.
-    # Si el robot.yaml tiene un número diferente de articulaciones, esto necesitará ajuste.
-    thetas_singular = [0, -np.pi/2, 0, 0, 0, 0, 0]
+# Ejemplo 8 y 9: Cinemática inversa con trayectoria circular
+def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectoria_circular"):
+    # Generar puntos en una trayectoria circular
+    num_puntos = 90
+    radio = 0.15
+    z = 0.3
+    angulos = np.linspace(0, 2*np.pi, num_puntos)
+    puntos = np.array([[radio*np.cos(theta), radio*np.sin(theta), z] for theta in angulos])
     
-    # Asegurar que los ángulos estén dentro de los límites (aunque para singularidad, esto es más conceptual)
-    # Si el robot tiene menos de 7 articulaciones, ajustar la longitud de thetas_singular
-    if robot.num_links < len(thetas_singular):
-        thetas_singular = thetas_singular[:robot.num_links]
-    elif robot.num_links > len(thetas_singular):
-        # Si el robot tiene más articulaciones, rellenar con ceros
-        thetas_singular.extend([0] * (robot.num_links - len(thetas_singular)))
+    # # Graficar la trayectoria deseada
+    # fig_traj = plt.figure()
+    # ax_traj = fig_traj.add_subplot(111, projection='3d')
+    # ax_traj.plot(puntos[:, 0], puntos[:, 1], puntos[:, 2], 'r--', label='Trayectoria Circular Deseada')
+    # ax_traj.set_xlabel('X')
+    # ax_traj.set_ylabel('Y')
+    # ax_traj.set_zlabel('Z')
+    # ax_traj.set_title('Trayectoria Circular Deseada')
+    # ax_traj.legend()
+    # plt.show()
 
-    thetas_singular_np = np.array(thetas_singular)
-    thetas_singular_np = thetas_limite(robot, thetas_singular_np)
-    
-    # Visualizar el robot
-    print(f"Visualizando robot en configuración singular: {str_config(thetas_singular_np, 3)}")
-    plot_robot(robot, thetas_singular_np)
 
-# Ejemplo 10: Visualizar multiples configuraciones en subplots
-def ejemplo_multiples_configuraciones_subplots(robot: Robot):
-    # Generar múltiples configuraciones aleatorias
-    num_configuraciones = 4  # Limit to 4 for a 2x2 grid
-    all_thetas = []
-    
-    for _ in range(num_configuraciones):
-        thetas, _ = thetas_aleatorias(robot)
-        all_thetas.append(thetas)
-    
-    # Crear una figura y subplots
-    fig = plt.figure(figsize=(12, 10))
-    
-    # Define el ángulo de vista que quieres usar para todos los subplots
-    view_angles = (30, 45)  # Elevación y azimut
-    
-    # Iterar a través de las configuraciones y crear subplots
-    for i, thetas in enumerate(all_thetas):
-        ax = fig.add_subplot(2, 2, i+1, projection='3d')  # Grid de 2x2
-        plot_robot(robot, thetas, ax=ax, show=False, view_angles=view_angles)
-        ax.set_title(f'Configuración {i+1}')
-    
-    plt.tight_layout()
-    plt.show()
+    # Calcular configuraciones articulares para cada punto
+    thetas_anim = []
+    # Initialize with a default guess (e.g., zero configuration).
+    # This will be updated with the last successful IK solution to provide continuity.
+    # Calculate initial thetas for the first point of the trajectory
+    # to ensure the animation starts smoothly.
+    initial_point = puntos[0]
+    # Initial guess for the first point can be zeros or a neutral configuration
 
-# Ejemplo 11: Prueba de singularidades
+    # Calcular
+    initial_ik_guess = np.zeros(robot.num_links)
+    Jacobiana_tuple = calcular_jacobiana(robot)
+    thetas_iniciales_trayectoria = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0], show=False)
+
+    if thetas_iniciales_trayectoria:
+        ik_initial_guess_thetas = thetas_iniciales_trayectoria[-1] # Use the last iteration of the first point's solution
+        # Add the initial configuration to the animation to ensure the first point is visualized
+        thetas_anim.extend(thetas_iniciales_trayectoria) 
+    else:
+        print(f"Advertencia: Cinemática Inversa falló para el punto inicial ({initial_point}). "
+              "Usando configuración cero como punto de partida.")
+        ik_initial_guess_thetas = np.zeros(robot.num_links)
+        # Optionally, add the zero configuration if you want the animation to start from there
+        # in case of initial IK failure.
+        # thetas_anim.append(ik_initial_guess_thetas) 
+
+    print(f"Punto inicial cinemática inversa de la animación: {ik_initial_guess_thetas}")
+
+    for punto_idx, punto in enumerate(puntos): # Using enumerate for clearer logging on failure
+        # Orientación fija (ejemplo: orientación hacia abajo)
+        # Tsd = Rp2Trans(Euler2R(0, np.pi, 0), punto)
+        
+        # Use the solution from the previous point (or initial guess) as the 'thetas_actuales' for the IK solver.
+        thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0], show=False)
+        
+        if thetas_follower: # Assumes thetas_follower is a list of configurations (iterations) on success.
+            thetas_anim.extend(thetas_follower)  # Add all iterations to the animation.
+            ik_initial_guess_thetas = thetas_follower[-1] # Update the guess for the next point.
+        else:
+            # Handle cases where Inverse Kinematics fails to find a solution.
+            print(f"Advertencia: Cinemática Inversa falló para el punto {punto_idx} ({punto}). "
+                  f"La animación podría tener un salto o usar la configuración anterior como base para el siguiente punto.")
+            # ik_initial_guess_thetas remains unchanged, so the next IK attempt will start
+            # from the last known good configuration.
+            
+    # # Suavizar trayectoria si es necesario
+    # if len(thetas_anim) < 100:
+    #     print("Aplicando interpolación para suavizar...")
+    #     from scipy.interpolate import CubicSpline
+    #     t_original = np.linspace(0, 1, len(thetas_anim))
+    #     t_nuevo = np.linspace(0, 1, 100)
+    #     thetas_anim = CubicSpline(t_original, thetas_anim, axis=0)(t_nuevo)
+    
+    # Visualizar y guardar animación
+    print("Animando trayectoria circular...")
+    fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos)
+    guardar_animacion(anim, nombre_archivo) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
+    plt.close()
+
+# Ejemplo 10: Prueba de singularidades
 def ejemplo_prueba_singularidades(robot: Robot):
     # Calcular la Jacobiana
     Jacobian, thetas_s = calcular_jacobiana(robot)
@@ -362,12 +309,11 @@ def menu_plotter():
         print("4. Animación entre dos configuraciones")
         print("5. Trayectoria con múltiples puntos")
         print("6. Cinemática directa")
-        print("7. Configuración singular")
-        print("8. Animación de articulaciones prismáticas")
-        print("9. Cinemática inversa con trayectoria circular (robot.yaml)")
-        print("10. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
-        print("11. Prueba de singularidades (robot.yaml)")
-        print("12. Probar todos los graficos y animaciones")
+        print("7. Animación de articulaciones prismáticas")
+        print("8. Cinemática inversa con trayectoria circular (robot.yaml)")
+        print("9. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
+        print("10. Prueba de singularidades (robot.yaml)")
+        print("11. Probar todos los graficos y animaciones")
         print("-"*90)   # Separador
         print("0. Salir")
 
@@ -398,28 +344,24 @@ def menu_plotter():
             ejemplo_cinematica_directa(robot)
         
         elif opcion == '7':
-            print("Ejecutando: Configuración singular")
-            ejemplo_configuracion_singular(robot)
-       
-        elif opcion == '8':
             print("Ejecutando: Animación de articulaciones prismáticas")
             ejemplo_animacion_prismatica(robot)
         
-        elif opcion == '9':
+        elif opcion == '8':
             print("Ejecutando: Cinemática inversa con trayectoria circular (robot.yaml)")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
         
-        elif opcion == '10':
+        elif opcion == '9':
             print("Ejecutando: Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
             robot = cargar_robot_desde_yaml("robot-niryo.yaml")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
             robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
         
-        elif opcion == '11':
+        elif opcion == '10':
             print("Ejecutando: Prueba de singularidades")
             ejemplo_prueba_singularidades(robot)
 
-        elif opcion == '12':
+        elif opcion == '11':
             print("Ejecutando: Probar todos los graficos y animaciones")
             ejemplo_visualizacion_simple(robot)
             ejemplo_configuracion_personalizada(robot)
@@ -427,7 +369,6 @@ def menu_plotter():
             ejemplo_animacion(robot)
             ejemplo_trayectoria(robot)
             ejemplo_cinematica_directa(robot)
-            ejemplo_configuracion_singular(robot)
             ejemplo_animacion_prismatica(robot)
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
             robot = cargar_robot_desde_yaml("robot-niryo.yaml")

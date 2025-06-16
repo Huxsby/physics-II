@@ -15,14 +15,14 @@ Ejemplo de uso:
     >>> plot_robot(robot, thetas)
 """
 
-from class_robot_structure import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
-from class_helicoidales import calcular_M_generalizado, calcular_T_robot
+from class_robot_structure import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
+from class_helicoidales import calcular_T_robot
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-from mpl_toolkits.mplot3d import Axes3D
-import time
+import numpy as np                              # Import NumPy for numerical operations
+import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
+from matplotlib.animation import FuncAnimation  # Import FuncAnimation for animations
+from scipy.spatial import ConvexHull            # Import ConvexHull for workspace visualization
+import sys                                      # Import sys for platform checks
 
 def matriz_rotacion(eje, angulo):
     """
@@ -97,14 +97,21 @@ def guardar_animacion(anim, nombre_archivo):
         return
     print("Guardando animación...")
     try:
-        _guardar_animacion_ffmpeg(anim, nombre_archivo)
-    except Exception as e:
-        print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
-        try:
-            _guardar_animacion_pillow(anim, nombre_archivo)
-        except Exception as e_pillow: # Renamed e to e_pillow
-            print(f"\t\033[31mError al guardar con Pillow: {e_pillow}\033[0m")
-            print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
+        if sys.platform.startswith("linux"):
+            try:
+                _guardar_animacion_ffmpeg(anim, nombre_archivo)
+            except Exception as e:
+                print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
+                _guardar_animacion_pillow(anim, nombre_archivo)
+        else:
+            try:
+                _guardar_animacion_pillow(anim, nombre_archivo)
+            except Exception as e:
+                print(f"\t\033[31mError al guardar con Pillow: {e}\033[0m")
+                _guardar_animacion_ffmpeg(anim, nombre_archivo)
+    except Exception as e_final:
+        print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
+        print(f"\t\033[31mError: {e_final}\033[0m")
 
 def _guardar_animacion_ffmpeg(anim, nombre_archivo):
     print("\tIntentando guardar la animación como MP4 con ffmpeg...")
@@ -119,24 +126,29 @@ def _guardar_animacion_pillow(anim, nombre_archivo):
 """ Función principal para visualizar el robot manipulador en 3D """
 def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None, 
                animation_speed=200, view_angles=None, is_overlay=False):
-    animacion = isinstance(thetas[0], (list, np.ndarray)) and hasattr(thetas[0], "__len__")
     
-    fig_provided_ax = ax is not None # Renamed fig_provided to fig_provided_ax
+    thetas = np.asarray(thetas)
+    if thetas.ndim == 2 and thetas.shape[0] > 1:
+        animacion = True
+    else:
+        animacion = False
+    
+    fig_provided_ax = ax is not None
     if not fig_provided_ax:
         fig = plt.figure(figsize=(10, 8))
         ax = fig.add_subplot(111, projection='3d')
     else:
         fig = ax.figure
-    
+
     if not is_overlay:
         if view_angles:
             ax.view_init(elev=view_angles[0], azim=view_angles[1])
-        elif not fig_provided_ax : 
-             ax.view_init(elev=30, azim=60)
+        elif not fig_provided_ax:
+            ax.view_init(elev=30, azim=60)
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-    
+
     ax.set_title('Visualización del Robot Manipulador')
 
     def _draw_provided_trajectory(ax_to_plot_on, trajectory_points):
@@ -144,73 +156,91 @@ def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None,
             try:
                 path_data = np.asarray(trajectory_points)
                 if path_data.ndim == 2 and path_data.shape[1] == 3 and path_data.shape[0] > 0:
-                    line, = ax_to_plot_on.plot(path_data[:, 0], path_data[:, 1], path_data[:, 2], 
-                                               color='cyan', linestyle='--', linewidth=1.5, label='Trayectoria Proporcionada')
-                    return [line] 
+                    ax_to_plot_on.plot(path_data[:, 0], path_data[:, 1], path_data[:, 2], 
+                                       color='cyan', linestyle='--', linewidth=1.5, label='Trayectoria Proporcionada')
             except Exception as e:
                 print(f"Advertencia: No se pudo dibujar la trayectoria proporcionada. Error: {e}")
-        return []
 
     if not animacion:
-        _plot_frame(robot, thetas, ax) 
+        _plot_frame(robot, thetas, ax)
         if trayectoria is not None:
             _draw_provided_trajectory(ax, trayectoria)
-        if not is_overlay and not fig_provided_ax : 
-            _adjust_axis_limits(ax) 
-        
+        # Ajustar límites de los ejes siempre para evitar distorsión
+        if not is_overlay:
+            _adjust_axis_limits(ax)
+
         if show:
             plt.tight_layout()
             plt.show()
         return fig, ax
-    
+
     num_frames = len(thetas)
-    max_limits = _get_animation_limits(robot, thetas) 
-    robot_artists_collection = [] 
+    max_limits = _get_animation_limits(robot, thetas)
 
-    def init_animation():
-        nonlocal robot_artists_collection
-        for artist in robot_artists_collection:
-            artist.remove()
-        robot_artists_collection.clear()
-        trajectory_artists = []
-
+    def init():
         if not is_overlay:
-            ax.clear() 
-            if view_angles:
-                ax.view_init(elev=view_angles[0], azim=view_angles[1])
-            else:
-                ax.view_init(elev=30, azim=60)
-            ax.set_xlabel('X')
-            ax.set_ylabel('Y')
-            ax.set_zlabel('Z')
-            ax.set_xlim(max_limits['x'])
-            ax.set_ylim(max_limits['y'])
-            ax.set_zlim(max_limits['z'])
-            if trayectoria is not None: 
-                trajectory_artists.extend(_draw_provided_trajectory(ax, trayectoria))
-        
+            ax.clear()
+        if view_angles:
+            ax.view_init(elev=view_angles[0], azim=view_angles[1])
+        else:
+            ax.view_init(elev=30, azim=60)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
         ax.set_title(f'Visualización del Robot Manipulador - Frame 1/{num_frames}')
-        new_robot_artists = _plot_frame(robot, thetas[0], ax)
-        robot_artists_collection.extend(new_robot_artists)
-        return robot_artists_collection + trajectory_artists
+        ax.set_xlim(max_limits['x'])
+        ax.set_ylim(max_limits['y'])
+        ax.set_zlim(max_limits['z'])
+        # --- CAMBIO: limpiar y guardar artistas también en overlay ---
+        if is_overlay:
+            for artist in artists_overlay:
+                try:
+                    artist.remove()
+                except Exception:
+                    pass
+            artists_overlay.clear()
+        # Dibuja el primer frame y guarda los artistas
+        artists = _plot_frame(robot, thetas[0], ax)
+        if is_overlay:
+            artists_overlay.extend(artists)
+        if trayectoria is not None:
+            _draw_provided_trajectory(ax, trayectoria)
+        return []
 
-    def update_animation(frame_index):
-        nonlocal robot_artists_collection
-        for artist in robot_artists_collection:
-            artist.remove()
-        robot_artists_collection.clear()
+    artists_overlay = []
+
+    def update(frame_index):
+        # Limpiar los artistas del frame anterior SOLO si es overlay
+        if is_overlay:
+            for artist in artists_overlay:
+                try:
+                    artist.remove()
+                except Exception:
+                    pass
+            artists_overlay.clear()
+        elif not is_overlay:
+            ax.clear()
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
         ax.set_title(f'Visualización del Robot Manipulador - Frame {frame_index+1}/{num_frames}')
-        
-        # Axis properties (limits, view, labels) are set in init_animation if not is_overlay,
-        # or by the caller if is_overlay. No need to change them per frame here.
+        ax.set_xlim(max_limits['x'])
+        ax.set_ylim(max_limits['y'])
+        ax.set_zlim(max_limits['z'])
+        if view_angles:
+            ax.view_init(elev=view_angles[0], azim=view_angles[1])
+        else:
+            ax.view_init(elev=30, azim=60)
+        artists = _plot_frame(robot, thetas[frame_index], ax)        # Aquí guarda los artistas del frame actual
+        if is_overlay:
+            artists_overlay.extend(artists)
+        if trayectoria is not None:
+            _draw_provided_trajectory(ax, trayectoria)
+        return []
 
-        new_robot_artists = _plot_frame(robot, thetas[frame_index], ax)
-        robot_artists_collection.extend(new_robot_artists)
-        return robot_artists_collection
-    
-    anim = FuncAnimation(fig, update_animation, frames=num_frames, init_func=init_animation,
-                            interval=animation_speed, blit=True)
-    
+    anim = FuncAnimation(fig, update, frames=num_frames, init_func=init,
+                         interval=animation_speed, blit=True)
+
     if show:
         plt.tight_layout()
         plt.show()
@@ -285,7 +315,7 @@ def _plot_frame(robot: Robot, thetas, ax):
         artists.extend(cs_artists)
     return artists
 
-def _draw_coordinate_system(ax, T_mat, scale=0.1): # Renamed T to T_mat
+def _draw_coordinate_system(ax, T_mat, scale=0.05): # Renamed T to T_mat
     artists = []
     origin = T_mat[:3, 3]
     x_axis = T_mat[:3, 0] * scale
@@ -374,21 +404,78 @@ def _get_animation_limits(robot: Robot, thetas_list):
     
     return {'x': final_x_range, 'y': final_y_range, 'z': final_z_range}
 
-from scipy.spatial import ConvexHull
 def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=None,
-                       thetas_anim=None, animation_speed=200, view_angles=None,
-                       save_animation_name=None):
+                       thetas_anim=None, animation_speed=200, view_angles=(30, 45),
+                       save_animation_name=None, subtitle=None):
+    """
+    Visualiza el espacio de trabajo de un robot y opcionalmente superpone una animación.
+    Esta función genera un gráfico 3D del espacio de trabajo del robot mediante muestreo
+    aleatorio de configuraciones válidas. Puede mostrar la frontera convexa del espacio
+    de trabajo y superponer animaciones del robot.
+    Parameters
+    ----------
+    robot : Robot
+        Objeto Robot que contiene la información cinemática del robot.
+    N : int, optional
+        Número de muestras aleatorias para generar el espacio de trabajo (default: 2000).
+    show_points : bool, optional
+        Si True, muestra los puntos muestreados del espacio de trabajo (default: True).
+    half_space_axis : str, optional
+        Filtro para mostrar solo un semi-espacio. Formato: "+X", "-Y", "+Z", etc.
+        (default: None).
+    thetas_anim : list, optional
+        Lista de configuraciones de ángulos para superponer una animación (default: None).
+    animation_speed : int, optional
+        Velocidad de la animación en milisegundos entre frames (default: 200).
+    view_angles : tuple, optional
+        Ángulos de vista (elevación, azimut) para la cámara 3D (default: None).
+    save_animation_name : str, optional
+        Nombre del archivo para guardar la animación (default: None).
+    subtitle : str, optional
+        Subtítulo adicional para el gráfico (default: None).
+    Returns
+    -------
+    tuple
+        Una tupla conteniendo:
+        - fig : matplotlib.figure.Figure
+            La figura de matplotlib generada.
+        - ax : matplotlib.axes._subplots.Axes3DSubplot
+            Los ejes 3D de la figura.
+        - anim_obj : matplotlib.animation.FuncAnimation or None
+            Objeto de animación si se proporcionó thetas_anim, None en caso contrario.
+    Notes
+    -----
+    - La función calcula puntos del espacio de trabajo mediante muestreo aleatorio
+        de configuraciones válidas del robot.
+    - Si el robot tiene límites definidos, se agregan puntos adicionales en las
+        configuraciones límite.
+    - La frontera convexa se calcula y dibuja si hay suficientes puntos (≥4).
+    - El filtro half_space_axis permite visualizar solo una porción del espacio
+        de trabajo (ej: "+Z" muestra solo puntos con Z≥0).
+    - Si se proporciona thetas_anim, se superpone una animación del robot sobre
+        el espacio de trabajo.
+    Examples
+    --------
+    >>> # Visualizar espacio de trabajo básico
+    >>> fig, ax, anim = graficar_workspace(mi_robot, N=1000)
+    >>> # Visualizar solo el semi-espacio superior en Z
+    >>> fig, ax, anim = graficar_workspace(mi_robot, half_space_axis="+Z")
+    >>> # Superponer animación
+    >>> trayectoria = [config1, config2, config3]
+    >>> fig, ax, anim = graficar_workspace(mi_robot, thetas_anim=trayectoria)
+    """
+
     puntos_ws = []
-    M = calcular_M_generalizado(robot)
+    M = robot.M
     apply_filter = False
     filter_axis_idx = -1
-    filter_positive_side = True 
+    filter_positive_side = True
 
     if half_space_axis and isinstance(half_space_axis, str) and len(half_space_axis) == 2:
         sign_char, axis_char = half_space_axis[0], half_space_axis[1].lower()
         if sign_char == '+': filter_positive_side = True
         elif sign_char == '-': filter_positive_side = False
-        else: sign_char = None 
+        else: sign_char = None
         if axis_char == 'x': filter_axis_idx = 0
         elif axis_char == 'y': filter_axis_idx = 1
         elif axis_char == 'z': filter_axis_idx = 2
@@ -396,7 +483,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         if sign_char is not None and filter_axis_idx != -1: apply_filter = True
         else:
             print(f"Advertencia: 'half_space_axis' ('{half_space_axis}') inválido. Se ignorará el filtro.")
-            half_space_axis = None 
+            half_space_axis = None
     elif half_space_axis:
         print(f"Advertencia: 'half_space_axis' ('{half_space_axis}') con formato incorrecto. Se ignorará el filtro.")
         half_space_axis = None
@@ -421,7 +508,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
                     th_at_lim = mid_l.copy() # Renamed thetas_at_limit
                     th_at_lim[i] = min_l[i] if lim_type == "min" else max_l[i]
                     cfgs_check.append(th_at_lim)
-            
+
             unique_cfgs_set, final_cfgs = set(), [] # Renamed
             for cfg in cfgs_check: # Renamed config to cfg
                 cfg_tuple = tuple(cfg)
@@ -430,7 +517,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
                     unique_cfgs_set.add(cfg_tuple)
 
             for th_cfg in final_cfgs: # Renamed thetas_config to th_cfg
-                if limits(robot, th_cfg)[0]: 
+                if limits(robot, th_cfg)[0]:
                     T_m_cfg = calcular_T_robot(robot.ejes_helicoidales, th_cfg, M) # Renamed
                     p_cfg = T_m_cfg[:3, 3] # Renamed
                     if apply_filter:
@@ -454,7 +541,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
             pos_f = np.array([T_m_f[:3, 3] for T_m_f in tf_f]) # Renamed
             if pos_f.size > 0:
                 all_x.extend(pos_f[:, 0]); all_y.extend(pos_f[:, 1]); all_z.extend(pos_f[:, 2])
-    if not all_x: all_x, all_y, all_z = [-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5] 
+    if not all_x: all_x, all_y, all_z = [-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]
 
     min_x_all, max_x_all = min(all_x) - 0.1, max(all_x) + 0.1
     min_y_all, max_y_all = min(all_y) - 0.1, max(all_y) + 0.1
@@ -465,24 +552,24 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     ax.set_xlim(x_c - h_span, x_c + h_span); ax.set_ylim(y_c - h_span, y_c + h_span); ax.set_zlim(z_c - h_span, z_c + h_span)
 
     if view_angles: ax.view_init(elev=view_angles[0], azim=view_angles[1])
-    else: ax.view_init(elev=25, azim=45) 
+    else: ax.view_init(elev=25, azim=45)
     ax.set_xlabel("X (m)"); ax.set_ylabel("Y (m)"); ax.set_zlabel("Z (m)")
 
     if show_points and num_actual_puntos_ws > 0:
         ax.scatter(puntos_ws_array[:,0], puntos_ws_array[:,1], puntos_ws_array[:,2], s=5, alpha=0.15, label='Muestras Espacio Trabajo', color='darkgrey')
-    
+
     title_str = "Espacio de Trabajo"
     if apply_filter and half_space_axis: title_str = f"Medio Espacio de Trabajo ({half_space_axis})"
-    
+
     hull_plotted, hull_message = False, ""
-    if num_actual_puntos_ws >= 4: 
+    if num_actual_puntos_ws >= 4:
         try:
             hull_obj = ConvexHull(puntos_ws_array) # Renamed hull to hull_obj
             ax.plot_trisurf(puntos_ws_array[:,0], puntos_ws_array[:,1], puntos_ws_array[:,2], triangles=hull_obj.simplices,
                             color='cornflowerblue', alpha=0.25, edgecolor='black', linewidth=0.15, label='Frontera Convexa')
             if not (apply_filter and half_space_axis) : title_str += " y Frontera Convexa"
             hull_plotted = True
-        except Exception as e_hull: 
+        except Exception as e_hull:
             hull_message = f" (Frontera Convexa no dibujada: {type(e_hull).__name__})"
             print(f"Advertencia: No se pudo calcular/dibujar la frontera convexa: {e_hull}")
     else:
@@ -490,6 +577,8 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         if num_actual_puntos_ws > 0 : print(f"Advertencia: No hay suficientes puntos ({num_actual_puntos_ws}) para dibujar la frontera convexa (se necesitan al menos 4).")
 
     main_title = f"{title_str} de {robot.name} ({num_actual_puntos_ws} puntos){hull_message}"
+    if subtitle:
+        main_title = f"{main_title}\n{subtitle}"
     if thetas_anim: main_title += "\nSuperponiendo Animación"
     ax.set_title(main_title, fontsize=10)
 
@@ -497,14 +586,14 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     if thetas_anim and len(thetas_anim) > 0:
         print("Superponiendo animación sobre el espacio de trabajo...")
         _fig_anim, _ax_anim, anim_obj = plot_robot(
-            robot, thetas_anim, ax=ax, show=False, 
-            animation_speed=animation_speed, view_angles=None, 
+            robot, thetas_anim, ax=ax, show=False,
+            animation_speed=animation_speed, view_angles=None,
             trayectoria=None, is_overlay=True # Pass is_overlay=True
         )
-    
+
     if show_points or hull_plotted: ax.legend(fontsize=8, loc='upper left', bbox_to_anchor=(0.01, 0.99))
-    plt.tight_layout(rect=[0, 0, 1, 0.96]) 
-    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+
     # Show plot here if not handled by plot_robot (i.e., if plot_robot's show=False, which it is for animation overlay)
     # Or if it's a static workspace plot (no animation)
     if not (anim_obj and save_animation_name): # Avoid double plt.show() if anim_obj will be saved (which might show it)
@@ -515,11 +604,10 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
 
 
     if save_animation_name and anim_obj:
-        print(f"Intentando guardar la animación como '{save_animation_name}'...")
-        guardar_animacion(anim_obj, save_animation_name) 
-    
-    return fig, ax, anim_obj
+        print(f"Intentando guardar la animación como '\033[94m{save_animation_name}\033[0m'...")
+        guardar_animacion(anim_obj, save_animation_name)
 
+    return fig, ax, anim_obj
 
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
@@ -528,41 +616,76 @@ if __name__ == "__main__":
     thetas_static, _ = thetas_aleatorias(robot)
     print(f"Configuración aleatoria: {str_config(thetas_static, 3)}")
     plot_robot(robot, thetas_static)
+    input("Press Enter to continue...")
 
     print("\nEjemplo 2: Espacio de trabajo básico")
-    graficar_workspace(robot, N=500, show_points=True, half_space_axis=None) # Reduced N for tests
+    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización básica del espacio de trabajo")
+    input("Press Enter to continue...")
 
     print("\nEjemplo 3: Espacio de trabajo -z")
-    graficar_workspace(robot, N=500, show_points=True, half_space_axis='-z')
+    graficar_workspace(robot, N=1000, show_points=True, half_space_axis='-z', subtitle="Espacio de trabajo filtrado para Z < 0")
+    input("Press Enter to continue...")
 
     print("\nEjemplo 4: Espacio de trabajo +y, sin puntos")
-    graficar_workspace(robot, N=500, show_points=False, half_space_axis='+y')
+    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+y', subtitle="Espacio de trabajo filtrado para Y >= 0 (solo frontera)")
+    input("Press Enter to continue...")
 
-    num_frames_anim = 30 # Renamed
-    thetas_anim_list = [] # Renamed
-    thetas_s, _ = thetas_aleatorias(robot) # Renamed
-    thetas_e, _ = thetas_aleatorias(robot) # Renamed
-    thetas_s_np, thetas_e_np = np.array(thetas_s), np.array(thetas_e) # Renamed
-    for i in range(num_frames_anim):
-        t_param = i / (num_frames_anim - 1) if num_frames_anim > 1 else 0.0 # Renamed
-        thetas_i = thetas_s_np * (1 - t_param) + thetas_e_np * t_param
-        thetas_anim_list.append(thetas_i.tolist())
+    num_waypoints = 5  # Number of configurations in the complete circle
+    frames_per_segment = 40  # Frames between each waypoint
+    num_frames_anim = frames_per_segment * num_waypoints
+    thetas_anim_list = []
+    
+    # Generate waypoints for the circle
+    waypoints = []
+    for i in range(num_waypoints - 1):  # -1 because we'll repeat the first point at the end
+        theta_waypoint, _ = thetas_aleatorias(robot)
+        waypoints.append(theta_waypoint)
+    
+    # Add the first waypoint again to close the loop
+    waypoints.append(waypoints[0])
+    
+    # Create smooth interpolations between waypoints
+    for i in range(num_waypoints):
+        theta_start = np.array(waypoints[i])
+        theta_end = np.array(waypoints[(i + 1) % num_waypoints])  # Modulo to loop back
+        
+        for j in range(frames_per_segment):
+            # Use a smooth easing function (sine-based) instead of linear interpolation
+            # This creates natural-looking motion that accelerates/decelerates smoothly
+            t_param = j / frames_per_segment
+            t_smooth = 0.5 - 0.5 * np.cos(t_param * np.pi)
+            
+            theta_interpolated = theta_start * (1 - t_smooth) + theta_end * t_smooth
+            theta_clipped = thetas_limite(robot, theta_interpolated.tolist())
+            thetas_anim_list.append(theta_clipped)
     
     print("\nEjemplo 5: Animación simple")
     plot_robot(robot, thetas_anim_list, animation_speed=50)
 
+    input("Press Enter to continue...")
+
     print("\nEjemplo 6: Espacio de trabajo con animación superpuesta y guardado")
-    graficar_workspace(robot, N=500, show_points=True, half_space_axis=None,
+    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None,
                        thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_anim_test")
+                       save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo")
+    input("Press Enter to continue...")
 
     print("\nEjemplo 7: Espacio de trabajo +x con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=500, show_points=False, half_space_axis='+x',
+    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+x',
                        thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_mas_x_anim_test")
+                       save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)")
+    input("Press Enter to continue...")
 
-    print("\nEjemplo 8: Espacio de trabajo -y (sin animación, sin puntos)")
-    graficar_workspace(robot, N=500, show_points=False, half_space_axis='-y')
+    print("\nEjemplo 8: Espacio de trabajo completo con animación (sin puntos) y guardado")
+    graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
+                       thetas_anim=thetas_anim_list, animation_speed=50,
+                       save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
+    input("Press Enter to continue...")
 
-    print("\nEjemplo 9: Espacio de trabajo completo (sin animación)")
-    graficar_workspace(robot, N=500, show_points=True, half_space_axis=None)
+    print("\nEjemplo 9: Espacio de trabajo -y (sin animación, sin puntos)")
+    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='-y', subtitle="Espacio de trabajo filtrado para Y < 0 (solo frontera)")
+    input("Press Enter to continue...")
+
+    print("\nEjemplo 10: Espacio de trabajo completo (sin animación)")
+    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización completa del espacio de trabajo (estático)")
+    print("Fin de los ejemplos.")

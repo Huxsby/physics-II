@@ -96,7 +96,22 @@ import yaml
 MARGEN_LIMITES_THETAS = 5 # Grados de margen para los límites de las articulaciones y evitar colisiones
 
 class Robot:
-    """ Clase que representa un robot con eslabones y sus propiedades."""
+    """
+    Clase que representa un robot con eslabones y sus propiedades.
+    Esta clase implementa la estructura básica de un robot con múltiples eslabones,
+    permitiendo su creación, configuración y análisis cinemático mediante el método
+    de los ejes helicoidales.
+    Attributes:
+        name (str): Nombre identificativo del robot.
+        links (list): Lista que contiene los objetos Link (eslabones) del robot.
+        ejes_helicoidales (str): Mensaje informativo sobre los ejes helicoidales.
+            Se calcularán realmente con el método get_ejes_helicoidales().
+        limits_dict (dict, optional): Diccionario que almacena los límites de movimiento
+            de las articulaciones. Por defecto es None y puede establecerse posteriormente.
+        num_links (int): Contador del número de eslabones que tiene el robot.
+        M (numpy.ndarray, optional): Matriz de transformación homogénea para la 
+            posición inicial del efector final.
+    """
     def __init__(self, name: str):
         """ Inicializa una nueva instancia de la clase Robot. """
         self.name = name
@@ -104,6 +119,7 @@ class Robot:
         self.ejes_helicoidales = "Los ejes helicoidales se calcularán al crear el robot."
         self.limits_dict = None # Inicializa limits_dict como None, se puede establecer más tarde
         self.num_links = 0
+        self.M = None
         print(f"\033[92\tmRobot '{self.name}' creado.\033[0m")
 
     def __str__(self):
@@ -233,6 +249,154 @@ class Link:
         
         return eje*self.length
 
+class Datos:
+    """
+    Clase para la toma y validación de datos específicos para cálculos de física.
+
+    Este módulo proporciona la clase `Datos`, diseñada para facilitar la
+    solicitud de diferentes tipos de datos al usuario (vectores, ejes, ángulos,
+    coordenadas exponenciales) con validación incorporada y mensajes
+    personalizables.
+
+    Clases Principales:
+        Datos: Clase principal para solicitar y almacenar datos validados.
+
+    Ejemplo de uso:
+        >>> # Solicitar un vector de 3 componentes
+        >>> vector_dato = Datos(tipo="vector")
+        Ingrese el vector a rotar (separado por comas o espacios en blanco): 1 2 3
+        >>> print(vector_dato.obtener_valor())
+        [1. 2. 3.]
+        >>> print(vector_dato.obtener_tipo())
+        vector
+
+        >>> # Solicitar un ángulo en grados (se almacena en radianes)
+        >>> angulo_dato = Datos(tipo="angulo", mensaje="Introduce el ángulo deseado (º):")
+        Introduce el ángulo deseado (º): 90
+        >>> print(angulo_dato.obtener_valor())
+        1.5707963267948966
+
+        >>> # Solicitar un eje
+        >>> eje_dato = Datos(tipo="eje")
+        Ingrese el eje de rotación (x, y o z): y
+        >>> print(eje_dato)
+        y
+    """
+    def __init__(self, tipo, mensaje=None, robot=None):
+        """
+        Constructor de la clase Datos.
+
+        Parámetros:
+        - tipo (str): Tipo de dato a solicitar ("vector", "eje", "angulo", "cordenadas_exponenciales", "configuración").
+        - mensaje (str, opcional): Mensaje personalizado para solicitar el dato.
+        - robot (Robot, opcional): Instancia de Robot para validar configuraciones.
+        """
+        # Mensajes predeterminados según el tipo
+        if mensaje is None:
+            if tipo == "vector":
+                mensaje = "Ingrese el vector a rotar (separado por comas o espacios en blanco): "
+            elif tipo == "eje":
+                mensaje = "Ingrese el eje de rotación (x, y o z): "
+            elif tipo == "angulo":
+                mensaje = "Ingrese el ángulo de rotación (º): "
+            elif tipo == "cordenadas_exponenciales":
+                mensaje = "Ingrese las coordenadas exponenciales (separadas por comas o espacios): "
+            elif tipo == "configuración":
+                mensaje = "Ingrese los valores de las articulaciones (separados por comas o espacios): "
+            else:
+                mensaje = "Ingrese el dato: "
+        
+        self.tipo = tipo
+        self.mensaje = mensaje
+        self.robot = robot
+        self.valor = self.tomar_dato()
+
+    def __str__(self):
+        """ Método para representar el objeto como una cadena. """
+        return str(self.valor)
+    
+    def __iter__(self):
+        """ Método para permitir la iteración sobre el objeto. """
+        return iter(self.valor)
+    
+    def __getitem__(self, key):
+        """ Método para permitir el acceso a los elementos del objeto como si fuera una lista. """
+        return self.valor[key]
+    
+    def __len__(self):
+        """ Método para permitir el uso de len() en el objeto. """
+        return len(self.valor)
+    
+    def obtener_valor(self):
+        """ Devuelve el valor almacenado. """
+        return self.valor
+    
+    def obtener_tipo(self):
+        """ Devuelve el tipo de dato. """
+        return self.tipo
+
+    def tomar_dato(self):
+        """ Toma el dato según el tipo especificado. """
+        if self.tipo == "vector":
+            while True:
+                try:
+                    input_vector = input(self.mensaje)
+                    vector = np.array([float(x) for x in input_vector.replace(',', ' ').split() if x.strip()])
+                    if vector.shape != (3,):
+                        raise ValueError("El vector debe tener 3 componentes.")
+                    return vector
+                except ValueError as e:
+                    print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3 o 1 2 3).")
+        
+        elif self.tipo == "eje":
+            while True:
+                input_eje = input(self.mensaje).lower()
+                if input_eje in ["x", "y", "z"]:
+                    return input_eje
+                else:
+                    print("Eje no válido. Debe ser x, y o z.")
+        
+        elif self.tipo == "angulo":
+            while True:
+                try:
+                    input_θ = np.deg2rad(float(input(self.mensaje)))
+                    return input_θ
+                except ValueError:
+                    print("Ángulo no válido. Debe ser un número.")
+        
+        elif self.tipo == "cordenadas_exponenciales":
+            while True:
+                try:
+                    input_vector = input(self.mensaje)
+                    vector = np.array([float(x) for x in input_vector.replace(',', ' ').split() if x.strip()])
+                    if vector.shape != (6,):
+                        raise ValueError("El vector debe tener 6 componentes.")
+                    return vector
+                except ValueError as e:
+                    print(f"Error: {e}. Por favor, ingrese un vector válido (ej: 1,2,3,4,5,6 o 1 2 3 4 5 6).")
+        
+        elif self.tipo == "configuración":
+            if self.robot is None:
+                raise ValueError("Para el tipo 'configuración' debe proporcionar el argumento 'robot'.")
+            while True:
+                try:
+                    input_thetas = input(self.mensaje)
+                    thetas = np.array([float(x) for x in input_thetas.replace(',', ' ').split()])
+                    if len(thetas) != len(self.robot.links):
+                        print(f"Error: Debe ingresar {len(self.robot.links)} valores (uno por cada articulación)")
+                        continue
+                    valido, msg = limits(self.robot, thetas)
+                    if not valido:
+                        print(f"Configuración inválida: {msg}")
+                        continue
+                    return thetas
+                except ValueError:
+                    print("Error: Ingrese solo valores numéricos separados por comas o espacios")
+        
+        else:
+            print("Tipo de dato no válido.")
+            return None
+
 """ Funciones auxiliares """
 
 def cargar_robot_desde_yaml(path="robot.yaml"):
@@ -316,6 +480,12 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
         
     robot.ejes_helicoidales = robot.get_ejes_helicoidales() # Guardar los ejes helicoidales en el robot
     robot.limits_dict = {f'joint_{i+1}': link.joint_limits for i, link in enumerate(robot.links) if link.joint_limits is not None}
+    
+    # Calcular la matriz M del robot
+    robot.M = np.eye(4)  # Matriz identidad inicial
+    for link in robot.links:
+        robot.M[:3, 3] += link.joint_coords  # Sumar la posición de la articulación
+
     return robot
 
 def print_ejes_helicoidales(robot: Robot):
@@ -405,6 +575,8 @@ def thetas_aleatorias(robot: Robot):
     - La función utiliza las funciones auxiliares get_limits_negative, get_limits_positive y limits
       para validar que la configuración generada sea válida.
     """
+
+    # Si no hay límites definidos, generar una configuración aleatoria entre -2π y 2π
     if robot.limits_dict is None or len(robot.limits_dict) == 0:
         random_config = np.zeros(robot.num_links)
         for i in range(robot.num_links):
@@ -415,10 +587,13 @@ def thetas_aleatorias(robot: Robot):
     positive_limits = get_limits_positive(robot)
     # print(f"negative_limits: {negative_limits}")
     # print(f"positive_limits: {positive_limits}")
+
+    # Generar una configuración aleatoria dentro de los límites negativos y positivos
     while True:
         random_config = np.zeros(len(negative_limits))
         for i in range(len(negative_limits)):
             random_config[i] = np.random.uniform(negative_limits[i], positive_limits[i])
+        
         # Validar la configuración generada
         valid, msg = limits(robot, random_config)
         if valid:
@@ -470,9 +645,9 @@ def filtrar_configuraciones(robot: Robot, configuraciones):
     for config in configuraciones:
         if limits(robot, config)[0]:
             configuraciones_validas.append(config)
-            print(f"\t\033[92mConfiguración válida: {str_config(config, 2)}\033[0m")
+            print(f"\t\033[92mConfiguración válida:\t{str_config(config, 2)}\033[0m")
         else:
-            print(f"\t\033[91mConfiguración inválida: {str_config(config, 2)}\033[0m")
+            print(f"\t\033[91mConfiguración inválida:\t{str_config(config, 2)}\033[0m")
     return configuraciones_validas
 
 def str_config(config, decimales=6):
@@ -508,11 +683,11 @@ def str_config(config, decimales=6):
         # Return the original if conversion fails
         return str(config)
 
-
 # Ejemplo de uso
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
     print(f"\n{robot}")
+    print(f"\nMatriz de transformación homogénea nula del robot:\n{robot.M}")
     print(f"\nLímites de las articulaciones: {robot.limits_dict}")
     print_ejes_helicoidales(robot)
     print("\nObtener_eje_de_giro")
