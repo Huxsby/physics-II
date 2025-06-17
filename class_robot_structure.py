@@ -93,7 +93,7 @@ import numpy as np
 import time
 import yaml
 
-MARGEN_LIMITES_THETAS = 5 # Grados de margen para los límites de las articulaciones y evitar colisiones
+MARGEN_LIMITES_THETAS = 0 # Rads por defecto del margen para los límites de las articulaciones y así evitar colisiones
 
 class Robot:
     """
@@ -153,7 +153,7 @@ class Robot:
             q = link.joint_coords + qs[i-1] if i > 0 else link.joint_coords
             qs.append(q) # This loop calculating qs seems incorrect for standard screw axis definition and is unused below.
 
-        #print(f"qs {len(qs)}: {qs}") # qs se calcula bien
+        # print(f"qs {len(qs)}: {qs}") # qs se calcula bien
 
         # Recalculate based on standard screw axis definition in base frame {0} at zero configuration
         # ejes_helicoidales = []
@@ -253,13 +253,10 @@ class Datos:
     """
     Clase para la toma y validación de datos específicos para cálculos de física.
 
-    Este módulo proporciona la clase `Datos`, diseñada para facilitar la
+    La clase `Datos`, diseñada para facilitar la
     solicitud de diferentes tipos de datos al usuario (vectores, ejes, ángulos,
-    coordenadas exponenciales) con validación incorporada y mensajes
+    coordenadas exponenciales, configuraciones) con validación incorporada y mensajes
     personalizables.
-
-    Clases Principales:
-        Datos: Clase principal para solicitar y almacenar datos validados.
 
     Ejemplo de uso:
         >>> # Solicitar un vector de 3 componentes
@@ -399,7 +396,7 @@ class Datos:
 
 """ Funciones auxiliares """
 
-def cargar_robot_desde_yaml(path="robot.yaml"):
+def cargar_robot_desde_yaml(path="robot.yaml", margen=MARGEN_LIMITES_THETAS):
     """
     Carga la configuración del robot desde un archivo YAML.
 
@@ -432,6 +429,7 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
     robot_data = data['robot']
     robot = Robot(robot_data['name'])
 
+    # Iterar sobre los eslabones y crear instancias de Link
     for l in robot_data['links']:
         joint_limits_str = l.get('joint_limits', None)
         if joint_limits_str:
@@ -440,11 +438,6 @@ def cargar_robot_desde_yaml(path="robot.yaml"):
             # Convertir a flotantes
             initial_min_limit = float(parts[0].strip())
             initial_max_limit = float(parts[1].strip())
-
-            # Definir el margen
-            #margen = np.deg2rad(MARGEN_LIMITES_THETAS)  # Convertir a radianes
-            margen = 0
-
             # Aplicar el margen para reducir el rango de operación
             # El límite inferior se incrementa y el límite superior se decrementa
             adjusted_min_limit = initial_min_limit + margen

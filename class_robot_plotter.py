@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plott
 from matplotlib.animation import FuncAnimation  # Import FuncAnimation for animations
 from scipy.spatial import ConvexHull            # Import ConvexHull for workspace visualization
 import sys                                      # Import sys for platform checks
+import time                                     # Import time for timing operations
 
 def matriz_rotacion(eje, angulo):
     """
@@ -126,6 +127,52 @@ def _guardar_animacion_pillow(anim, nombre_archivo):
 """ Función principal para visualizar el robot manipulador en 3D """
 def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None, 
                animation_speed=200, view_angles=None, is_overlay=False):
+    """
+    Visualiza un robot manipulador en 3D con Matplotlib.
+    
+    Esta función permite visualizar un robot manipulador en un espacio 3D, ya sea como una pose
+    estática o como una animación de múltiples poses. También permite la visualización de trayectorias
+    predefinidas y la superposición sobre gráficos existentes.
+    
+    Parameters
+    ----------
+    robot : Robot
+        Objeto Robot que se desea visualizar. Debe contener la información 
+        cinemática necesaria para el cálculo de las poses.
+    thetas : array-like
+        Ángulos de las articulaciones del robot. 
+        - Si es un array 1D: visualiza una pose estática.
+        - Si es un array 2D con shape[0] > 1: genera una animación con cada fila como una pose.
+    ax : matplotlib.axes.Axes, optional
+        Eje 3D de Matplotlib donde realizar la visualización. Si es None,
+        se crea uno nuevo. Default: None.
+    show : bool, optional
+        Si es True, muestra el plot inmediatamente. Si es False, 
+        permite manipulaciones adicionales antes de mostrarlo. Default: True.
+    trayectoria : array-like, optional
+        Puntos de una trayectoria para visualizar junto con el robot.
+        Debe ser un array de shape (n,3) donde cada fila es un punto [x,y,z].
+        Default: None.
+    animation_speed : int, optional
+        Velocidad de la animación en milisegundos por frame. Default: 200.
+    view_angles : list or tuple, optional
+        Ángulos de visualización [elevación, azimut] para la vista 3D.
+        Si es None, se usa [30, 60]. Default: None.
+    is_overlay : bool, optional
+        Si es True, superpone la visualización sobre un gráfico existente sin
+        reinicializar los ejes. Default: False.
+        
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        La figura de Matplotlib que contiene la visualización.
+    ax : matplotlib.axes.Axes
+        El objeto de ejes 3D que contiene la visualización.
+    anim : matplotlib.animation.FuncAnimation, optional
+        Solo se devuelve cuando se genera una animación. Objeto de animación
+        que puede usarse para guardar la animación como un archivo.
+    """
+    tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
     
     thetas = np.asarray(thetas)
     if thetas.ndim == 2 and thetas.shape[0] > 1:
@@ -152,6 +199,7 @@ def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None,
     ax.set_title('Visualización del Robot Manipulador')
 
     def _draw_provided_trajectory(ax_to_plot_on, trajectory_points):
+        """ Dibuja la trayectoria proporcionada en el eje especificado. """
         if trajectory_points is not None:
             try:
                 path_data = np.asarray(trajectory_points)
@@ -171,6 +219,8 @@ def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None,
 
         if show:
             plt.tight_layout()
+            # Medición de tiempo SOLO de los cálculos previos al plot
+            print(f"\t\033[92mTiempo de cálculo de plot_robot: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
             plt.show()
         return fig, ax
 
@@ -243,10 +293,14 @@ def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None,
 
     if show:
         plt.tight_layout()
+        # Medición de tiempo SOLO de los cálculos previos al plot
+        print(f"\t\033[92mTiempo de cálculo de plot_robot: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
         plt.show()
+
     return fig, ax, anim
 
 def _plot_frame(robot: Robot, thetas, ax):
+    """ Dibuja un frame del robot en una configuración específica. """
     artists = []
     transformaciones = calcular_transformaciones(robot, thetas)
     positions = [T_mat[:3, 3] for T_mat in transformaciones] # Renamed T to T_mat
@@ -315,7 +369,8 @@ def _plot_frame(robot: Robot, thetas, ax):
         artists.extend(cs_artists)
     return artists
 
-def _draw_coordinate_system(ax, T_mat, scale=0.05): # Renamed T to T_mat
+def _draw_coordinate_system(ax, T_mat, scale=0.05):
+    """ Dibuja un sistema de coordenadas en el espacio 3D. """
     artists = []
     origin = T_mat[:3, 3]
     x_axis = T_mat[:3, 0] * scale
@@ -331,6 +386,7 @@ def _draw_coordinate_system(ax, T_mat, scale=0.05): # Renamed T to T_mat
     return artists
 
 def _adjust_axis_limits(ax):
+    """ Ajusta los límites de los ejes para que tengan el mismo rango. """
     x_lim = ax.get_xlim()
     y_lim = ax.get_ylim()
     z_lim = ax.get_zlim()
@@ -356,6 +412,7 @@ def _adjust_axis_limits(ax):
     ax.set_zlim(z_center - half_max_range, z_center + half_max_range)
 
 def _get_animation_limits(robot: Robot, thetas_list):
+    """ Obtiene los límites del espacio de trabajo del robot para la animación. """
     x_all, y_all, z_all = [], [], []
     
     for thetas_single_frame in thetas_list:
@@ -464,7 +521,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     >>> trayectoria = [config1, config2, config3]
     >>> fig, ax, anim = graficar_workspace(mi_robot, thetas_anim=trayectoria)
     """
-
+    tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
     puntos_ws = []
     M = robot.M
     apply_filter = False
@@ -584,7 +641,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
 
     anim_obj = None
     if thetas_anim and len(thetas_anim) > 0:
-        print("Superponiendo animación sobre el espacio de trabajo...")
+        print("\nSuperponiendo animación sobre el espacio de trabajo...")
         _fig_anim, _ax_anim, anim_obj = plot_robot(
             robot, thetas_anim, ax=ax, show=False,
             animation_speed=animation_speed, view_angles=None,
@@ -594,19 +651,16 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     if show_points or hull_plotted: ax.legend(fontsize=8, loc='upper left', bbox_to_anchor=(0.01, 0.99))
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    # Show plot here if not handled by plot_robot (i.e., if plot_robot's show=False, which it is for animation overlay)
-    # Or if it's a static workspace plot (no animation)
-    if not (anim_obj and save_animation_name): # Avoid double plt.show() if anim_obj will be saved (which might show it)
-                                              # More simply, always call plt.show() unless plot_robot did it.
-                                              # Since plot_robot is called with show=False in animation case,
-                                              # graficar_workspace is responsible for plt.show().
-        plt.show()
+    # Medición de tiempo SOLO de los cálculos previos al plot
+    print(f"\t\033[92mTiempo de cálculo de graficar_workspace (N = {N}): {time.time() - tiempo_inicio:.4f} segundos\033[0m")
 
+    # Show plot aquí si no lo maneja plot_robot
+    if not (anim_obj and save_animation_name):
+        plt.show()
 
     if save_animation_name and anim_obj:
         print(f"Intentando guardar la animación como '\033[94m{save_animation_name}\033[0m'...")
         guardar_animacion(anim_obj, save_animation_name)
-
     return fig, ax, anim_obj
 
 if __name__ == "__main__":
@@ -677,7 +731,7 @@ if __name__ == "__main__":
     input("Press Enter to continue...")
 
     print("\nEjemplo 8: Espacio de trabajo completo con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
+    graficar_workspace(robot, N=5000000, show_points=False, half_space_axis=None,
                        thetas_anim=thetas_anim_list, animation_speed=50,
                        save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
     input("Press Enter to continue...")
