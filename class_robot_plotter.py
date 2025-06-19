@@ -24,6 +24,9 @@ from matplotlib.animation import FuncAnimation  # Import FuncAnimation for anima
 from scipy.spatial import ConvexHull            # Import ConvexHull for workspace visualization
 import sys                                      # Import sys for platform checks
 import time                                     # Import time for timing operations
+import pandas as pd                             # Import pandas for data manipulation
+import os                                       # Import os for file path operations
+from datetime import datetime                   # Import datetime for timestamping
 
 def matriz_rotacion(eje, angulo):
     """
@@ -454,12 +457,36 @@ def _get_animation_limits(robot: Robot, thetas_list):
     x_center = (x_range_val[0] + x_range_val[1]) / 2.0
     y_center = (y_range_val[0] + y_range_val[1]) / 2.0
     z_center = (z_range_val[0] + z_range_val[1]) / 2.0
+
+    return {
+        'x': (x_center - half_max_dim_range, x_center + half_max_dim_range),
+        'y': (y_center - half_max_dim_range, y_center + half_max_dim_range),
+        'z': (z_center - half_max_dim_range, z_center + half_max_dim_range)
+    }
+
+def _log_performance_data(robot, N, execution_time):
+    """
+    Registra los datos de rendimiento de la generación del workspace en un archivo CSV.
+    """
+    log_file = 'workspace_performance_log.csv'
     
-    final_x_range = (x_center - half_max_dim_range, x_center + half_max_dim_range)
-    final_y_range = (y_center - half_max_dim_range, y_center + half_max_dim_range)
-    final_z_range = (z_center - half_max_dim_range, z_center + half_max_dim_range)
+    # Datos a registrar
+    new_data = {
+        'timestamp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+        'robot_name': [robot.name],
+        'num_links': [robot.num_links],
+        'N': [N],
+        'execution_time': [execution_time]
+    }
     
-    return {'x': final_x_range, 'y': final_y_range, 'z': final_z_range}
+    df_new = pd.DataFrame(new_data)
+    
+    # Si el archivo no existe, se crea con cabeceras
+    if not os.path.exists(log_file):
+        df_new.to_csv(log_file, index=False, header=True)
+    else:
+        # Si ya existe, se añaden los datos sin cabeceras
+        df_new.to_csv(log_file, mode='a', index=False, header=False)
 
 def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=None,
                        thetas_anim=None, animation_speed=200, view_angles=(30, 45),
@@ -488,9 +515,9 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         Ángulos de vista (elevación, azimut) para la cámara 3D (default: None).
     save_animation_name : str, optional
         Nombre del archivo para guardar la animación (default: None).
-    subtitle : str, optional
-        Subtítulo adicional para el gráfico (default: None).
-    show_plot : bool, optional
+    subtitle : str, opcional
+        Subtítulo para el gráfico (default: None).
+    show_plot : bool, opcional
         Si True, muestra el gráfico al final (default: True). Útil para desactivar
         al recolectar datos de rendimiento.
     Returns
@@ -537,7 +564,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         else:
             return f"{seconds:.2f}s"
 
-    print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(0.0640 + 0.0001*N)}\033[0m") # La formula 0.0951 + 0.0002*N se obtiene de analisis_rendimiento.py 17/06/2025
+    print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(1.905905e-01 + (2.69602793e-06 * N) + (9.54891620e-12 * N * N))}\033[0m") # La formula 0.0951 + 0.0002*N se obtiene de analisis_rendimiento.py 17/06/2025
     tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
     puntos_ws = []
     M = robot.M
@@ -668,6 +695,9 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     # Captura del tiempo de cálculo después de las operaciones principales y antes de mostrar/guardar
     tiempo_calculo = time.time() - tiempo_inicio
     print(f"\t\033[92mTiempo de cálculo (graficar_workspace(N={N})): {format_time_hms(tiempo_calculo)}\033[0m")
+
+    # Registrar datos de rendimiento
+    _log_performance_data(robot, N, tiempo_calculo)
 
     if show_points or hull_plotted: ax.legend(fontsize=8, loc='upper left', bbox_to_anchor=(0.01, 0.99))
     plt.tight_layout(rect=[0, 0, 1, 0.96])
