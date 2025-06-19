@@ -463,7 +463,7 @@ def _get_animation_limits(robot: Robot, thetas_list):
 
 def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=None,
                        thetas_anim=None, animation_speed=200, view_angles=(30, 45),
-                       save_animation_name=None, subtitle=None):
+                       save_animation_name=None, subtitle=None, show_plot=True):
     """
     Visualiza el espacio de trabajo de un robot y opcionalmente superpone una animación.
     Esta función genera un gráfico 3D del espacio de trabajo del robot mediante muestreo
@@ -490,6 +490,9 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         Nombre del archivo para guardar la animación (default: None).
     subtitle : str, optional
         Subtítulo adicional para el gráfico (default: None).
+    show_plot : bool, optional
+        Si True, muestra el gráfico al final (default: True). Útil para desactivar
+        al recolectar datos de rendimiento.
     Returns
     -------
     tuple
@@ -521,6 +524,20 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     >>> trayectoria = [config1, config2, config3]
     >>> fig, ax, anim = graficar_workspace(mi_robot, thetas_anim=trayectoria)
     """
+    
+    def format_time_hms(seconds):
+        """Format seconds into hours, minutes, and seconds."""
+        hours, remainder = divmod(int(seconds), 3600)
+        minutes, seconds_part = divmod(remainder, 60)
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds_part}s"
+        elif minutes > 0:
+            return f"{minutes}m {seconds_part}s"
+        else:
+            return f"{seconds:.2f}s"
+
+    print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(0.0640 + 0.0001*N)}\033[0m") # La formula 0.0951 + 0.0002*N se obtiene de analisis_rendimiento.py 17/06/2025
     tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
     puntos_ws = []
     M = robot.M
@@ -636,32 +653,34 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     main_title = f"{title_str} de {robot.name} ({num_actual_puntos_ws} puntos){hull_message}"
     if subtitle:
         main_title = f"{main_title}\n{subtitle}"
-    if thetas_anim: main_title += "\nSuperponiendo Animación"
+    if thetas_anim: main_title += "\tSuperponiendo Animación"
     ax.set_title(main_title, fontsize=10)
 
     anim_obj = None
     if thetas_anim and len(thetas_anim) > 0:
-        print("\nSuperponiendo animación sobre el espacio de trabajo...")
+        print("\tSuperponiendo animación sobre el espacio de trabajo...")
         _fig_anim, _ax_anim, anim_obj = plot_robot(
             robot, thetas_anim, ax=ax, show=False,
             animation_speed=animation_speed, view_angles=None,
             trayectoria=None, is_overlay=True # Pass is_overlay=True
         )
 
+    # Captura del tiempo de cálculo después de las operaciones principales y antes de mostrar/guardar
+    tiempo_calculo = time.time() - tiempo_inicio
+    print(f"\t\033[92mTiempo de cálculo (graficar_workspace(N={N})): {format_time_hms(tiempo_calculo)}\033[0m")
+
     if show_points or hull_plotted: ax.legend(fontsize=8, loc='upper left', bbox_to_anchor=(0.01, 0.99))
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    # Medición de tiempo SOLO de los cálculos previos al plot
-    print(f"\t\033[92mTiempo de cálculo de graficar_workspace (N = {N}): {time.time() - tiempo_inicio:.4f} segundos\033[0m")
-
-    # Show plot aquí si no lo maneja plot_robot
-    if not (anim_obj and save_animation_name):
-        plt.show()
+    if show_plot: # Usar el nuevo parámetro
+        if not (anim_obj and save_animation_name): # Condición original para mostrar
+            plt.show()
 
     if save_animation_name and anim_obj:
         print(f"Intentando guardar la animación como '\033[94m{save_animation_name}\033[0m'...")
         guardar_animacion(anim_obj, save_animation_name)
-    return fig, ax, anim_obj
+    
+    return fig, ax, anim_obj, tiempo_calculo # Devolver tiempo_calculo
 
 if __name__ == "__main__":
     robot = cargar_robot_desde_yaml("robot.yaml")
@@ -713,6 +732,12 @@ if __name__ == "__main__":
             theta_clipped = thetas_limite(robot, theta_interpolated.tolist())
             thetas_anim_list.append(theta_clipped)
     
+    print("\nEjemplo Complex: Espacio de trabajo completo con animación (sin puntos) y guardado")
+    graficar_workspace(robot, N=10000000, show_points=False, half_space_axis=None,
+                       thetas_anim=thetas_anim_list, animation_speed=50,
+                       save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
+    input("Press Enter to continue...")
+
     print("\nEjemplo 5: Animación simple")
     plot_robot(robot, thetas_anim_list, animation_speed=50)
 
@@ -731,7 +756,7 @@ if __name__ == "__main__":
     input("Press Enter to continue...")
 
     print("\nEjemplo 8: Espacio de trabajo completo con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=5000000, show_points=False, half_space_axis=None,
+    graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
                        thetas_anim=thetas_anim_list, animation_speed=50,
                        save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
     input("Press Enter to continue...")
