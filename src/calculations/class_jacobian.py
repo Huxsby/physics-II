@@ -2,7 +2,7 @@ import sympy as sp
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config
+from ..core import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 
@@ -612,6 +612,6 @@ def prueba_elipsoides(robot: Robot, final_unique_solutions):
     print("\n\n\033[93m--- Fin de la prueba ---\033[0m")
 
 if __name__ == "__main__":
-    robot = cargar_robot_desde_yaml("robot.yaml") # Carga del robot
+    robot = cargar_robot_desde_yaml("config/robot.yaml") # Carga del robot
     final_unique_solutions = prueba_jacobiana(robot)
     prueba_elipsoides(robot, final_unique_solutions)

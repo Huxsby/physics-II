@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/calculations/__init__.py
+src/calculations/class_helicoidales.py
+src/calculations/class_jacobian.py
+src/calculations/class_rotaciones.py
+src/calculations/problema_cinematico_inverso_gen.py
+src/core/__init__.py
+src/core/class_robot_structure.py
+src/physics_robotics_project.egg-info/PKG-INFO
+src/physics_robotics_project.egg-info/SOURCES.txt
+src/physics_robotics_project.egg-info/dependency_links.txt
+src/physics_robotics_project.egg-info/top_level.txt
+src/simulation/__init__.py
+src/simulation/class_robot_plotter.py

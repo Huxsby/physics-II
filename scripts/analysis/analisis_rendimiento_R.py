@@ -11,8 +11,8 @@ import subprocess
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from class_robot_plotter import graficar_workspace
-from class_robot_structure import cargar_robot_desde_yaml
+from src.simulation.class_robot_plotter import graficar_workspace
+from src.core.class_robot_structure import cargar_robot_desde_yaml
 
 def generar_datos_rendimiento(robot, N_valores, num_repeticiones=3):
     """
@@ -122,7 +122,7 @@ print(paste("Gráfico guardado en: {output_image_path}"))
 if __name__ == "__main__":
     print("Cargando robot...")
     # Asegúrate de que este archivo exista y sea correcto en la raíz del proyecto
-    robot_yaml_path = "robot.yaml" 
+    robot_yaml_path = "config/robot.yaml" 
     try:
         robot = cargar_robot_desde_yaml(robot_yaml_path)
     except FileNotFoundError:

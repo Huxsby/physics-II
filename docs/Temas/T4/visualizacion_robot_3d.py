@@ -10,7 +10,7 @@ from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
 # Importamos las clases definidas en el archivo original
-from class_robot_structure import Robot, Link, cargar_robot_desde_yaml
+from src.core.class_robot_structure import Robot, Link, cargar_robot_desde_yaml
 
 class Arrow3D(FancyArrowPatch):
     """Clase para dibujar flechas en 3D que representan los ejes de las articulaciones"""
@@ -188,7 +188,7 @@ def visualizar_robot_3d_actualizado(robot: Robot, angulos=None):
 
 if __name__ == "__main__":
     # Cargamos el robot desde el archivo YAML
-    robot = cargar_robot_desde_yaml("robot.yaml")
+    robot = cargar_robot_desde_yaml("config/robot.yaml")
     
     if robot:
         # Visualizamos el robot en su posición cero con etiquetas

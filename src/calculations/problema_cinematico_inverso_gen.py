@@ -5,10 +5,10 @@ import numpy as np
 import sympy as sp
 import time
 
-from class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
-from class_helicoidales import calcular_T_robot
-from class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
-from class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
+from ..core import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
+from .class_helicoidales import calcular_T_robot
+from .class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
+from .class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinemático inverso
 
@@ -242,7 +242,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
 def menu_cinematica_inversa():
     """Resolución del problema cinemático inverso generalizado."""
 
-    robot = cargar_robot_desde_yaml('robot.yaml')
+    robot = cargar_robot_desde_yaml('config/robot.yaml')
     Jacobiana_tuple = calcular_jacobiana(robot)
     CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
 

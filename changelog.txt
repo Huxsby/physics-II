@@ -1,61 +1,34 @@
-Global
-    - Trabajar siempre en radians y nunca en grados, dejar estos para la toma de datos y castearlos enseguida a radians.
+# Changelog del proyecto
 
-class_datos.py
-    - Terminar implementación del tipo 'cordenadas_exponenciales'. ¿Es necesario usar el nuevo tipo de dato 'cordenadas_exponenciales'?
-    - Normalizar vector eje en la toma general de datos, dar la opcion de elegir entre ['x','y','z','g'] -> 'g' Irse por 'vector'
-        - Cambiar en ejercicios.py
+## General
+- **Refactorización Completa (Junio 2025):** Se ha reestructurado todo el proyecto para seguir las convenciones estándar de Python, mejorar la mantenibilidad y facilitar la ejecución de scripts y pruebas.
+- Se ha adoptado el uso de radianes como unidad estándar para todos los cálculos angulares internos.
 
-class_robot_structure.py
-    [X] - Optimizar (si se puede hacer): self.ejes_helicoidales = self.get_ejes_helicoidales()
-    [ ] - Los margenes no se calculan de forma correcta en casos limite / de precisión.
+## Nueva Estructura del proyecto
+El proyecto ahora sigue una organización modular y escalable:
 
+- **/src/**: Contiene todo el código fuente principal de la librería de robótica.
+  - **/src/core/**: Clases base como `Robot`, `Link`, y funciones para cargar configuraciones.
+  - **/src/calculations/**: Módulos para cálculos de cinemática, jacobiana, rotaciones, etc.
+  - **/src/simulation/**: Código para visualización, ploteo y animación de robots.
+- **/scripts/**: Scripts ejecutables para realizar análisis, predicciones o tareas específicas.
+- **/tests/**: Pruebas unitarias y de integración. Contiene el menú principal de pruebas (`main.py`).
+- **/config/**: Archivos de configuración, como los ficheros `.yaml` que definen los robots.
+- **/data/**: Datos de entrada o datasets (ej. `data_θi.txt`, `tiempos_workspace.csv`).
+- **/results/**: Para guardar los resultados generados, como imágenes, GIFs o logs.
+- **/docs/**: Documentación del proyecto.
 
-ejercicio.py
-!   - Queda por implementar encontrar T con los datos del robot y una lista generada de angulos.
+## Sistema de Paquetes y Ejecución
+- **Paquete Instalable:** El código en `src` ahora es un paquete de Python instalable. Se ha añadido un archivo `pyproject.toml`.
+- **Instalación Editable:** Para el desarrollo, el paquete se instala con `pip install -e .` desde la raíz del proyecto. Esto permite que los cambios en `src` se reflejen inmediatamente sin necesidad de reinstalar.
+- **Importaciones Absolutas:** Todas las importaciones ahora son absolutas desde la raíz del paquete `src` (ej. `from src.core import Robot`), lo que elimina errores de importación relativa.
+- **Ejecución de Pruebas:** La forma recomendada de ejecutar el menú de pruebas es desde la raíz del proyecto: `python -m tests.main`.
 
-T4
-    - Configuraciones singulares.
+## Tareas Pendientes (Post-Refactorización)
+- [ ] Validar que todos los scripts en la carpeta `/scripts` funcionan correctamente con la nueva estructura de importación.
+- [ ] Limitar los ángulos de las articulaciones de forma robusta en los cálculos de cinemática inversa y jacobiana.
+- [ ] Optimizar el cálculo de los márgenes de los límites de las articulaciones en `class_robot_structure.py`.
+- [ ] Cambiar el nombre de la función `antisimetrica()` a un nombre más descriptivo como `vector_a_so3()` o similar.
 
-P1
-    [X] - Crear archivo .yaml para el brazo del laboratorio.
-
-
-    - Desarrolla un código en Python que genere las gráficas correspondientes a los
-    elipsoides de manipulabilidad y de fuerza para una configuración singular del robot
-    2R plano y para las configuraciones con coordenadas de articulaciones (0,π/4)y
-    (0,3π/4).
-
-        - Cabiar nombre de antisimetrica() -> VecToso3sp o parecido.
-
-P2  7. Ejercicios prácticos
-     [x] 7.1 Matriz jacobiana
-     [x] 7.2 Configuraciones singulares (Preparar codigo para experimentar con el robot como se indica en la práctica)
-         [ ] - Limitar ángulos
-     [x] 7.3 Elipsoides de Manipulabilidad y Fuerza (Generalizar el código)
-     [x] 7.4 Cinemática Inversa
-
-BUGS
-    - En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml)
-
-# Info.
-
-Ejes helicoidales en problema_cinematico_directo.py (P1):
-[array([0., 0., 1., 0., 0., 0.]), array([ 0.   , -1.   ,  0.   ,  0.183,  0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393,  0.   , -0.   ]), array([1.   , 0.   , 0.   , 0.   , 0.423, 0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 ,  0.    , -0.2215]), array([1.    , 0.    , 0.    , 0.    , 0.4175, 0.    ])]
-vs: [array([0., 0., 0.]), array([ 0.183,  0.   , -0.   ]), array([ 0.393,  0.   , -0.   ]), array([0.   , 0.423, 0.   ]), array([ 0.423 ,  0.    , -0.2215]), array([0.    , 0.4175, 0.    ])]
-ws: [array([0, 0, 1]), array([ 0, -1,  0]), array([ 0, -1,  0]), array([1, 0, 0]), array([ 0, -1,  0]), array([1, 0, 0])]
-
-Ejes helicoidales con .yalm del robot niryo_one:
-[array([ 0.,  0.,  1., -0., -0., -0.]), array([ 0.   , -1.   ,  0.   ,  0.183, -0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393, -0.   , -0.   ]), array([ 1.   ,  0.   ,  0.   , -0.   ,  0.423, -0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 , -0.    , -0.2215]), array([ 1.    ,  0.    ,  0.    , -0.    ,  0.4175, -0.    ])]
-
-Ejes helicoidales en calcular_jacobiana():
-[array([ 0.,  0.,  1., -0., -0., -0.]), array([ 0.   , -1.   ,  0.   ,  0.183, -0.   , -0.   ]), array([ 0.   , -1.   ,  0.   ,  0.393, -0.   , -0.   ]), array([ 1.   ,  0.   ,  0.   , -0.   ,  0.423, -0.   ]), array([ 0.    , -1.    ,  0.    ,  0.423 , -0.    , -0.2215]), array([ 1.    ,  0.    ,  0.    , -0.    ,  0.4175, -0.    ])]
-
-Ejes helicoidales en jacobian.py (P2):
-[[0,0,1,0,0,0], Monstruosidad simbólica] *Nota Si es Ji, los vectores están en columnas.
-Dados t = 0: 
-( [0, 0, 1, 0, 0, 0],                           [0, -1, 0, 0.183, 0, 0],                                [0, -1, 0, 0.393, 0, 0],                                [1, 0, 0, 0, 0.423, 0],                                 [0, -1, 0, 0.423, 0, -0.2215],                                  [1, 0, 0, 0, 0.4175, 0] )
-
-
-vs: [Monstruosidad simbólica]
-ws: [Monstruosidad simbólica]
+## BUGS
+- [ ] En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml).

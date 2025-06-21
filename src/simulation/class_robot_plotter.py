@@ -7,16 +7,21 @@ estática o crear animaciones de movimiento.
 
 Funciones:
     plot_robot: Visualiza el robot en una configuración específica o crea una animación.
-    calcular_transformaciones: Calcula las transformaciones para cada eslabón basadas en la cinemática.
-    
+    graficar_workspace: Genera un gráfico del espacio de trabajo del robot, con opciones
+    para mostrar puntos muestreados y superponer animaciones.    
 Ejemplo de uso:
-    >>> robot = cargar_robot_desde_yaml("robot.yaml")
+    >>> robot = cargar_robot_desde_yaml("config/robot.yaml")
     >>> thetas = [0, 0, 0, 0, 0, 0, 0]  # Una configuración estática
     >>> plot_robot(robot, thetas)
+    >>> # Para animación, se puede usar una lista de configuraciones
+    >>> thetas_anim = [[0, 0, 0, 0, 0, 0, 0], [np.pi/4, 0, 0, 0, 0, 0, 0], ...]
+    >>> fig, ax, anim = plot_robot(robot, thetas_anim)
+    >>> fig, ax, anim = graficar_workspace(robot, N=1000, thetas_anim=thetas_anim)
+    >>> guardar_animacion(anim, "robot_animation")
 """
 
-from class_robot_structure import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
-from class_helicoidales import calcular_T_robot
+from ..core import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
+from ..calculations.class_helicoidales import calcular_T_robot # Otro ejemplo
 
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
@@ -564,7 +569,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         else:
             return f"{seconds:.2f}s"
 
-    print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(1.905905e-01 + (2.69602793e-06 * N) + (9.54891620e-12 * N * N))}\033[0m") # La formula 0.0951 + 0.0002*N se obtiene de analisis_rendimiento.py 17/06/2025
+    print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(1.905905e-01 + (2.69602793e-06 * N) + (9.54891620e-12 * N * N))}\033[0m") # 19/06/2025
     tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
     puntos_ws = []
     M = robot.M
@@ -713,7 +718,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     return fig, ax, anim_obj, tiempo_calculo # Devolver tiempo_calculo
 
 if __name__ == "__main__":
-    robot = cargar_robot_desde_yaml("robot.yaml")
+    robot = cargar_robot_desde_yaml("config/robot.yaml")
 
     print("Ejemplo 1: Visualización estática")
     thetas_static, _ = thetas_aleatorias(robot)

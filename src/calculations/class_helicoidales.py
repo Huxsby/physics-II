@@ -1,6 +1,6 @@
 import numpy as np
-from class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
-from class_robot_structure import Robot, cargar_robot_desde_yaml
+from .class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
+from ..core import Robot, cargar_robot_desde_yaml
 
 ## Función validada
 def calcular_Sθ(S, theta):

@@ -2,13 +2,18 @@
 Ejemplos de uso para la visualización del robot manipulador
 """
 
-from class_robot_structure import *                                                                     # Para cargar el robot desde un archivo YAML
-from class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
+from src.simulation.class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
+from src.calculations.problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
+from src.core.class_robot_structure import (Robot,
+                                            str_config,
+                                            thetas_aleatorias,
+                                            thetas_limite,
+                                            filtrar_configuraciones,
+                                            cargar_robot_desde_yaml)  # Para la manipulación de configuraciones
+from src.calculations.class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
+from src.calculations.class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
 import numpy as np                                                                                      # Para la manipulación de matrices
 import matplotlib.pyplot as plt                                                                         # Para la visualización
-from problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
-from class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
-from class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
 import os                                                                                               # Para limpiar la pantalla en Windows/Linux
 
 # Ejemplo 1: Visualización simple
@@ -297,7 +302,7 @@ def menu_plotter():
         if stop: input("\033[93mPresione Enter para continuar...\033[0m")
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    robot = cargar_robot_desde_yaml("robot.yaml")
+    robot = cargar_robot_desde_yaml("config/robot.yaml")
     
     while True:
         print("\n" + "="*90)    # Separador
@@ -353,9 +358,9 @@ def menu_plotter():
         
         elif opcion == '9':
             print("Ejecutando: Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
-            robot = cargar_robot_desde_yaml("robot-niryo.yaml")
+            robot = cargar_robot_desde_yaml("config/robot-niryo.yaml")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
-            robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
+            robot = cargar_robot_desde_yaml("config/robot.yaml") # Reset robot to default
         
         elif opcion == '10':
             print("Ejecutando: Prueba de singularidades")
@@ -371,9 +376,9 @@ def menu_plotter():
             ejemplo_cinematica_directa(robot)
             ejemplo_animacion_prismatica(robot)
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
-            robot = cargar_robot_desde_yaml("robot-niryo.yaml")
+            robot = cargar_robot_desde_yaml("config/robot-niryo.yaml")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
-            robot = cargar_robot_desde_yaml("robot.yaml") # Reset robot to default
+            robot = cargar_robot_desde_yaml("config/robot.yaml") # Reset robot to default
             ejemplo_prueba_singularidades(robot)
             
         elif opcion == '0':

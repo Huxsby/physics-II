@@ -1,9 +1,9 @@
 import numpy as np
-from class_robot_plotter import graficar_workspace
-from class_robot_structure import cargar_robot_desde_yaml
+from src.simulation.class_robot_plotter import graficar_workspace
+from src.core import Robot, cargar_robot_desde_yaml
 import matplotlib.pyplot as plt
 
-def recopilar_datos_rendimiento(robot, n_inicial, n_final, n_pasos):
+def recopilar_datos_rendimiento(robot: Robot, n_inicial, n_final, n_pasos):
     """
     Ejecuta graficar_workspace para un rango de valores de N y recopila datos.
     Los datos se guardan automáticamente en 'workspace_performance_log.csv'.
@@ -27,19 +27,16 @@ def recopilar_datos_rendimiento(robot, n_inicial, n_final, n_pasos):
     print("\n--- Recopilación de Datos Finalizada ---")
 
 if __name__ == "__main__":
-    # --- Configuración ---
-    ROBOT_YAML = "robot.yaml"
-    
     # Define el rango de N para la recolección de datos
-    N_INICIAL = 1000
-    N_FINAL = 100000
-    N_PASOS = 1000  # Se ejecutará para N = 1000, 2000, 3000, ..., 10000
+    N_INICIAL = 100000
+    N_FINAL = 1000000
+    N_PASOS = 5000  # Se ejecutará para N = 1000, 2000, 3000, ..., 10000
 
     # --- Ejecución ---
     try:
-        robot = cargar_robot_desde_yaml(ROBOT_YAML)
+        robot = cargar_robot_desde_yaml("config/robot.yaml")
         recopilar_datos_rendimiento(robot, N_INICIAL, N_FINAL, N_PASOS)
     except FileNotFoundError:
-        print(f"Error: No se encontró el archivo del robot en '{ROBOT_YAML}'")
+        print(f"Error: No se encontró el archivo del robot en '{robot.name}'")
     except Exception as e:
         print(f"Ocurrió un error inesperado: {e}")

@@ -76,7 +76,7 @@ Ejemplo:
     ... '''
     >>> with open("robot_example.yaml", "w") as f:
     ...     f.write(yaml_content)
-    >>> robot = cargar_robot_desde_yaml("robot_example.yaml") # doctest: +SKIP
+    >>> robot = cargar_robot_desde_yaml("config/robot_example.yaml") # doctest: +SKIP
     >>> print(robot) # doctest: +SKIP
     >>> print(robot.ejes_helicoidales) # doctest: +SKIP
     >>> print(robot.limits_dict) # doctest: +SKIP
@@ -396,7 +396,7 @@ class Datos:
 
 """ Funciones auxiliares """
 
-def cargar_robot_desde_yaml(path="robot.yaml", margen=MARGEN_LIMITES_THETAS):
+def cargar_robot_desde_yaml(path="config/robot.yaml", margen=MARGEN_LIMITES_THETAS):
     """
     Carga la configuración del robot desde un archivo YAML.
 
@@ -412,7 +412,7 @@ def cargar_robot_desde_yaml(path="robot.yaml", margen=MARGEN_LIMITES_THETAS):
 
     Example:
     ```python
-    robot = cargar_robot_desde_yaml(path='mi_robot.yaml')
+    robot = cargar_robot_desde_yaml(path='config/mi_robot.yaml')
     if robot:
         print(f"Robot cargado: {robot.name}")
     else:
@@ -678,7 +678,7 @@ def str_config(config, decimales=6):
 
 # Ejemplo de uso
 if __name__ == "__main__":
-    robot = cargar_robot_desde_yaml("robot.yaml")
+    robot = cargar_robot_desde_yaml("config/robot.yaml")
     print(f"\n{robot}")
     print(f"\nMatriz de transformación homogénea nula del robot:\n{robot.M}")
     print(f"\nLímites de las articulaciones: {robot.limits_dict}")
