@@ -4,6 +4,11 @@
 - **Refactorización Completa (Junio 2025):** Se ha reestructurado todo el proyecto para seguir las convenciones estándar de Python, mejorar la mantenibilidad y facilitar la ejecución de scripts y pruebas.
 - Se ha adoptado el uso de radianes como unidad estándar para todos los cálculos angulares internos.
 
+## Cambios Recientes (22 de Junio de 2025)
+- **Corrección de Importaciones:** Se han solucionado errores de `ImportError` y `ModuleNotFoundError` en varios módulos dentro de `src/calculations` y `tests`.
+  - **Causa:** Los scripts se ejecutaban directamente, pero las importaciones (ej. `from src.core...`) requerían que el proyecto se ejecutara como un paquete.
+  - **Solución:** Se ha añadido código a cada script para modificar dinámicamente `sys.path`, añadiendo el directorio raíz del proyecto. Esto permite que los scripts sean ejecutables de forma individual para facilitar las pruebas y el desarrollo, manteniendo al mismo tiempo la estructura de importación absoluta.
+
 ## Nueva Estructura del proyecto
 El proyecto ahora sigue una organización modular y escalable:
 
@@ -25,7 +30,7 @@ El proyecto ahora sigue una organización modular y escalable:
 - **Ejecución de Pruebas:** La forma recomendada de ejecutar el menú de pruebas es desde la raíz del proyecto: `python -m tests.main`.
 
 ## Tareas Pendientes (Post-Refactorización)
-- [ ] Validar que todos los scripts en la carpeta `/scripts` funcionan correctamente con la nueva estructura de importación.
+- [x] Validar que todos los scripts en la carpeta `/scripts` y `/tests` funcionan correctamente con la nueva estructura de importación. (Solucionado con la modificación de `sys.path`).
 - [ ] Limitar los ángulos de las articulaciones de forma robusta en los cálculos de cinemática inversa y jacobiana.
 - [ ] Optimizar el cálculo de los márgenes de los límites de las articulaciones en `class_robot_structure.py`.
 - [ ] Cambiar el nombre de la función `antisimetrica()` a un nombre más descriptivo como `vector_a_so3()` o similar.

@@ -1,8 +1,11 @@
 """
 Ejemplos de uso para la visualización del robot manipulador
 """
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.simulation.class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
+from src.animation.class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
 from src.calculations.problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
 from src.core.class_robot_structure import (Robot,
                                             str_config,

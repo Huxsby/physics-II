@@ -1,5 +1,5 @@
 import numpy as np
-from src.simulation.class_robot_plotter import graficar_workspace
+from src.animation.class_robot_plotter import graficar_workspace
 from src.core import Robot, cargar_robot_desde_yaml
 import matplotlib.pyplot as plt
 

@@ -23,7 +23,7 @@ from src.calculations import (RotarVector, RotGen, RotRodrigues, Visualizar_Rota
                               prueba_jacobiana, prueba_elipsoides, calcular_jacobiana, 
                               calcular_volumen_elipsoides,
                               menu_cinematica_inversa)
-from .class_robot_plotter_prueba import menu_plotter 
+from tests.class_robot_plotter_prueba import menu_plotter 
 
 def menu_helicoidales():
     """Menú interactivo para operaciones con ejes helicoidales."""

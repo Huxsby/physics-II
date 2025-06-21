@@ -11,7 +11,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from src.simulation.class_robot_plotter import graficar_workspace
+from src.animation.class_robot_plotter import graficar_workspace
 from src.core.class_robot_structure import cargar_robot_desde_yaml
 
 def generar_datos_rendimiento(robot, N_valores, num_repeticiones=3):

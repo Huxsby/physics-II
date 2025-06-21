@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: physics-robotics-project
 Version: 0.1.0
 Summary: Un paquete para el análisis y simulación de robots de Física II.
-Author-email: Tu Nombre <tu@email.com>
+Author-email: HGP <hgp@example.com>
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent

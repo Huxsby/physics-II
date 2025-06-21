@@ -1,6 +1,9 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
-from .class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
-from ..core import Robot, cargar_robot_desde_yaml
+from src.calculations.class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
+from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml
 
 ## Función validada
 def calcular_Sθ(S, theta):
@@ -249,8 +252,6 @@ def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     Calcula los ejes helicoidales en el sistema de referencia del efector final (body frame)
     usando los ejes helicoidales almacenados en el robot.
     """
-    import numpy as np
-    from class_helicoidales import calcular_Sθ
 
     if M is None:
         M = robot.M

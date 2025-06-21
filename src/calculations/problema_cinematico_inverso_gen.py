@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import numpy as np
 import sympy as sp
 import time
 
-from ..core import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
-from .class_helicoidales import calcular_T_robot
-from .class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
-from .class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
+from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
+from src.calculations.class_helicoidales import calcular_T_robot
+from src.calculations.class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
+from src.calculations.class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinemático inverso
 

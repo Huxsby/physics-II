@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "physics-robotics-project"
 version = "0.1.0"
 authors = [
-  { name="HGP", email="undefine" },
+  { name="HGP", email="hgp@example.com" },
 ]
 description = "Un paquete para el análisis y simulación de robots de Física II."
 readme = "README.md"

@@ -1,8 +1,11 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import sympy as sp
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from ..core import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config
+from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 

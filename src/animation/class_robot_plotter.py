@@ -19,9 +19,12 @@ Ejemplo de uso:
     >>> fig, ax, anim = graficar_workspace(robot, N=1000, thetas_anim=thetas_anim)
     >>> guardar_animacion(anim, "robot_animation")
 """
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from ..core import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
-from ..calculations.class_helicoidales import calcular_T_robot # Otro ejemplo
+from src.core.class_robot_structure import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
+from src.calculations.class_helicoidales import calcular_T_robot # Otro ejemplo
 
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
@@ -29,9 +32,8 @@ from matplotlib.animation import FuncAnimation  # Import FuncAnimation for anima
 from scipy.spatial import ConvexHull            # Import ConvexHull for workspace visualization
 import sys                                      # Import sys for platform checks
 import time                                     # Import time for timing operations
-import pandas as pd                             # Import pandas for data manipulation
-import os                                       # Import os for file path operations
 from datetime import datetime                   # Import datetime for timestamping
+import pandas as pd                             # Import pandas for data manipulation
 
 def matriz_rotacion(eje, angulo):
     """
@@ -570,7 +572,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
             return f"{seconds:.2f}s"
 
     print(f"\n\t\033[92mIniciando graficar_workspace... Tiempo esperado (N={N}): {format_time_hms(1.905905e-01 + (2.69602793e-06 * N) + (9.54891620e-12 * N * N))}\033[0m") # 19/06/2025
-    tiempo_inicio = time.time()  # Captura el tiempo de inicio para medir duración
+    tiempo_inicio = time.time()
     puntos_ws = []
     M = robot.M
     apply_filter = False
@@ -594,45 +596,49 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         print(f"Advertencia: 'half_space_axis' ('{half_space_axis}') con formato incorrecto. Se ignorará el filtro.")
         half_space_axis = None
 
-    for _ in range(N):
-        thetas_rand, _ = thetas_aleatorias(robot)
-        T_mat = calcular_T_robot(robot.ejes_helicoidales, thetas_rand, M)
-        punto = T_mat[:3, 3]
-        if apply_filter:
-            if (filter_positive_side and punto[filter_axis_idx] >= 0) or \
-               (not filter_positive_side and punto[filter_axis_idx] < 0):
-                puntos_ws.append(punto)
-        else: puntos_ws.append(punto)
+    try:
+        print("\t(Puedes presionar Ctrl+C para detener la generación de puntos y visualizar los resultados parciales)")
+        for _ in range(N):
+            thetas_rand, _ = thetas_aleatorias(robot)
+            T_mat = calcular_T_robot(robot.ejes_helicoidales, thetas_rand, M)
+            punto = T_mat[:3, 3]
+            if apply_filter:
+                if (filter_positive_side and punto[filter_axis_idx] >= 0) or \
+                   (not filter_positive_side and punto[filter_axis_idx] < 0):
+                    puntos_ws.append(punto)
+            else: puntos_ws.append(punto)
 
-    if robot.limits_dict and robot.num_links > 0:
-        min_l, max_l = get_limits_negative(robot), get_limits_positive(robot) # Shorter names
-        if min_l is not None and max_l is not None and len(min_l) == robot.num_links and len(max_l) == robot.num_links:
-            mid_l = (np.array(min_l) + np.array(max_l)) / 2.0
-            cfgs_check = [min_l, max_l] # Renamed configurations_to_check
-            for i in range(robot.num_links):
-                for lim_type in ["min", "max"]:
-                    th_at_lim = mid_l.copy() # Renamed thetas_at_limit
-                    th_at_lim[i] = min_l[i] if lim_type == "min" else max_l[i]
-                    cfgs_check.append(th_at_lim)
+        if robot.limits_dict and robot.num_links > 0:
+            min_l, max_l = get_limits_negative(robot), get_limits_positive(robot) # Shorter names
+            if min_l is not None and max_l is not None and len(min_l) == robot.num_links and len(max_l) == robot.num_links:
+                mid_l = (np.array(min_l) + np.array(max_l)) / 2.0
+                cfgs_check = [min_l, max_l] # Renamed configurations_to_check
+                for i in range(robot.num_links):
+                    for lim_type in ["min", "max"]:
+                        th_at_lim = mid_l.copy() # Renamed thetas_at_limit
+                        th_at_lim[i] = min_l[i] if lim_type == "min" else max_l[i]
+                        cfgs_check.append(th_at_lim)
 
-            unique_cfgs_set, final_cfgs = set(), [] # Renamed
-            for cfg in cfgs_check: # Renamed config to cfg
-                cfg_tuple = tuple(cfg)
-                if cfg_tuple not in unique_cfgs_set:
-                    final_cfgs.append(list(cfg))
-                    unique_cfgs_set.add(cfg_tuple)
+                unique_cfgs_set, final_cfgs = set(), [] # Renamed
+                for cfg in cfgs_check: # Renamed config to cfg
+                    cfg_tuple = tuple(cfg)
+                    if cfg_tuple not in unique_cfgs_set:
+                        final_cfgs.append(list(cfg))
+                        unique_cfgs_set.add(cfg_tuple)
 
-            for th_cfg in final_cfgs: # Renamed thetas_config to th_cfg
-                if limits(robot, th_cfg)[0]:
-                    T_m_cfg = calcular_T_robot(robot.ejes_helicoidales, th_cfg, M) # Renamed
-                    p_cfg = T_m_cfg[:3, 3] # Renamed
-                    if apply_filter:
-                        if (filter_positive_side and p_cfg[filter_axis_idx] >= 0) or \
-                           (not filter_positive_side and p_cfg[filter_axis_idx] < 0):
-                            puntos_ws.append(p_cfg)
-                    else: puntos_ws.append(p_cfg)
-        else: print("Advertencia: No se pudieron obtener los límites para puntos adicionales del workspace.")
-
+                for th_cfg in final_cfgs: # Renamed thetas_config to th_cfg
+                    if limits(robot, th_cfg)[0]:
+                        T_m_cfg = calcular_T_robot(robot.ejes_helicoidales, th_cfg, M) # Renamed
+                        p_cfg = T_m_cfg[:3, 3] # Renamed
+                        if apply_filter:
+                            if (filter_positive_side and p_cfg[filter_axis_idx] >= 0) or \
+                               (not filter_positive_side and p_cfg[filter_axis_idx] < 0):
+                                puntos_ws.append(p_cfg)
+                        else: puntos_ws.append(p_cfg)
+            else: print("Advertencia: No se pudieron obtener los límites para puntos adicionales del workspace.")
+    except KeyboardInterrupt:
+        print("\n\t\033[93mInterrupción por el usuario. Visualizando con los puntos generados hasta ahora...\033[0m")
+        
     puntos_ws_array = np.array(puntos_ws) if puntos_ws else np.empty((0,3))
     num_actual_puntos_ws = puntos_ws_array.shape[0]
     fig = plt.figure(figsize=(12, 10))
