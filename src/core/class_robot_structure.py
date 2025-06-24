@@ -636,7 +636,8 @@ def filtrar_configuraciones(robot: Robot, configuraciones):
     print("\nFiltrando configuraciones:")
     configuraciones_validas = []
     for config in configuraciones:
-        if limits(robot, config)[0]:
+        valida, msg = limits(robot, config)
+        if valida:
             configuraciones_validas.append(config)
             print(f"\t\033[92mConfiguración válida:\t{str_config(config, 2)}\033[0m")
         else:

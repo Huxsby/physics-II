@@ -8,7 +8,7 @@ import numpy as np
 import sympy as sp
 import time
 
-from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config
+from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config, filtrar_configuraciones
 from src.calculations.class_helicoidales import calcular_T_robot
 from src.calculations.class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
 from src.calculations.class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
@@ -100,7 +100,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
         show (bool, optional): Mostrar información detallada del proceso. Por defecto: True.
 
     Returns:
-        list: Lista de listas con los ángulos de las articulaciones en cada iteración del algoritmo.
+        thetas_follower (list): Lista de listas con los ángulos de las articulaciones en cada iteración del algoritmo.
 
     Algoritmo:
         1. Calcula la matriz de transformación homogénea objetivo (Tsd) a partir de posición y orientación.
@@ -247,7 +247,7 @@ def menu_cinematica_inversa():
 
     robot = cargar_robot_desde_yaml('config/robot.yaml')
     Jacobiana_tuple = calcular_jacobiana(robot)
-    CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
-
+    thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
+    filtrar_configuraciones(robot, thetas_follower)
 if __name__ == "__main__":
     menu_cinematica_inversa()

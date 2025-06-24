@@ -11,8 +11,8 @@
 import numpy as np
 import sympy as sp
 import optparse
-import numpy as np
-import sympy as sp
+import os
+import sys
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinem ́atico inverso del Niryo One
 
@@ -166,7 +166,7 @@ def Jacobiana(theta):
         Ji.append(ws[i].row_insert(3,vs[i]))
         J=J.col_insert(i,Ji[i])
     return np.array(J.subs({t[0]:theta[0], t[1]:theta[1], t[2]:theta[2], t[3]:theta[3], t[4]:theta[4]}))
-desc="Resolución del problema cinem ́atico inverso para el Robot Niryo One."
+desc="Resolución del problema cinematico inverso para el Robot Niryo One."
 
 def main():
     parser = optparse.OptionParser(description=desc, version='%prog version 1.0')
@@ -193,6 +193,8 @@ def main():
     eomg=float(options.eomg)
     ev=float(options.ev)
 
+    print(f"\nCoordenadas de las articulaciones iniciales: {t}\n Coordenadas xyz del elemento terminal: {r}\n Angulos de Euler del elemento terminal: {orientation}\n Error en la orientación: {eomg}\n Error en la posición: {ev}\n")
+
     scalefactor=0.001
     L=np.array([103.0, 80.0, 210.0, 30.0, 41.5, 180.0, 23.7, -5.5])*scalefactor
 
@@ -206,6 +208,7 @@ def main():
     M=np.array([[1,0,0,L[6]+L[5]+L[4]],[0,1,0,0],[0,0,1,L[0]+L[1]+L[2]+L[3]+L[7]],[0,0,0,1]])
     
     thetalist = np.array(t).copy()
+    thetalist_follower = [thetalist.copy()]
     i = 0
     MAXITERATIONS = 20
     Tsb = CinematicaDirecta(M,S, thetalist) # Resuelve la Cinem ́atica Directa para thetalist
@@ -215,9 +218,10 @@ def main():
     # condición de convergencia: módulo de velocidad angular < eomg y velocidad lineal < ev
     err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
     while err and i < MAXITERATIONS:
-        J=Jacobiana(thetalist);
+        J=Jacobiana(thetalist)
         J=np.array(J.tolist()).astype(np.float64)
         thetalist = thetalist + np.dot(np.linalg.pinv(J), Vs)
+        thetalist_follower.append(thetalist.copy())
         i = i + 1
         Tsb = CinematicaDirecta(M, S, thetalist)
         Vb = MatrixLog6(np.dot(np.linalg.inv(Tsb), T))
@@ -228,6 +232,20 @@ def main():
     print ("Error en w:", np.round(np.linalg.norm([Vs[0], Vs[1], Vs[2]]),8))
     print ("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
     print ("Número de iteraciones:", i)
+    
+    # To import from the 'src' directory, we add the project root to the Python path.
+    # The script is in .../physics-II/docs/Practicas/P2/
+    # The project root 'physics-II' is three levels up.
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+    from src.core import filtrar_configuraciones, cargar_robot_desde_yaml
+
+    robot_config_path = os.path.join(project_root, "config", "robot-niryo.yaml")
+    robot = cargar_robot_desde_yaml(robot_config_path)
+
+    filtrar_configuraciones(robot, thetalist_follower)
 
 if __name__=="__main__" :
     main()

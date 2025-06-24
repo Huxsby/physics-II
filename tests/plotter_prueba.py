@@ -5,8 +5,8 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.animation.class_robot_plotter import plot_robot, guardar_animacion                                           # Para la visualización del robot
-from src.calculations.problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                        # Para la cinemática inversa
+from src.animation.class_robot_plotter import plot_robot, guardar_animacion, graficar_workspace                         # Para la visualización del robot
+from src.calculations.problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                       # Para la cinemática inversa
 from src.core.class_robot_structure import (Robot,
                                             str_config,
                                             thetas_aleatorias,
@@ -394,5 +394,121 @@ def menu_plotter():
         
         limpiar_pantalla()
 
+""" Ejemplos de workspace """
+
+def menu_graficar_workspace():
+    def limpiar_pantalla(stop=True):
+        """Limpia la pantalla de la consola."""
+        if stop: input("\033[93mPresione Enter para continuar...\033[0m")
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+    robot = cargar_robot_desde_yaml("config/robot.yaml")
+
+    # Preparar datos de animación una vez
+    num_waypoints = 5
+    frames_per_segment = 40
+    thetas_anim_list = []
+    waypoints = []
+    for i in range(num_waypoints - 1):
+        theta_waypoint, _ = thetas_aleatorias(robot)
+        waypoints.append(theta_waypoint)
+    waypoints.append(waypoints[0])
+    for i in range(num_waypoints):
+        theta_start = np.array(waypoints[i])
+        theta_end = np.array(waypoints[(i + 1) % num_waypoints])
+        for j in range(frames_per_segment):
+            t_param = j / frames_per_segment
+            t_smooth = 0.5 - 0.5 * np.cos(t_param * np.pi)
+            theta_interpolated = theta_start * (1 - t_smooth) + theta_end * t_smooth
+            theta_clipped = thetas_limite(robot, theta_interpolated.tolist())
+            thetas_anim_list.append(theta_clipped)
+
+    while True:
+        print("\n" + "="*90)
+        print(" "*30 + "MENÚ DE EJEMPLOS DE WORKSPACE")
+        print("="*90)
+        print("1. Visualización estática")
+        print("2. Espacio de trabajo básico (1k puntos)")
+        print("3. Espacio de trabajo -z")
+        print("4. Espacio de trabajo +y (solo frontera)")
+        print("5. Animación simple de trayectoria")
+        print("6. Workspace con animación superpuesta")
+        print("7. Workspace +x con animación (solo frontera)")
+        print("8. Workspace -y (solo frontera)")
+        print("9. Workspace completo (estático, 1k puntos)")
+        print("10. Workspace con animación (10k puntos, solo frontera)")
+        print("11. Workspace con animación (10M puntos, solo frontera)")
+        print("12. Probar todos los ejemplos de workspace")
+        print("-"*90)
+        print("0. Volver al menú principal")
+
+        opcion = input("Seleccione un ejemplo (0-12): ")
+
+        if opcion == '1':
+            print("\nEjecutando: Visualización estática")
+            thetas_static, _ = thetas_aleatorias(robot)
+            print(f"Configuración aleatoria: {str_config(thetas_static, 3)}")
+            plot_robot(robot, thetas_static)
+        elif opcion == '2':
+            print("\nEjecutando: Espacio de trabajo básico")
+            graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización básica del espacio de trabajo")
+        elif opcion == '3':
+            print("\nEjecutando: Espacio de trabajo -z")
+            graficar_workspace(robot, N=1000, show_points=True, half_space_axis='-z', subtitle="Espacio de trabajo filtrado para Z < 0")
+        elif opcion == '4':
+            print("\nEjecutando: Espacio de trabajo +y, sin puntos")
+            graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+y', subtitle="Espacio de trabajo filtrado para Y >= 0 (solo frontera)")
+        elif opcion == '5':
+            print("\nEjecutando: Animación simple")
+            plot_robot(robot, thetas_anim_list, animation_speed=50)
+        elif opcion == '6':
+            print("\nEjecutando: Espacio de trabajo con animación superpuesta y guardado")
+            graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None,
+                               thetas_anim=thetas_anim_list, animation_speed=50,
+                               save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo")
+        elif opcion == '7':
+            print("\nEjecutando: Espacio de trabajo +x con animación (sin puntos) y guardado")
+            graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+x',
+                               thetas_anim=thetas_anim_list, animation_speed=50,
+                               save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)")
+        elif opcion == '8':
+            print("\nEjecutando: Espacio de trabajo -y (sin animación, sin puntos)")
+            graficar_workspace(robot, N=1000, show_points=False, half_space_axis='-y', subtitle="Espacio de trabajo filtrado para Y < 0 (solo frontera)")
+        elif opcion == '9':
+            print("\nEjecutando: Espacio de trabajo completo (sin animación)")
+            graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización completa del espacio de trabajo (estático)")
+        elif opcion == '10':
+            print("\nEjecutando: Espacio de trabajo completo con animación (10k puntos, solo frontera) y guardado")
+            graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
+                               thetas_anim=thetas_anim_list, animation_speed=50,
+                               save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
+        elif opcion == '11':
+            print("\nEjecutando: Espacio de trabajo completo con animación (10M puntos, solo frontera) y guardado")
+            graficar_workspace(robot, N=10000000, show_points=False, half_space_axis=None,
+                               thetas_anim=thetas_anim_list, animation_speed=50,
+                               save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
+        elif opcion == '12':
+            print("\nEjecutando: Probar todos los ejemplos de workspace")
+            print("\nEjecutando: Visualización estática"); thetas_static, _ = thetas_aleatorias(robot); print(f"Configuración aleatoria: {str_config(thetas_static, 3)}"); plot_robot(robot, thetas_static); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo básico"); graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización básica del espacio de trabajo"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo -z"); graficar_workspace(robot, N=1000, show_points=True, half_space_axis='-z', subtitle="Espacio de trabajo filtrado para Z < 0"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo +y, sin puntos"); graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+y', subtitle="Espacio de trabajo filtrado para Y >= 0 (solo frontera)"); limpiar_pantalla()
+            print("\nEjecutando: Animación simple"); plot_robot(robot, thetas_anim_list, animation_speed=50); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo con animación superpuesta y guardado"); graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, thetas_anim=thetas_anim_list, animation_speed=50, save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo +x con animación (sin puntos) y guardado"); graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+x', thetas_anim=thetas_anim_list, animation_speed=50, save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo -y (sin animación, sin puntos)"); graficar_workspace(robot, N=1000, show_points=False, half_space_axis='-y', subtitle="Espacio de trabajo filtrado para Y < 0 (solo frontera)"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo completo (sin animación)"); graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización completa del espacio de trabajo (estático)"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo completo con animación (10k puntos, solo frontera) y guardado"); graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None, thetas_anim=thetas_anim_list, animation_speed=50, save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)"); limpiar_pantalla()
+            print("\nEjecutando: Espacio de trabajo completo con animación (10M puntos, solo frontera) y guardado"); graficar_workspace(robot, N=10000000, show_points=False, half_space_axis=None, thetas_anim=thetas_anim_list, animation_speed=50, save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
+        elif opcion == '0':
+            print("Fin de los ejemplos de workspace.")
+            break
+        else:
+            print("Opción no válida. Intente de nuevo.")
+        
+        limpiar_pantalla()
+
 if __name__ == "__main__":
+
     menu_plotter()
+    menu_graficar_workspace()

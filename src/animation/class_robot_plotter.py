@@ -22,15 +22,13 @@ Ejemplo de uso:
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-from src.core.class_robot_structure import str_config, cargar_robot_desde_yaml, thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, thetas_limite
+from src.core.class_robot_structure import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
 from src.calculations.class_helicoidales import calcular_T_robot # Otro ejemplo
 
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
 from matplotlib.animation import FuncAnimation  # Import FuncAnimation for animations
 from scipy.spatial import ConvexHull            # Import ConvexHull for workspace visualization
-import sys                                      # Import sys for platform checks
 import time                                     # Import time for timing operations
 from datetime import datetime                   # Import datetime for timestamping
 import pandas as pd                             # Import pandas for data manipulation
@@ -722,90 +720,3 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         guardar_animacion(anim_obj, save_animation_name)
     
     return fig, ax, anim_obj, tiempo_calculo # Devolver tiempo_calculo
-
-if __name__ == "__main__":
-    robot = cargar_robot_desde_yaml("config/robot.yaml")
-
-    print("Ejemplo 1: Visualización estática")
-    thetas_static, _ = thetas_aleatorias(robot)
-    print(f"Configuración aleatoria: {str_config(thetas_static, 3)}")
-    plot_robot(robot, thetas_static)
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 2: Espacio de trabajo básico")
-    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización básica del espacio de trabajo")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 3: Espacio de trabajo -z")
-    graficar_workspace(robot, N=1000, show_points=True, half_space_axis='-z', subtitle="Espacio de trabajo filtrado para Z < 0")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 4: Espacio de trabajo +y, sin puntos")
-    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+y', subtitle="Espacio de trabajo filtrado para Y >= 0 (solo frontera)")
-    input("Press Enter to continue...")
-
-    num_waypoints = 5  # Number of configurations in the complete circle
-    frames_per_segment = 40  # Frames between each waypoint
-    num_frames_anim = frames_per_segment * num_waypoints
-    thetas_anim_list = []
-    
-    # Generate waypoints for the circle
-    waypoints = []
-    for i in range(num_waypoints - 1):  # -1 because we'll repeat the first point at the end
-        theta_waypoint, _ = thetas_aleatorias(robot)
-        waypoints.append(theta_waypoint)
-    
-    # Add the first waypoint again to close the loop
-    waypoints.append(waypoints[0])
-    
-    # Create smooth interpolations between waypoints
-    for i in range(num_waypoints):
-        theta_start = np.array(waypoints[i])
-        theta_end = np.array(waypoints[(i + 1) % num_waypoints])  # Modulo to loop back
-        
-        for j in range(frames_per_segment):
-            # Use a smooth easing function (sine-based) instead of linear interpolation
-            # This creates natural-looking motion that accelerates/decelerates smoothly
-            t_param = j / frames_per_segment
-            t_smooth = 0.5 - 0.5 * np.cos(t_param * np.pi)
-            
-            theta_interpolated = theta_start * (1 - t_smooth) + theta_end * t_smooth
-            theta_clipped = thetas_limite(robot, theta_interpolated.tolist())
-            thetas_anim_list.append(theta_clipped)
-    
-    print("\nEjemplo Complex: Espacio de trabajo completo con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=10000000, show_points=False, half_space_axis=None,
-                       thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 5: Animación simple")
-    plot_robot(robot, thetas_anim_list, animation_speed=50)
-
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 6: Espacio de trabajo con animación superpuesta y guardado")
-    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None,
-                       thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 7: Espacio de trabajo +x con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+x',
-                       thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 8: Espacio de trabajo completo con animación (sin puntos) y guardado")
-    graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
-                       thetas_anim=thetas_anim_list, animation_speed=50,
-                       save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 9: Espacio de trabajo -y (sin animación, sin puntos)")
-    graficar_workspace(robot, N=1000, show_points=False, half_space_axis='-y', subtitle="Espacio de trabajo filtrado para Y < 0 (solo frontera)")
-    input("Press Enter to continue...")
-
-    print("\nEjemplo 10: Espacio de trabajo completo (sin animación)")
-    graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None, subtitle="Visualización completa del espacio de trabajo (estático)")
-    print("Fin de los ejemplos.")

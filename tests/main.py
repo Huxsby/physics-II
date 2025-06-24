@@ -23,7 +23,7 @@ from src.calculations import (RotarVector, RotGen, RotRodrigues, Visualizar_Rota
                               prueba_jacobiana, prueba_elipsoides, calcular_jacobiana, 
                               calcular_volumen_elipsoides,
                               menu_cinematica_inversa)
-from tests.class_robot_plotter_prueba import menu_plotter 
+from tests.plotter_prueba import menu_plotter, menu_graficar_workspace 
 
 def menu_helicoidales():
     """Menú interactivo para operaciones con ejes helicoidales."""
@@ -192,7 +192,8 @@ def menu_principal():
         print("-"*90)   # Separador
         print("11. Comparar configuraciones random.")
         print("12. Múltiples graficaciones y animcaciones para robot.yaml.")
-        print("13. Problema cinemático inverso.")
+        print("13. Múltiples graficaciones del workspace del robot.")
+        print("14. Problema cinemático inverso.")
         print("-"*90)   # Separador
         print("0. Salir.")
 
@@ -361,8 +362,12 @@ def menu_principal():
         elif opcion == "12":                           # 12. Graficar robot.yaml
             print("Graficando robot.yaml...")
             menu_plotter() #; limpiar_pantalla()
+
+        elif opcion == "13":                           # 13. Graficar workspace
+            print("Graficar workspace del robot.")
+            menu_graficar_workspace()
             
-        elif opcion == "13":                           # 13. Problema cinemático inverso
+        elif opcion == "14":                           # 14. Problema cinemático inverso
             print("Problema cinemático inverso.")
             menu_cinematica_inversa(); limpiar_pantalla()
 
