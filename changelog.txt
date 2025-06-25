@@ -38,3 +38,4 @@ El proyecto ahora sigue una organización modular y escalable:
 ## BUGS
 - [ ] En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml).
 - [ ] Método actual para hacer cinemática inversa no respeta los limites de las articulaciones.
+  - Probar con fabric.

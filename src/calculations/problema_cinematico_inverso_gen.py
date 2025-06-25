@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
 import numpy as np
 import sympy as sp
 import time
 
-from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config, filtrar_configuraciones
-from src.calculations.class_helicoidales import calcular_T_robot
-from src.calculations.class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
-from src.calculations.class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
+from core import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config, filtrar_configuraciones
+from calculations.class_helicoidales import calcular_T_robot
+from calculations.class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
+from calculations.class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
 # 8.2. Funciones utilizadas en el código que resuelve el problema cinemático inverso
 
@@ -249,5 +245,10 @@ def menu_cinematica_inversa():
     Jacobiana_tuple = calcular_jacobiana(robot)
     thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
     filtrar_configuraciones(robot, thetas_follower)
+
+    print("\nConfiguraciones equivalentes entre (-π, π):")
+    # thetas_follower = [[np.mod(theta, 2 * np.pi) for theta in thetas] for thetas in thetas_follower] # PASAR VALORES A VALORES ENTRE -2PI Y 2PI
+    thetas_follower = [[(theta + np.pi) % (2 * np.pi) - np.pi for theta in thetas] for thetas in thetas_follower] # PASAR VALORES A VALORES ENTRE -π Y π
+    filtrar_configuraciones(robot, thetas_follower) 
 if __name__ == "__main__":
     menu_cinematica_inversa()

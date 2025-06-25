@@ -1,29 +1,14 @@
 """
 Programa principal para probar los codigos de rotaciones y cinemática inversa y funciones auxiliares para las prácticas.
 """
-import sys
-import os
-
-# Añadir el directorio raíz del proyecto al sys.path
-# Esto permite que Python encuentre el paquete 'src' y otros módulos en la raíz
-# cuando se ejecuta el script desde el subdirectorio 'tests'.
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
-
-
 import numpy as np                                  # Para cálculos numéricos
-# Usamos importaciones explícitas y organizadas desde nuestros paquetes
-from src.core import (Robot, Datos, cargar_robot_desde_yaml, print_ejes_helicoidales, 
-                      limits, get_limits_positive, thetas_aleatorias, str_config)
-from src.calculations import (RotarVector, RotGen, RotRodrigues, Visualizar_Rotacion, 
-                              LogRot, validar_rotaciones, R2Euler, imprimir_matriz,
-                              calcular_Sθ, calcular_exp_Sθ, logaritmo_transformacion, 
-                              visualizar_eje_helicoidal, validar_transformaciones_helicoidales, 
-                              calcular_T_robot,
-                              prueba_jacobiana, prueba_elipsoides, calcular_jacobiana, 
-                              calcular_volumen_elipsoides,
-                              menu_cinematica_inversa)
-from tests.plotter_prueba import menu_plotter, menu_graficar_workspace 
+import os                                           # Para limpiar la pantalla
+from core import *
+from calculations.class_rotaciones import *
+from calculations.class_helicoidales import *
+from calculations.class_jacobian import calcular_jacobiana, calcular_volumen_elipsoides, prueba_jacobiana, prueba_elipsoides
+from calculations.problema_cinematico_inverso_gen import menu_cinematica_inversa
+from plotter_prueba import menu_plotter, menu_graficar_workspace 
 
 def menu_helicoidales():
     """Menú interactivo para operaciones con ejes helicoidales."""
@@ -321,7 +306,7 @@ def menu_principal():
         elif opcion == "10":                            # 10. Calcular la matriz Jacobiana del robot
             print("Calcular la matriz Jacobiana del robot. Singularidades y elipsoides.")
             robot = cargar_robot_desde_yaml("config/robot.yaml") # Carga del robot
-            final_unique_solutions = prueba_jacobiana(robot); limpiar_pantalla()
+            final_unique_solutions = prueba_jacobiana(robot)
             prueba_elipsoides(robot, final_unique_solutions); limpiar_pantalla()
 
         

@@ -1,9 +1,6 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
-from src.calculations.class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
-from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml
+from calculations.class_rotaciones import RotRodrigues, LogRot, antisimetrica, imprimir_matriz
+from core import Robot, cargar_robot_desde_yaml
 
 ## Función validada
 def calcular_Sθ(S, theta):

@@ -1,11 +1,8 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import sympy as sp
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from src.core.class_robot_structure import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config
+from core import Robot, cargar_robot_desde_yaml, thetas_aleatorias, limits, str_config, filtrar_configuraciones
 
 """ Funciones de calculo simbólico de la Jacobiana"""
 
@@ -539,76 +536,41 @@ def prueba_elipsoides(robot: Robot, final_unique_solutions):
     graficar_elipsoides(xx, yy, giro, llave, name="(θs=0)")
 
     # Buscar el primer caso válido en sol1 o sol2
-    valid_config = None
-    msg = ""
-
     print(f"\n\033[93m--- Buscando configuraciones válidas (Probaremos a gráficar la primera que sea compatible con {robot.name}) ---\033[0m")
     
-    # Inicializar variable para configuración válida
-    valid_config = None
-    valid_config_dict = None
-
     # Depuración: Mostrar número de soluciones a probar
     print(f"\tEvaluando {len(final_unique_solutions)} configuraciones potencialmente singulares")
-    
-    # Probar cada configuración
-    for config in final_unique_solutions:
-        # Format the configuration as a clean comma-separated list with rounded values
-        config_str = "[" + ", ".join([f"{val:.4f}" for val in config]) + "]"
-        print(f"\n\t\033[36mProbando configuración: {config_str}\033[0m")
-        
-        # Create and format the configuration dictionary more cleanly
-        config_dict = {thetas_s[i]: float(config[i]) for i in range(len(thetas_s))}
-        config_dict_str = "{" + ", ".join([f"{theta}: {val:.4f}" for theta, val in config_dict.items()]) + "}"
-        print(f"\tDiccionario de configuración: {config_dict_str}")
-        
-        # Verificar límites
-        try:
-            valid, msg = limits(robot, config)
-            status = "\033[32mVálida\033[0m" if valid else "\033[31mInválida\033[0m"
-            print(f"\tResultado validación: {status}")
-            if valid:
-                valid_config = config
-                valid_config_dict = config_dict
-                print(f"\t\033[32mConfiguración válida encontrada: {config_str}\033[0m")
-                print(f"\t\033[32m{msg}\033[0m")
-                break
-            else:
-                print(f"\t\033[31mMotivo rechazo: {msg}\033[0m")
-        except Exception as e:
-            print(f"\t\033[91mError al validar configuración: {e}\033[0m")
+    _, config_dict = thetas_aleatorias(robot)
+    final_unique_solutions = filtrar_configuraciones(robot, final_unique_solutions)
 
     # Verificar si encontramos una configuración válida
-    if valid_config is not None:
+    if final_unique_solutions:
         # Format the valid configuration as a clean comma-separated list
-        print(f"\n\033[92m--- Usando configuración válida: {str_config(valid_config, 2)} ---\033[0m")
+        print(f"\n\033[92m--- Usando configuración válida: {str_config(final_unique_solutions[0], 2)} ---\033[0m")
+        # Sustituir valores en la Jacobiana usando el diccionario
+        Jsing = J_sym.subs(config_dict)
+        
+        # Calcular volúmenes
         try:
-            # Sustituir valores en la Jacobiana usando el diccionario
-            Jsing = J_sym.subs(valid_config_dict)
-            
-            # Calcular volúmenes
-            try:
-                vol_EM, vol_EF = calcular_volumen_elipsoides(Jsing)
-                # Format the volume with scientific notation, 4 decimal places
-                vol_str = f"{float(vol_EM):.4e}"
-                print(f"\t\033[96mVolumen de elipsoides: {vol_str}\033[0m")
-            except Exception as e:
-                print(f"\t\033[91mError al calcular volúmenes: {e}\033[0m")
-                vol_EM = vol_EF = "Error en cálculo"
-            
-            # Calcular elipsoides
-            xx, yy, giro = elipsoide_manipulabilidad(Jsing)
-            _, _, llave = elipsoide_fuerza(Jsing)
-            
-            print(f"\t\033[96mGraficando elipsoides...\033[0m")
-            graficar_elipsoides(xx, yy, giro, llave, name=f"Configuración singular {str_config(valid_config, 2)}")
-            
-            # Mostrar Jacobiana para depuración
-            print(f"\t\033[96mJacobiana en configuración singular:\033[0m")
-            mostrar_jacobiana_resumida(Jsing)
-            
+            vol_EM, vol_EF = calcular_volumen_elipsoides(Jsing)
+            # Format the volume with scientific notation, 4 decimal places
+            vol_str = f"{float(vol_EM):.4e}"
+            print(f"\t\033[96mVolumen de elipsoides: {vol_str}\033[0m")
         except Exception as e:
-            print(f"\t\033[91mError al procesar configuración válida: {e}\033[0m")
+            print(f"\t\033[91mError al calcular volúmenes: {e}\033[0m")
+            vol_EM = vol_EF = "Error en cálculo"
+        
+        # Calcular elipsoides
+        xx, yy, giro = elipsoide_manipulabilidad(Jsing)
+        _, _, llave = elipsoide_fuerza(Jsing)
+        
+        print(f"\t\033[96mGraficando elipsoides...\033[0m")
+        graficar_elipsoides(xx, yy, giro, llave, name=f"Configuración singular {str_config(final_unique_solutions[0], 2)}")
+        
+        # Mostrar Jacobiana para depuración
+        print(f"\t\033[96mJacobiana en configuración singular:\033[0m")
+        mostrar_jacobiana_resumida(Jsing)
+
     else:
         print("\n\t\033[91mNo se encontró ninguna configuración válida entre las analizadas.\033[0m")
 

@@ -629,19 +629,48 @@ def thetas_limite(robot: Robot, thetas, show=False):
                 
     return thetas
 
-def filtrar_configuraciones(robot: Robot, configuraciones):
+def filtrar_configuraciones(robot: Robot, configuraciones, show=False, cero_umbral=1e-8):
     """
     Filtra las configuraciones de un robot para asegurarse de que estén dentro de los límites definidos.
+    Imprime cada elemento con colores: verde si está dentro de límites, rojo si rebasa, gris si es ~0.
+    Los elementos se alinean para que la impresión sea cuadriculada.
+    El corchete [ siempre se imprime en blanco.
     """
     print("\nFiltrando configuraciones:")
     configuraciones_validas = []
-    for config in configuraciones:
+    ancho = 12  # Ancho fijo para alineación
+    for idx, config in enumerate(configuraciones):
         valida, msg = limits(robot, config)
+        formatted_values = []
+        for i, val in enumerate(config):
+            joint_key = f'joint_{i+1}'
+            # Obtener límites si existen
+            if robot.limits_dict and joint_key in robot.limits_dict:
+                lower, upper = robot.limits_dict[joint_key]
+            else:
+                lower, upper = -np.inf, np.inf
+            # Colorear según valor
+            if abs(val) < cero_umbral:
+                color = "\033[90m"  # Gris para ~0
+            elif val < lower or val > upper:
+                color = "\033[91m"  # Rojo si fuera de límites
+            else:
+                color = "\033[92m"  # Verde si válido
+            # Notación científica para valores pequeños, fija para el resto
+            if abs(val) < 1e-4 and abs(val) >= cero_umbral:
+                formatted = f"{color}{val:>{ancho}.4e}\033[0m"
+            else:
+                formatted = f"{color}{val:>{ancho}.8f}\033[0m"
+            formatted_values.append(formatted)
+        # El corchete [ siempre en blanco (sin color)
+        vector_str = "\033[0m[" + ", ".join(formatted_values) + "]"
         if valida:
             configuraciones_validas.append(config)
-            print(f"\t\033[92mConfiguración válida:\t{str_config(config, 2)}\033[0m")
+            print(f"\t\033[92mConfiguración válida:\t{vector_str}\033[0m")
         else:
-            print(f"\t\033[91mConfiguración inválida:\t{str_config(config, 2)}\033[0m")
+            print(f"\t\033[91mConfiguración inválida:\t{vector_str}\033[0m")
+        if show and not valida:
+            print(f"\t\t{msg}")
     return configuraciones_validas
 
 def str_config(config, decimales=6):
