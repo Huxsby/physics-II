@@ -10,7 +10,7 @@ from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
 # Importamos las clases definidas en el archivo original
-from src.core.class_robot_structure import Robot, Link, cargar_robot_desde_yaml
+from core import Robot, Link, cargar_robot_desde_yaml
 
 class Arrow3D(FancyArrowPatch):
     """Clase para dibujar flechas en 3D que representan los ejes de las articulaciones"""

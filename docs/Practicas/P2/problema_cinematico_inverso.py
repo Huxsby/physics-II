@@ -233,18 +233,8 @@ def main():
     print ("Error en v:", np.round(np.linalg.norm([Vs[3], Vs[4], Vs[5]]),8))
     print ("Número de iteraciones:", i)
     
-    # To import from the 'src' directory, we add the project root to the Python path.
-    # The script is in .../physics-II/docs/Practicas/P2/
-    # The project root 'physics-II' is three levels up.
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-
-    from src.core import filtrar_configuraciones, cargar_robot_desde_yaml
-
-    robot_config_path = os.path.join(project_root, "config", "robot-niryo.yaml")
-    robot = cargar_robot_desde_yaml(robot_config_path)
-
+    from core import filtrar_configuraciones, cargar_robot_desde_yaml
+    robot = cargar_robot_desde_yaml("config/robot-niryo.yaml")
     filtrar_configuraciones(robot, thetalist_follower)
 
 if __name__=="__main__" :

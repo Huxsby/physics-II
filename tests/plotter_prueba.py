@@ -1,20 +1,11 @@
 """
 Ejemplos de uso para la visualización del robot manipulador
 """
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from src.animation.class_robot_plotter import plot_robot, guardar_animacion, graficar_workspace                         # Para la visualización del robot
-from src.calculations.problema_cinematico_inverso_gen import CinematicaInversa, CinematicaDirecta                       # Para la cinemática inversa
-from src.core.class_robot_structure import (Robot,
-                                            str_config,
-                                            thetas_aleatorias,
-                                            thetas_limite,
-                                            filtrar_configuraciones,
-                                            cargar_robot_desde_yaml)  # Para la manipulación de configuraciones
-from src.calculations.class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
-from src.calculations.class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
+from animation import plot_robot, guardar_animacion, graficar_workspace                         # Para la visualización del robot
+from calculations import CinematicaInversa, CinematicaDirecta                       # Para la cinemática inversa
+from core import Robot, str_config, thetas_aleatorias, thetas_limite, filtrar_configuraciones, cargar_robot_desde_yaml  # Para la manipulación de configuraciones
+from calculations.class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
+from calculations.class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
 import numpy as np                                                                                      # Para la manipulación de matrices
 import matplotlib.pyplot as plt                                                                         # Para la visualización
 import os                                                                                               # Para limpiar la pantalla en Windows/Linux
@@ -464,13 +455,13 @@ def menu_graficar_workspace():
         elif opcion == '6':
             print("\nEjecutando: Espacio de trabajo con animación superpuesta y guardado")
             graficar_workspace(robot, N=1000, show_points=True, half_space_axis=None,
-                               thetas_anim=thetas_anim_list, animation_speed=50,
-                               save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo")
+                                thetas_anim=thetas_anim_list, animation_speed=50,
+                                save_animation_name="ws_anim_test", subtitle="Animación superpuesta en espacio de trabajo completo")
         elif opcion == '7':
             print("\nEjecutando: Espacio de trabajo +x con animación (sin puntos) y guardado")
             graficar_workspace(robot, N=1000, show_points=False, half_space_axis='+x',
-                               thetas_anim=thetas_anim_list, animation_speed=50,
-                               save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)")
+                                thetas_anim=thetas_anim_list, animation_speed=50,
+                                save_animation_name="ws_mas_x_anim_test", subtitle="Animación en espacio de trabajo filtrado para X >= 0 (solo frontera)")
         elif opcion == '8':
             print("\nEjecutando: Espacio de trabajo -y (sin animación, sin puntos)")
             graficar_workspace(robot, N=1000, show_points=False, half_space_axis='-y', subtitle="Espacio de trabajo filtrado para Y < 0 (solo frontera)")
@@ -480,13 +471,13 @@ def menu_graficar_workspace():
         elif opcion == '10':
             print("\nEjecutando: Espacio de trabajo completo con animación (10k puntos, solo frontera) y guardado")
             graficar_workspace(robot, N=10000, show_points=False, half_space_axis=None,
-                               thetas_anim=thetas_anim_list, animation_speed=50,
-                               save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
+                                thetas_anim=thetas_anim_list, animation_speed=50,
+                                save_animation_name="ws_anim_final_form", subtitle="Animación en espacio de trabajo (solo frontera)")
         elif opcion == '11':
             print("\nEjecutando: Espacio de trabajo completo con animación (10M puntos, solo frontera) y guardado")
             graficar_workspace(robot, N=10000000, show_points=False, half_space_axis=None,
-                               thetas_anim=thetas_anim_list, animation_speed=50,
-                               save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
+                                thetas_anim=thetas_anim_list, animation_speed=50,
+                                save_animation_name="ws_anim_10M", subtitle="Animación en espacio de trabajo (solo frontera)")
         elif opcion == '12':
             print("\nEjecutando: Probar todos los ejemplos de workspace")
             print("\nEjecutando: Visualización estática"); thetas_static, _ = thetas_aleatorias(robot); print(f"Configuración aleatoria: {str_config(thetas_static, 3)}"); plot_robot(robot, thetas_static); limpiar_pantalla()
@@ -509,6 +500,5 @@ def menu_graficar_workspace():
         limpiar_pantalla()
 
 if __name__ == "__main__":
-
-    menu_plotter()
+    # menu_plotter()
     menu_graficar_workspace()

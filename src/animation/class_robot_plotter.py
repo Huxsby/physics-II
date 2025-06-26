@@ -21,9 +21,8 @@ Ejemplo de uso:
 """
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.core.class_robot_structure import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
-from src.calculations.class_helicoidales import calcular_T_robot # Otro ejemplo
+from core import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
+from calculations.class_helicoidales import CinematicaDirecta
 
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
@@ -98,7 +97,9 @@ def calcular_transformaciones(robot: Robot, thetas):
 
 """ Funciones para guardar animaciones en diferentes formatos """
 def guardar_animacion(anim, nombre_archivo):
-    if input("\t¿Deseas guardar la animación? (s/n): ").strip().lower() != 's':
+    ask = input("\t¿Deseas guardar la animación? (s/n): \033[95m").strip().lower() != 's'
+    print("\033[0m", end="")  # Reset color after input
+    if ask:
         print("\tAnimación no guardada.")
         return 
     if not anim:
@@ -469,11 +470,11 @@ def _get_animation_limits(robot: Robot, thetas_list):
         'z': (z_center - half_max_dim_range, z_center + half_max_dim_range)
     }
 
-def _log_performance_data(robot, N, execution_time):
+def _log_performance_data(robot: Robot, N, execution_time):
     """
     Registra los datos de rendimiento de la generación del workspace en un archivo CSV.
     """
-    log_file = 'workspace_performance_log.csv'
+    log_file = 'data/workspace_performance_log.csv'
     
     # Datos a registrar
     new_data = {
@@ -598,7 +599,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         print("\t(Puedes presionar Ctrl+C para detener la generación de puntos y visualizar los resultados parciales)")
         for _ in range(N):
             thetas_rand, _ = thetas_aleatorias(robot)
-            T_mat = calcular_T_robot(robot.ejes_helicoidales, thetas_rand, M)
+            T_mat = CinematicaDirecta(robot.ejes_helicoidales, thetas_rand, M)
             punto = T_mat[:3, 3]
             if apply_filter:
                 if (filter_positive_side and punto[filter_axis_idx] >= 0) or \
@@ -626,7 +627,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
 
                 for th_cfg in final_cfgs: # Renamed thetas_config to th_cfg
                     if limits(robot, th_cfg)[0]:
-                        T_m_cfg = calcular_T_robot(robot.ejes_helicoidales, th_cfg, M) # Renamed
+                        T_m_cfg = CinematicaDirecta(robot.ejes_helicoidales, th_cfg, M) # Renamed
                         p_cfg = T_m_cfg[:3, 3] # Renamed
                         if apply_filter:
                             if (filter_positive_side and p_cfg[filter_axis_idx] >= 0) or \
@@ -634,8 +635,10 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
                                 puntos_ws.append(p_cfg)
                         else: puntos_ws.append(p_cfg)
             else: print("Advertencia: No se pudieron obtener los límites para puntos adicionales del workspace.")
+            cuted = False
     except KeyboardInterrupt:
         print("\n\t\033[93mInterrupción por el usuario. Visualizando con los puntos generados hasta ahora...\033[0m")
+        cuted = True
         
     puntos_ws_array = np.array(puntos_ws) if puntos_ws else np.empty((0,3))
     num_actual_puntos_ws = puntos_ws_array.shape[0]
@@ -703,10 +706,10 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
 
     # Captura del tiempo de cálculo después de las operaciones principales y antes de mostrar/guardar
     tiempo_calculo = time.time() - tiempo_inicio
-    print(f"\t\033[92mTiempo de cálculo (graficar_workspace(N={N})): {format_time_hms(tiempo_calculo)}\033[0m")
+    print(f"\t\033[92mTiempo de cálculo{' interrumpido' if cuted else ''} (graficar_workspace(N={N})): {format_time_hms(tiempo_calculo)}\033[0m")
 
-    # Registrar datos de rendimiento
-    _log_performance_data(robot, N, tiempo_calculo)
+    # Registrar datos de rendimiento si no se cortó la ejecución
+    if not cuted: _log_performance_data(robot, N, tiempo_calculo)
 
     if show_points or hull_plotted: ax.legend(fontsize=8, loc='upper left', bbox_to_anchor=(0.01, 0.99))
     plt.tight_layout(rect=[0, 0, 1, 0.96])

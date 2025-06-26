@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 import os
 
-def get_prediction_for_n(target_n, robot_name, log_file='workspace_performance_log.csv'):
+def get_prediction_for_n(target_n, robot_name, log_file='data/workspace_performance_log.csv'):
     """
     Entrena un modelo localmente para predecir el tiempo de ejecución para un N específico.
 

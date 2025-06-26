@@ -1,12 +1,12 @@
 import numpy as np
-from src.animation.class_robot_plotter import graficar_workspace
-from src.core import Robot, cargar_robot_desde_yaml
+from animation import graficar_workspace
+from core import Robot, cargar_robot_desde_yaml
 import matplotlib.pyplot as plt
 
 def recopilar_datos_rendimiento(robot: Robot, n_inicial, n_final, n_pasos):
     """
     Ejecuta graficar_workspace para un rango de valores de N y recopila datos.
-    Los datos se guardan automáticamente en 'workspace_performance_log.csv'.
+    Los datos se guardan automáticamente en 'data/workspace_performance_log.csv'.
     """
     print(f"--- Iniciando Recopilación de Datos ---")
     print(f"Robot: {robot.name}")

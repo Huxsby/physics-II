@@ -4,7 +4,7 @@ Este script realiza un análisis de rendimiento para la función graficar_worksp
 utilizando modelos de Machine Learning con scikit-learn.
 
 Funcionalidades:
-1. Carga los datos de rendimiento desde 'workspace_performance_log.csv'.
+1. Carga los datos de rendimiento desde 'data/workspace_performance_log.csv'.
 2. Permite filtrar los datos por nombre de robot.
 3. Entrena y compara dos modelos de regresión:
    - Regresión Lineal Simple.
@@ -23,7 +23,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import os
 
-def cargar_y_preparar_datos(log_file='workspace_performance_log.csv', robot_name_filter=None):
+def cargar_y_preparar_datos(log_file='data/workspace_performance_log.csv', robot_name_filter=None):
     """
     Carga los datos desde el archivo CSV y los prepara para el modelado.
     - Filtra por nombre de robot si se especifica.

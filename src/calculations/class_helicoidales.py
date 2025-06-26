@@ -264,7 +264,7 @@ def calcular_ejes_helicoidales_body_frame(robot: Robot, M=None):
     return beta
 
 # Funcion para calcular la matriz de transformación homogénea del robot
-def calcular_T_robot(ejes, thetas, M):
+def CinematicaDirecta(ejes, thetas, M):
     """ Calcula la matriz de transformación homogénea T con los ejes helicoidales y la matriz de transformación M, usando la fórmula del producto de exponenciales. """
     T = np.eye(4)
     for S, theta in zip(ejes, thetas): # ejes,thetas -> eje,theta

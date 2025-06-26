@@ -4,7 +4,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 import os
 
-def show_model_equations(robot_name, log_file='workspace_performance_log.csv'):
+def show_model_equations(robot_name, log_file='data/workspace_performance_log.csv'):
     """
     Entrena los modelos y muestra sus ecuaciones matemáticas.
     """

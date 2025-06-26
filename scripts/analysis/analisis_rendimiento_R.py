@@ -11,10 +11,10 @@ import subprocess
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from src.animation.class_robot_plotter import graficar_workspace
-from src.core.class_robot_structure import cargar_robot_desde_yaml
+from animation import graficar_workspace
+from core import cargar_robot_desde_yaml, Robot
 
-def generar_datos_rendimiento(robot, N_valores, num_repeticiones=3):
+def generar_datos_rendimiento(robot: Robot, N_valores, num_repeticiones=3):
     """
     Genera datos de tiempo de ejecución para graficar_workspace con diferentes N.
     """

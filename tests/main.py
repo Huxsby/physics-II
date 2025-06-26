@@ -131,7 +131,7 @@ def menu_helicoidales():
             print("Valores de las articulaciones:", thetas, "\n")
 
             # Calcular T
-            T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
+            T = CinematicaDirecta(robot.ejes_helicoidales, thetas, M)
 
             print("Matriz de transformación homogénea T:")
             imprimir_matriz(T, "T")
@@ -293,7 +293,7 @@ def menu_principal():
                 continue
             
             # Calcular T
-            T = calcular_T_robot(robot.ejes_helicoidales, thetas, M)
+            T = CinematicaDirecta(robot.ejes_helicoidales, thetas, M)
             print("\nMatriz de transformación homogénea T:")
             imprimir_matriz(T, "T")
             

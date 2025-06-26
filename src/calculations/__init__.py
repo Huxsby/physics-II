@@ -11,7 +11,7 @@ from .class_helicoidales import (
     logaritmo_transformacion,
     visualizar_eje_helicoidal,
     validar_transformaciones_helicoidales,
-    calcular_T_robot
+    CinematicaDirecta
 )
 from .class_jacobian import (
     prueba_jacobiana,

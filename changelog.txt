@@ -4,11 +4,6 @@
 - **Refactorización Completa (Junio 2025):** Se ha reestructurado todo el proyecto para seguir las convenciones estándar de Python, mejorar la mantenibilidad y facilitar la ejecución de scripts y pruebas.
 - Se ha adoptado el uso de radianes como unidad estándar para todos los cálculos angulares internos.
 
-## Cambios Recientes (22 de Junio de 2025)
-- **Corrección de Importaciones:** Se han solucionado errores de `ImportError` y `ModuleNotFoundError` en varios módulos dentro de `src/calculations` y `tests`.
-  - **Causa:** Los scripts se ejecutaban directamente, pero las importaciones (ej. `from src.core...`) requerían que el proyecto se ejecutara como un paquete.
-  - **Solución:** Se ha añadido código a cada script para modificar dinámicamente `sys.path`, añadiendo el directorio raíz del proyecto. Esto permite que los scripts sean ejecutables de forma individual para facilitar las pruebas y el desarrollo, manteniendo al mismo tiempo la estructura de importación absoluta.
-
 ## Nueva Estructura del proyecto
 El proyecto ahora sigue una organización modular y escalable:
 
@@ -29,6 +24,21 @@ El proyecto ahora sigue una organización modular y escalable:
 - **Importaciones Absolutas:** Todas las importaciones ahora son absolutas desde la raíz del paquete `src` (ej. `from src.core import Robot`), lo que elimina errores de importación relativa.
 - **Ejecución de Pruebas:** La forma recomendada de ejecutar el menú de pruebas es desde la raíz del proyecto: `python -m tests.main`.
 
+## Importación de módulos internos como paquete
+- **Importaciones Absolutas y Paquete Editable:**
+  - Ahora, tras instalar el paquete en modo editable (`pip install -e .`), cualquier módulo de `src` puede ser importado desde cualquier script del proyecto usando importaciones absolutas, por ejemplo:
+    ```python
+    from core import Robot, cargar_robot_desde_yaml
+    from calculations import calcular_jacobiana
+    # O también sigue siendo válido:
+    from src.core import Robot
+    from src.calculations import calcular_jacobiana
+    ```
+  - El prefijo `src.` se ha vuelto opcional: puedes importar con o sin él según tu preferencia o el contexto del script.
+  - Esto elimina la necesidad de modificar manualmente `sys.path` en cada script y permite ejecutar scripts y pruebas desde cualquier ubicación dentro del proyecto.
+  - Facilita la reutilización de código, la integración con herramientas externas y la compatibilidad con entornos virtuales y sistemas de testing estándar de Python.
+  - Además, asegura que los cambios en el código fuente se reflejen inmediatamente en todo el proyecto sin reinstalaciones adicionales.
+
 ## Tareas Pendientes (Post-Refactorización)
 - [x] Validar que todos los scripts en la carpeta `/scripts` y `/tests` funcionan correctamente con la nueva estructura de importación. (Solucionado con la modificación de `sys.path`).
 - [ ] Limitar los ángulos de las articulaciones de forma robusta en los cálculos de cinemática inversa y jacobiana.
@@ -38,4 +48,4 @@ El proyecto ahora sigue una organización modular y escalable:
 ## BUGS
 - [ ] En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml).
 - [ ] Método actual para hacer cinemática inversa no respeta los limites de las articulaciones.
-  - Probar con fabric.
+  - [ ] Probar con fabric.

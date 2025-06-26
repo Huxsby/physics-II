@@ -5,7 +5,7 @@ import sympy as sp
 import time
 
 from core import Robot, cargar_robot_desde_yaml, print_ejes_helicoidales, str_config, filtrar_configuraciones
-from calculations.class_helicoidales import calcular_T_robot
+from calculations.class_helicoidales import CinematicaDirecta
 from calculations.class_jacobian import calcular_jacobiana, mostrar_jacobiana_resumida, calcular_volumen_elipsoides
 from calculations.class_rotaciones import Rp2Trans, Euler2R, R2Euler, imprimir_matriz
 
@@ -76,9 +76,6 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
 #     T=np.eye(4)
 #     for i in range(0,robot.num_links,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
 #     return np.dot(T,M)
-
-def CinematicaDirecta(ejes, thetas, M):
-    return calcular_T_robot(ejes, thetas, M)
 
 def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_vel_lineal=1.00000000e-10, show=True):
     """
@@ -214,7 +211,7 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     print(f"\t\033[92mTiempo de cálculo total de la cinemática inversa: {time.time() - tiempo:.4f} segundos\033[0m")
     
     if show: # Imprime el resultado final de la cinemática inversa.
-        Tsd_re = calcular_T_robot(robot.ejes_helicoidales, thetas_actuales, M)
+        Tsd_re = CinematicaDirecta(robot.ejes_helicoidales, thetas_actuales, M)
         R = Tsd_re[:3,:3]; p = Tsd_re[:3,3]; RPY = R2Euler(R)
         print(f"\nCoordenadas de las articulaciones:\n {thetas_actuales.tolist()}")
         print(f"\nCoordenadas (x,y,z) del TCP:  {p} (Objetivo: {Tsd[:3,3]})")
