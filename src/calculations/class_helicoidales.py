@@ -341,5 +341,43 @@ def validar_transformaciones_helicoidales():
     print("VALIDACIÓN COMPLETA: Todos los casos pasaron las pruebas.")
     print("="*90)
 
+def calcular_posiciones_articulaciones(robot: Robot, thetas: list, incluir_efector=False):
+    """
+    Calcula las posiciones cartesianas de cada articulación del robot y, opcionalmente, del efector final.
+    
+    Args:
+        robot (Robot): El objeto robot.
+        thetas (list): La lista de valores de las articulaciones (ángulos/distancias).
+        incluir_efector (bool): Si es True, incluye la posición del efector final (TCP).
+
+    Returns:
+        list: Lista de arrays numpy con las posiciones [x, y, z] de cada articulación.
+              Contiene n+1 puntos: [base, art_1, art_2, ..., art_n] o [base, art_1, ..., art_n, efector].
+    """
+    # Inicializar con la posición de la base (siempre en el origen)
+    posiciones = [np.zeros(3)]
+    
+    # Calcular posiciones usando cinemática directa acumulativa
+    T_acumulada = np.eye(4)
+    for i in range(robot.num_links):
+        # Aplicar la transformación de la articulación i
+        S_i = robot.ejes_helicoidales[i]
+        theta_i = thetas[i]
+        T_i = calcular_exp_Sθ(S_i, theta_i)
+        T_acumulada = T_acumulada @ T_i
+        
+        # La posición de la articulación i+1 en el sistema de coordenadas global (mundo)
+        # corresponde a la columna de traslación de T_acumulada
+        pos_articulacion = T_acumulada[:3, 3].copy()
+        posiciones.append(pos_articulacion)
+
+    if incluir_efector:
+        # Calcular la posición del efector final aplicando la matriz M
+        T_efector = T_acumulada @ robot.M
+        # Reemplazar la última posición (última articulación) por la del efector
+        posiciones[-1] = T_efector[:3, 3].copy()
+
+    return posiciones
+
 if __name__ == "__main__":
     validar_transformaciones_helicoidales()

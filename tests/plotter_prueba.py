@@ -248,7 +248,8 @@ def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectori
     print("Animando trayectoria circular...")
     fig, ax, anim = plot_robot(robot, thetas_anim, animation_speed=50, show=True, trayectoria=puntos)
     guardar_animacion(anim, nombre_archivo) # dpi=225 para altura de 1080px si la figura es de 6.4x4.8 pulgadas (predeterminado Matplotlib)
-    plt.close()
+    plt.close(fig)
+    return thetas_anim  # Return the animation data if needed for further processing
 
 # Ejemplo 10: Prueba de singularidades
 def ejemplo_prueba_singularidades(robot: Robot):
@@ -297,7 +298,8 @@ def menu_plotter():
         os.system('cls' if os.name == 'nt' else 'clear')
 
     robot = cargar_robot_desde_yaml("config/robot.yaml")
-    
+    robot_dron = cargar_robot_desde_yaml("config/robot-dron.yaml")
+
     while True:
         print("\n" + "="*90)    # Separador
         print(" "*32 + "MENÚ DE EJEMPLOS DE VISUALIZACIÓN")
@@ -308,8 +310,8 @@ def menu_plotter():
         print("4. Animación entre dos configuraciones")
         print("5. Trayectoria con múltiples puntos")
         print("6. Cinemática directa")
-        print("7. Animación de articulaciones prismáticas")
-        print("8. Cinemática inversa con trayectoria circular (robot.yaml)")
+        print("7. Animación de articulaciones prismáticas (robot-dron.yaml)")
+        print("8. Cinemática inversa con trayectoria circular (robot-dron.yaml)")
         print("9. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
         print("10. Prueba de singularidades (robot.yaml)")
         print("11. Probar todos los graficos y animaciones")
@@ -344,17 +346,15 @@ def menu_plotter():
         
         elif opcion == '7':
             print("Ejecutando: Animación de articulaciones prismáticas")
-            ejemplo_animacion_prismatica(robot)
+            ejemplo_animacion_prismatica(robot_dron)
         
         elif opcion == '8':
-            print("Ejecutando: Cinemática inversa con trayectoria circular (robot.yaml)")
-            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
+            print("Ejecutando: Cinemática inversa con trayectoria circular (robot-dron.yaml)")
+            ejemplo_cinematica_inversa_circular(robot_dron, nombre_archivo="trayectoria_circular_robot_dron")
         
         elif opcion == '9':
             print("Ejecutando: Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
-            robot = cargar_robot_desde_yaml("config/robot-niryo.yaml")
             ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
-            robot = cargar_robot_desde_yaml("config/robot.yaml") # Reset robot to default
         
         elif opcion == '10':
             print("Ejecutando: Prueba de singularidades")
@@ -369,10 +369,8 @@ def menu_plotter():
             ejemplo_trayectoria(robot)
             ejemplo_cinematica_directa(robot)
             ejemplo_animacion_prismatica(robot)
-            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_brazo_dron")
-            robot = cargar_robot_desde_yaml("config/robot-niryo.yaml")
-            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
-            robot = cargar_robot_desde_yaml("config/robot.yaml") # Reset robot to default
+            ejemplo_cinematica_inversa_circular(robot_dron, nombre_archivo="trayectoria_circular_robot_dron")
+            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_robot_niryo")
             ejemplo_prueba_singularidades(robot)
             
         elif opcion == '0':
@@ -500,5 +498,5 @@ def menu_graficar_workspace():
         limpiar_pantalla()
 
 if __name__ == "__main__":
-    # menu_plotter()
+    menu_plotter()
     menu_graficar_workspace()

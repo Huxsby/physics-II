@@ -1,3 +1,4 @@
+# Archivo de configuración del robot Niryo One, validado en el LAB de Robótica de la USC.
 robot:
   name: niryo_one
   # Función para imponer limites

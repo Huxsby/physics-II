@@ -105,7 +105,7 @@ def guardar_animacion(anim, nombre_archivo):
     if not anim:
         print("No hay animación para guardar.")
         return
-    print("Guardando animación...")
+    print(f"Guardando animación ({nombre_archivo})...")
     try:
         if sys.platform.startswith("linux"):
             try:
@@ -315,6 +315,19 @@ def _plot_frame(robot: Robot, thetas, ax):
     positions = [T_mat[:3, 3] for T_mat in transformaciones] # Renamed T to T_mat
     positions = np.array(positions)
     
+    # Verificar si las articulaciones están dentro de los límites
+    joint_within_limits = []
+    if robot.limits_dict is not None and len(robot.limits_dict) > 0:
+        for i in range(len(thetas)):
+            if i < len(robot.links) and f'joint_{i+1}' in robot.limits_dict:
+                limit_min, limit_max = robot.limits_dict[f'joint_{i+1}']
+                is_within = limit_min <= thetas[i] <= limit_max
+                joint_within_limits.append(is_within)
+            else:
+                joint_within_limits.append(True)  # Si no hay límites, asumimos que está dentro
+    else:
+        joint_within_limits = [True] * len(thetas)  # Si no hay límites definidos, todas están dentro
+    
     for i in range(len(positions)-1):
         link_obj = robot.links[i]
         p1 = positions[i]
@@ -327,7 +340,9 @@ def _plot_frame(robot: Robot, thetas, ax):
         # is associated with link_obj (robot.links[i]), but drawn at p2 (positions[i+1]).
         # This implies joint i's visual representation is at the end of link i.
         if link_obj.tipo == "revolute":
-            scatter_marker = ax.scatter([p2[0]], [p2[1]], [p2[2]], color='r', s=50, marker='o')
+            # Elegir color basado en si la articulación está dentro de los límites
+            joint_color = 'r' if joint_within_limits[i] else 'purple'
+            scatter_marker = ax.scatter([p2[0]], [p2[1]], [p2[2]], color=joint_color, s=50, marker='o')
             artists.append(scatter_marker)
             
             rot_axis_local = np.array(link_obj.joint_axis)
@@ -341,15 +356,20 @@ def _plot_frame(robot: Robot, thetas, ax):
             R_transform = transformaciones[i+1][:3, :3]
             rot_axis_global = R_transform @ rot_axis_scaled
             
+            # Flecha del eje de rotación con z-order alto para que se muestre por encima
             quiv = ax.quiver(p2[0], p2[1], p2[2], 
                              rot_axis_global[0], rot_axis_global[1], rot_axis_global[2], 
-                             color='g', arrow_length_ratio=0.3)
+                             color='goldenrod', arrow_length_ratio=0.3, 
+                             alpha=0.9, zorder=10)
             artists.append(quiv)
             
         elif link_obj.tipo == "prismatic":
-            scatter_marker = ax.scatter([p2[0]], [p2[1]], [p2[2]], color='g', s=50, marker='s')
+            # Elegir color basado en si la articulación está dentro de los límites
+            joint_color = 'g' if joint_within_limits[i] else 'purple'
+            scatter_marker = ax.scatter([p2[0]], [p2[1]], [p2[2]], color=joint_color, s=50, marker='s')
             artists.append(scatter_marker)
             
+            # Para articulaciones prismáticas, podemos mostrar el eje de traslación con una flecha
             local_joint_axis = np.array(link_obj.joint_axis)
             norm_val_prism = np.linalg.norm(local_joint_axis) # Renamed norm to norm_val_prism
             if norm_val_prism > 1e-9:
@@ -360,15 +380,15 @@ def _plot_frame(robot: Robot, thetas, ax):
             R_transform = transformaciones[i+1][:3, :3] 
             global_joint_axis_unit = R_transform @ local_joint_axis_unit
             
-            p_start_ext_line = p2 
-            # Draw line of length thetas[i] (actual displacement of joint i)
-            p_end_ext_line = p_start_ext_line + thetas[i] * global_joint_axis_unit 
-            
-            prismatic_ext_line, = ax.plot([p_start_ext_line[0], p_end_ext_line[0]], 
-                                          [p_start_ext_line[1], p_end_ext_line[1]], 
-                                          [p_start_ext_line[2], p_end_ext_line[2]],
-                                          color='lime', linestyle='-', linewidth=3) # Changed color
-            artists.append(prismatic_ext_line)
+            # Mostrar el eje de traslación con una flecha (sin representar extensión errónea)
+            axis_scale = 0.05  # Escala para la flecha del eje
+            quiv_prism = ax.quiver(p2[0], p2[1], p2[2], 
+                                   global_joint_axis_unit[0] * axis_scale, 
+                                   global_joint_axis_unit[1] * axis_scale, 
+                                   global_joint_axis_unit[2] * axis_scale, 
+                                   color='orange', arrow_length_ratio=0.3, 
+                                   alpha=0.8, zorder=5)
+            artists.append(quiv_prism)
 
     end_effector_scatter = ax.scatter([positions[-1][0]], [positions[-1][1]], [positions[-1][2]], color='k', s=150, marker='*')
     artists.append(end_effector_scatter)
@@ -386,11 +406,14 @@ def _draw_coordinate_system(ax, T_mat, scale=0.05):
     y_axis = T_mat[:3, 1] * scale
     z_axis = T_mat[:3, 2] * scale
     
-    quiv_x = ax.quiver(origin[0], origin[1], origin[2], x_axis[0], x_axis[1], x_axis[2], color='r', arrow_length_ratio=0.3)
+    quiv_x = ax.quiver(origin[0], origin[1], origin[2], x_axis[0], x_axis[1], x_axis[2], 
+                       color='r', arrow_length_ratio=0.3, zorder=1)
     artists.append(quiv_x)
-    quiv_y = ax.quiver(origin[0], origin[1], origin[2], y_axis[0], y_axis[1], y_axis[2], color='g', arrow_length_ratio=0.3)
+    quiv_y = ax.quiver(origin[0], origin[1], origin[2], y_axis[0], y_axis[1], y_axis[2], 
+                       color='g', arrow_length_ratio=0.3, zorder=1)
     artists.append(quiv_y)
-    quiv_z = ax.quiver(origin[0], origin[1], origin[2], z_axis[0], z_axis[1], z_axis[2], color='b', arrow_length_ratio=0.3)
+    quiv_z = ax.quiver(origin[0], origin[1], origin[2], z_axis[0], z_axis[1], z_axis[2], 
+                       color='b', arrow_length_ratio=0.3, zorder=1)
     artists.append(quiv_z)
     return artists
 
