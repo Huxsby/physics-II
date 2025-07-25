@@ -75,11 +75,11 @@ def visualizar_iteraciones_fabrik(robot: Robot, p_history: list, p_xyz_objetivo:
         ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
     # Crear la animación
-    ani = FuncAnimation(fig, update, frames=len(p_history), interval=500, repeat=False)
+    anim = FuncAnimation(fig, update, frames=len(p_history), interval=500, repeat=False)
 
     if save_gif:
         print("Guardando animación como 'fabrik_animation.gif'...")
-        ani.save('output/animations/fabrik_animation.gif', writer='pillow', fps=2)
+        anim.save('output/animations/fabrik_animation.gif', writer='pillow', fps=2)
         print("Animación guardada.")
 
     plt.show()

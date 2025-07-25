@@ -24,6 +24,7 @@ import os
 from core import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
 from calculations.class_helicoidales import CinematicaDirecta
 
+import cupy as cp                              # Reemplazo de NumPy por CuPy
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
 from matplotlib.animation import FuncAnimation  # Import FuncAnimation for animations
@@ -43,18 +44,18 @@ def matriz_rotacion(eje, angulo):
     Returns:
         numpy.ndarray: Matriz de rotación 3x3.
     """
-    eje = np.array(eje)
-    if np.linalg.norm(eje) < 1e-10:  # Si el eje es casi cero
-        return np.eye(3)  # Devuelve la matriz identidad
+    eje = cp.array(eje)
+    if cp.linalg.norm(eje) < 1e-10:  # Si el eje es casi cero
+        return cp.eye(3)  # Devuelve la matriz identidad
         
-    eje = eje / np.linalg.norm(eje)  # Normalizar el eje
+    eje = eje / cp.linalg.norm(eje)  # Normalizar el eje
     
     x, y, z = eje
-    c = np.cos(angulo)
-    s = np.sin(angulo)
+    c = cp.cos(angulo)
+    s = cp.sin(angulo)
     C = 1 - c
     
-    R_mat = np.array([ # Renamed R to R_mat
+    R_mat = cp.array([ # Renamed R to R_mat
         [x*x*C + c, x*y*C - z*s, x*z*C + y*s],
         [y*x*C + z*s, y*y*C + c, y*z*C - x*s],
         [z*x*C - y*s, z*y*C + x*s, z*z*C + c]
@@ -74,19 +75,19 @@ def calcular_transformaciones(robot: Robot, thetas):
         list: Lista de matrices de transformación homogénea 4x4 para cada eslabón.
     """
     n_links = robot.num_links
-    T_current = np.eye(4)  # Transformación acumulada actual, renamed T to T_current
+    T_current = cp.eye(4)  # Transformación acumulada actual, renamed T to T_current
     transformaciones = [T_current.copy()]  # Guardar la transformación inicial
     
     for i in range(n_links):
         link_obj = robot.links[i] # Renamed link to link_obj
         theta_val = thetas[i] # Renamed theta to theta_val
         
-        T_local = np.eye(4)
+        T_local = cp.eye(4)
         
         if link_obj.tipo == "prismatic":
-            T_local[:3, 3] = np.array(link_obj.joint_coords) + theta_val * np.array(link_obj.joint_axis)
+            T_local[:3, 3] = cp.array(link_obj.joint_coords) + theta_val * cp.array(link_obj.joint_axis)
         else:  # Para articulaciones rotacionales
-            T_local[:3, 3] = np.array(link_obj.joint_coords)
+            T_local[:3, 3] = cp.array(link_obj.joint_coords)
             R_val = matriz_rotacion(link_obj.joint_axis, theta_val)
             T_local[:3, :3] = R_val
         
@@ -96,7 +97,7 @@ def calcular_transformaciones(robot: Robot, thetas):
     return transformaciones
 
 """ Funciones para guardar animaciones en diferentes formatos """
-def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
+def guardar_animacion(anim, nombre_archivo):
     ask = input("\t¿Deseas guardar la animación? (s/n): \033[95m").strip().lower() != 's'
     print("\033[0m", end="")  # Reset color after input
     if ask:
@@ -109,28 +110,28 @@ def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
     try:
         if sys.platform.startswith("linux"):
             try:
-                _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
+                _guardar_animacion_ffmpeg(anim, nombre_archivo)
             except Exception as e:
                 print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
-                _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
+                _guardar_animacion_pillow(anim, nombre_archivo)
         else:
             try:
-                _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
+                _guardar_animacion_pillow(anim, nombre_archivo)
             except Exception as e:
                 print(f"\t\033[31mError al guardar con Pillow: {e}\033[0m")
-                _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
+                _guardar_animacion_ffmpeg(anim, nombre_archivo)
     except Exception as e_final:
         print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
         print(f"\t\033[31mError: {e_final}\033[0m")
 
-def _guardar_animacion_ffmpeg(anim, nombre_archivo, fps=30, dpi=225):
+def _guardar_animacion_ffmpeg(anim, nombre_archivo):
     print("\tIntentando guardar la animación como MP4 con ffmpeg...")
-    anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=fps, dpi=dpi)
+    anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=30, dpi=225)
     print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.mp4' usando ffmpeg.\033[0m")
 
-def _guardar_animacion_pillow(anim, nombre_archivo, fps=30, dpi=225):
+def _guardar_animacion_pillow(anim, nombre_archivo):
     print("\tIntentando guardar la animación como GIF con Pillow...")
-    anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=fps, dpi=dpi)
+    anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=30)
     print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.gif' usando Pillow.\033[0m")
 
 """ Función principal para visualizar el robot manipulador en 3D """
@@ -633,7 +634,7 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         if robot.limits_dict and robot.num_links > 0:
             min_l, max_l = get_limits_negative(robot), get_limits_positive(robot) # Shorter names
             if min_l is not None and max_l is not None and len(min_l) == robot.num_links and len(max_l) == robot.num_links:
-                mid_l = (np.array(min_l) + np.array(max_l)) / 2.0
+                mid_l = (cp.array(min_l) + cp.array(max_l)) / 2.0
                 cfgs_check = [min_l, max_l] # Renamed configurations_to_check
                 for i in range(robot.num_links):
                     for lim_type in ["min", "max"]:
@@ -663,27 +664,31 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
         print("\n\t\033[93mInterrupción por el usuario. Visualizando con los puntos generados hasta ahora...\033[0m")
         cuted = True
         
-    puntos_ws_array = np.array(puntos_ws) if puntos_ws else np.empty((0,3))
+    puntos_ws_array = cp.array(puntos_ws) if puntos_ws else cp.empty((0,3))
     num_actual_puntos_ws = puntos_ws_array.shape[0]
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
 
     all_x, all_y, all_z = [], [], []
     if num_actual_puntos_ws > 0:
-        all_x.extend(puntos_ws_array[:, 0]); all_y.extend(puntos_ws_array[:, 1]); all_z.extend(puntos_ws_array[:, 2])
+        all_x.extend(puntos_ws_array[:, 0].get())
+        all_y.extend(puntos_ws_array[:, 1].get())
+        all_z.extend(puntos_ws_array[:, 2].get())
     if thetas_anim:
-        for t_anim_f in thetas_anim: # Renamed
-            tf_f = calcular_transformaciones(robot, t_anim_f) # Renamed
-            pos_f = np.array([T_m_f[:3, 3] for T_m_f in tf_f]) # Renamed
+        for t_anim_f in thetas_anim:
+            tf_f = calcular_transformaciones(robot, t_anim_f)
+            pos_f = cp.array([T_m_f[:3, 3] for T_m_f in tf_f])
             if pos_f.size > 0:
-                all_x.extend(pos_f[:, 0]); all_y.extend(pos_f[:, 1]); all_z.extend(pos_f[:, 2])
+                all_x.extend(pos_f[:, 0].get())
+                all_y.extend(pos_f[:, 1].get())
+                all_z.extend(pos_f[:, 2].get())
     if not all_x: all_x, all_y, all_z = [-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]
 
     min_x_all, max_x_all = min(all_x) - 0.1, max(all_x) + 0.1
     min_y_all, max_y_all = min(all_y) - 0.1, max(all_y) + 0.1
     min_z_all, max_z_all = min(all_z) - 0.1, max(all_z) + 0.1
-    x_c, y_c, z_c = (min_x_all+max_x_all)/2, (min_y_all+max_y_all)/2, (min_z_all+max_z_all)/2 # Renamed
-    max_r_d = max(max_x_all-min_x_all, max_y_all-min_y_all, max_z_all-min_z_all) # Renamed
+    x_c, y_c, z_c = (min_x_all + max_x_all) / 2, (min_y_all + max_y_all) / 2, (min_z_all + max_z_all) / 2
+    max_r_d = max(max_x_all - min_x_all, max_y_all - min_y_all, max_z_all - min_z_all) # Renamed
     h_span = max(0.5, max_r_d / 2.0) # Renamed
     ax.set_xlim(x_c - h_span, x_c + h_span); ax.set_ylim(y_c - h_span, y_c + h_span); ax.set_zlim(z_c - h_span, z_c + h_span)
 
@@ -700,8 +705,8 @@ def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=N
     hull_plotted, hull_message = False, ""
     if num_actual_puntos_ws >= 4:
         try:
-            hull_obj = ConvexHull(puntos_ws_array) # Renamed hull to hull_obj
-            ax.plot_trisurf(puntos_ws_array[:,0], puntos_ws_array[:,1], puntos_ws_array[:,2], triangles=hull_obj.simplices,
+            hull_obj = ConvexHull(puntos_ws_array.get())
+            ax.plot_trisurf(puntos_ws_array[:,0].get(), puntos_ws_array[:,1].get(), puntos_ws_array[:,2].get(), triangles=hull_obj.simplices,
                             color='cornflowerblue', alpha=0.25, edgecolor='black', linewidth=0.15, label='Frontera Convexa')
             if not (apply_filter and half_space_axis) : title_str += " y Frontera Convexa"
             hull_plotted = True
