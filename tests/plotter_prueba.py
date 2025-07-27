@@ -2,7 +2,7 @@
 Ejemplos de uso para la visualización del robot manipulador
 """
 from animation import plot_robot, guardar_animacion, graficar_workspace                         # Para la visualización del robot
-from calculations import CinematicaInversa, CinematicaDirecta                       # Para la cinemática inversa
+from calculations import IK_Jacobian, CinematicaDirecta                       # Para la cinemática inversa
 from core import Robot, str_config, thetas_aleatorias, thetas_limite, filtrar_configuraciones, cargar_robot_desde_yaml  # Para la manipulación de configuraciones
 from calculations.class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
 from calculations.class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
@@ -203,7 +203,7 @@ def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectori
     # Calcular
     initial_ik_guess = np.zeros(robot.num_links)
     Jacobiana_tuple = calcular_jacobiana(robot)
-    thetas_iniciales_trayectoria = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0], show=False)
+    thetas_iniciales_trayectoria = IK_Jacobian(robot, Jacobiana_tuple, thetas_actuales=initial_ik_guess, p_xyz=initial_point, RPY=[0, np.pi, 0], show=False)
 
     if thetas_iniciales_trayectoria:
         ik_initial_guess_thetas = thetas_iniciales_trayectoria[-1] # Use the last iteration of the first point's solution
@@ -224,7 +224,7 @@ def ejemplo_cinematica_inversa_circular(robot: Robot, nombre_archivo="trayectori
         # Tsd = Rp2Trans(Euler2R(0, np.pi, 0), punto)
         
         # Use the solution from the previous point (or initial guess) as the 'thetas_actuales' for the IK solver.
-        thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0], show=False)
+        thetas_follower = IK_Jacobian(robot, Jacobiana_tuple, thetas_actuales=ik_initial_guess_thetas, p_xyz=punto, RPY=[0, np.pi, 0], show=False)
         
         if thetas_follower: # Assumes thetas_follower is a list of configurations (iterations) on success.
             thetas_anim.extend(thetas_follower)  # Add all iterations to the animation.

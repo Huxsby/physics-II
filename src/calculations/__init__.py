@@ -33,4 +33,4 @@ from .class_rotaciones import (
     Euler2R,
     antisimetrica
 )
-from .problema_cinematico_inverso_gen import menu_cinematica_inversa, CinematicaInversa
+from .inverse_kinematics_methods import menu_cinematica_inversa, IK_Jacobian

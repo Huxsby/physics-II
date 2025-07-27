@@ -97,7 +97,8 @@ def calcular_transformaciones(robot: Robot, thetas):
 
 """ Funciones para guardar animaciones en diferentes formatos """
 def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
-    ask = input("\t¿Deseas guardar la animación? (s/n): \033[95m").strip().lower() != 's'
+    # Extraer solo el nombre de archivo (sin path) para mostrar al usuario
+    ask = input(f"\t¿Deseas guardar la animación \033[93m{nombre_archivo.split('/')[-1].split('\\')[-1]}\033[0m? (s/n): \033[95m").strip().lower() != 's'
     print("\033[0m", end="")  # Reset color after input
     if ask:
         print("\tAnimación no guardada.")

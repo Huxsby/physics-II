@@ -7,7 +7,7 @@ from core import *
 from calculations.class_rotaciones import *
 from calculations.class_helicoidales import *
 from calculations.class_jacobian import calcular_jacobiana, calcular_volumen_elipsoides, prueba_jacobiana, prueba_elipsoides
-from calculations.problema_cinematico_inverso_gen import menu_cinematica_inversa
+from calculations.inverse_kinematics_methods import menu_cinematica_inversa
 from plotter_prueba import menu_plotter, menu_graficar_workspace 
 
 def menu_helicoidales():

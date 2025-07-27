@@ -80,7 +80,7 @@ def Adjunta(T): # Calcula la matriz adjunta de una MTH
 #     for i in range(0,robot.num_links,1): T=np.dot(T,MatrixExp6(VecTose3(S[i]*t[i])))
 #     return np.dot(T,M)
 
-def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_vel_lineal=1.00000000e-10, show=True):
+def IK_Jacobian(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0], error_oet=1.00000000e-10, error_vel_lineal=1.00000000e-10, show=True):
     """
     Resuelve el problema cinemático inverso para un robot utilizando el método iterativo de Newton-Raphson
     con la pseudo-inversa de la matriz Jacobiana.
@@ -238,9 +238,10 @@ def CinematicaInversa(robot: Robot, Jacobiana_tuple: tuple, thetas_actuales=None
     
     return thetas_follower
 
-def CinematicaInversa_FABRIK(robot: Robot, p_xyz_objetivo: list, thetas_iniciales: list = None, tol: float = 1e-3, max_iter: int = 100, show: bool = True):
+def IK_FABRIK(robot: Robot, p_xyz_objetivo: list, thetas_iniciales: list = None, tol: float = 1e-3, max_iter: int = 100, show: bool = True):
     """
     Resuelve la cinemática inversa utilizando el algoritmo FABRIK (Forward And Backward Reaching Inverse Kinematics).
+    Esta es una implementación robusta del algoritmo.
 
     Args:
         robot (Robot): El objeto robot con su estructura.
@@ -254,10 +255,12 @@ def CinematicaInversa_FABRIK(robot: Robot, p_xyz_objetivo: list, thetas_iniciale
         list: La lista de ángulos de las articulaciones (thetas) que alcanzan el objetivo, o None si no converge.
         list: Historial de posiciones de las articulaciones en cada iteración.
     """
+    tiempo_inicio = time.time()
     p_xyz_objetivo = np.array(p_xyz_objetivo, dtype=float)
-    num_eslabones = robot.num_links
+    num_articulaciones = robot.num_links
+    
     if thetas_iniciales is None:
-        thetas_iniciales = np.zeros(num_eslabones)
+        thetas_iniciales = np.zeros(num_articulaciones)
     else:
         thetas_iniciales = np.array(thetas_iniciales, dtype=float)
 
@@ -265,95 +268,63 @@ def CinematicaInversa_FABRIK(robot: Robot, p_xyz_objetivo: list, thetas_iniciale
     p = calcular_posiciones_articulaciones(robot, thetas_iniciales)
     p = [np.array(pi, dtype=float) for pi in p]
     longitudes = [np.linalg.norm(p[i+1] - p[i]) for i in range(len(p) - 1)]
-    dist_total = sum(longitudes)
+    
+    base = p[0].copy()
+    p_history = [[pi.copy() for pi in p]]
 
     if show:
         print("--- Cinematica Inversa FABRIK ---")
         print(f"Objetivo: {p_xyz_objetivo}")
-        print(f"Posiciones iniciales de las articulaciones (p):")
-        for i, pos in enumerate(p):
-            print(f"  p[{i}]: {pos}")
-        print(f"Longitudes de eslabones (d): {longitudes}")
-        print(f"Longitud total del brazo: {dist_total:.4f}")
+        print(f"Posiciones iniciales: {[pi.round(3) for pi in p]}")
+        print(f"Longitudes: {[round(l, 3) for l in longitudes]}")
 
-    # --- Algoritmo FABRIK ---
-    p_history = [ [pi.copy() for pi in p] ]  # Historial de posiciones
+    # 2. Comprobar si el objetivo está fuera de alcance
+    dist_total = sum(longitudes)
+    dist_objetivo = np.linalg.norm(p_xyz_objetivo - base)
 
-    # 1.1-1.3: Distancia raíz-objetivo y verificación de alcance
-    dist = np.linalg.norm(p[0] - p_xyz_objetivo)
-    if show: print(f"Distancia de la raíz al objetivo: {dist:.4f}")
-
-    # 1.4: Comprobar si el objetivo está fuera de alcance
-    if dist > dist_total:
-        if show: print("\033[93mAdvertencia: El objetivo está fuera del alcance del robot.\033[0m")
-        # Estirar el brazo hacia el objetivo
-        for i in range(num_eslabones):
-            r = np.linalg.norm(p_xyz_objetivo - p[i])
-            if r < EPSILON:
-                p[i+1] = p[i]
-            else:
-                lambda_i = longitudes[i] / r
-
-    if dist > dist_total:
-        if show: print("\033[93mAdvertencia: El objetivo está fuera del alcance del robot.\033[0m")
-        # Estirar el brazo hacia el objetivo
-        for i in range(num_eslabones):
-            r = np.linalg.norm(p_xyz_objetivo - p[i])
-            if r < EPSILON:
-                p[i+1] = p[i]
-            else:
-                lambda_i = longitudes[i] / r
-                p[i+1] = (1 - lambda_i) * p[i] + lambda_i * p_xyz_objetivo
+    if dist_objetivo > dist_total:
+        if show: print("\033[93mAdvertencia: El objetivo está fuera del alcance del robot. Estirando brazo...\033[0m")
+        for i in range(num_articulaciones):
+            direction = (p_xyz_objetivo - p[i]) / np.linalg.norm(p_xyz_objetivo - p[i])
+            p[i+1] = p[i] + direction * longitudes[i]
         p_history.append([pi.copy() for pi in p])
     else:
-        b = p[0].copy()  # Guardar la posición inicial de la raíz
-        difA = np.linalg.norm(p[-1] - p_xyz_objetivo)
+        # 3. Bucle de iteraciones FABRIK
         iteracion = 0
-        while difA > tol and iteracion < max_iter:
-            if show:
-                print(f"\n--- Iteración {iteracion + 1} ---")
-                print(f"Distancia al objetivo (difA): {difA:.6f}")
-
-            # FORWARD: mover efector final al objetivo y propagar hacia la base
-            p[-1] = p_xyz_objetivo.copy()
-            for i in range(num_eslabones - 1, 0, -1):
-                r = np.linalg.norm(p[i] - p[i-1])
-                if r < EPSILON:
-                    p[i-1] = p[i]
-                else:
-                    lambda_i = longitudes[i-1] / r
-                    p[i-1] = (1 - lambda_i) * p[i] + lambda_i * p[i-1]
-            # BACKWARD: fijar base y propagar hacia el efector
-            p[0] = b.copy()
-            for i in range(num_eslabones):
-                r = np.linalg.norm(p[i+1] - p[i])
-                if r < EPSILON:
-                    p[i+1] = p[i]
-                else:
-                    lambda_i = longitudes[i] / r
-                    p[i+1] = (1 - lambda_i) * p[i] + lambda_i * p[i+1]
+        while np.linalg.norm(p[-1] - p_xyz_objetivo) > tol and iteracion < max_iter:
+            # Fase hacia adelante (Forward reaching)
+            p[-1] = p_xyz_objetivo
+            for i in reversed(range(num_articulaciones)):
+                direction = (p[i] - p[i+1]) / np.linalg.norm(p[i] - p[i+1])
+                p[i] = p[i+1] + direction * longitudes[i]
+            
+            # Fase hacia atrás (Backward reaching)
+            p[0] = base
+            for i in range(num_articulaciones):
+                direction = (p[i+1] - p[i]) / np.linalg.norm(p[i+1] - p[i])
+                p[i+1] = p[i] + direction * longitudes[i]
+            
             p_history.append([pi.copy() for pi in p])
-            difA = np.linalg.norm(p[-1] - p_xyz_objetivo)
             iteracion += 1
 
         if show:
-            print("\n--- Convergencia ---")
-            print(f"Iteraciones: {iteracion}")
-            print(f"Distancia final al objetivo: {difA:.6f}")
-            if difA > tol:
-                print("\033[93mAdvertencia: No se alcanzó la tolerancia después del número máximo de iteraciones.\033[0m")
+            print(f"\n--- Convergencia en {iteracion} iteraciones ---")
+            dist_final = np.linalg.norm(p[-1] - p_xyz_objetivo)
+            print(f"Distancia final al objetivo: {dist_final:.6f}")
+            if dist_final > tol:
+                print("\033[93mAdvertencia: No se alcanzó la tolerancia después del máximo de iteraciones.\033[0m")
 
-    # --- Conversión de posiciones a ángulos (thetas) ---
+    # 4. Conversión de posiciones a ángulos (thetas)
     if show:
         print("\nPosiciones finales de las articulaciones (p):")
         for i, pos in enumerate(p):
-            print(f"  p[{i}]: {pos}")
+            print(f"  p[{i}]: {pos.round(4)}")
 
-    # Extraer los ángulos (thetas) de las posiciones finales de las articulaciones 'p'
     thetas_finales = extraer_thetas_desde_posiciones(robot, p)
 
     if show:
-        print(f"Ángulos finales (thetas): {np.round(np.rad2deg(thetas_finales), 2)}")
+        print(f"Ángulos finales (grados): {np.round(np.rad2deg(thetas_finales), 2)}")
+        print(f"\t\033[92mTiempo de cálculo total de FABRIK: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
 
     return thetas_finales, p_history
 
@@ -437,7 +408,7 @@ def menu_cinematica_inversa():
     # NOTA: Se usa una configuración inicial ligeramente flexionada para evitar la singularidad en thetas = [0,0,0...]
     thetas_iniciales_fabrik = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     p_xyz_objetivo = [0.1, 0.1, 0.1]
-    thetas_finales, p_history = CinematicaInversa_FABRIK(robot, p_xyz_objetivo=p_xyz_objetivo, thetas_iniciales=thetas_iniciales_fabrik, tol=1e-3, max_iter=15, show=True)
+    thetas_finales, p_history = IK_FABRIK(robot, p_xyz_objetivo=p_xyz_objetivo, thetas_iniciales=thetas_iniciales_fabrik, tol=1e-3, max_iter=15, show=True)
     
     if thetas_finales is not None:
         # La función de filtrado espera una lista de configuraciones
@@ -447,12 +418,13 @@ def menu_cinematica_inversa():
         visualizar_iteraciones_fabrik(robot, p_history, p_xyz_objetivo, save_gif=True)
 
     # Jacobiana_tuple = calcular_jacobiana(robot)
-    # thetas_follower = CinematicaInversa(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
+    # thetas_follower = IK_Jacobian(robot, Jacobiana_tuple, p_xyz=[0.1, 0.1, 0.1], RPY=[0, 0, 0])
     # filtrar_configuraciones(robot, thetas_follower)
 
     # print("\nConfiguraciones equivalentes entre (-π, π):")
     # # thetas_follower = [[np.mod(theta, 2 * np.pi) for theta in thetas] for thetas in thetas_follower] # PASAR VALORES A VALORES ENTRE -2PI Y 2PI
     # thetas_follower = [[(theta + np.pi) % (2 * np.pi) - np.pi for theta in thetas] for thetas in thetas_follower] # PASAR VALORES A VALORES ENTRE -π Y π
     # filtrar_configuraciones(robot, thetas_follower) 
+
 if __name__ == "__main__":
     menu_cinematica_inversa()

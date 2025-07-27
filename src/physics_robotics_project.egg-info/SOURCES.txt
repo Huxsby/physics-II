@@ -4,7 +4,7 @@ src/calculations/__init__.py
 src/calculations/class_helicoidales.py
 src/calculations/class_jacobian.py
 src/calculations/class_rotaciones.py
-src/calculations/problema_cinematico_inverso_gen.py
+src/calculations/inverse_kinematics_methods.py
 src/core/__init__.py
 src/core/class_robot_structure.py
 src/physics_robotics_project.egg-info/PKG-INFO

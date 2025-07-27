@@ -247,7 +247,7 @@ class Link:
         
         print(f"Eje de giro: {signo}{eje_str}\033[0m \t( {sentido} \033[0m)")
         
-        return eje*self.length
+        return eje
 
 class Datos:
     """
