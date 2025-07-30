@@ -1,0 +1,39 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" version="1.1">
+  <defs>
+    <linearGradient id="fabrik-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00FFFF;" />
+      <stop offset="50%" style="stop-color:#FF00FF;" />
+      <stop offset="100%" style="stop-color:#8F00FF;" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Objetivos / End Effectors -->
+  <g id="target-1">
+    <circle cx="85" cy="25" r="9" fill="none" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+    <line x1="85" y1="19" x2="85" y2="31" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+    <line x1="79" y1="25" x2="91" y2="25" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+  </g>
+  <g id="target-2">
+    <circle cx="80" cy="50" r="9" fill="none" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+    <line x1="80" y1="44" x2="80" y2="56" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+    <line x1="74" y1="50" x2="86" y2="50" stroke="url(#fabrik-gradient)" stroke-width="2.5"/>
+  </g>
+
+  <!-- La Cadena Cinemática en forma de "F" -->
+  <!-- Brazo superior -->
+  <polyline points="50,50 50,25 85,25"
+            stroke="url(#fabrik-gradient)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <!-- Brazo medio -->
+  <polyline points="50,50 80,50"
+            stroke="url(#fabrik-gradient)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <!-- Gatillo / Base -->
+  <polyline points="20,80 50,50"
+            stroke="url(#fabrik-gradient)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            
+  <!-- Las Articulaciones -->
+  <circle cx="20" cy="80" r="8" fill="#FFFFFF" stroke="#333" stroke-width="2"/>
+  <circle cx="50" cy="50" r="8" fill="#FFFFFF" stroke="#333" stroke-width="2"/>
+  <circle cx="50" cy="25" r="8" fill="#FFFFFF" stroke="#333" stroke-width="2"/>
+  <circle cx="85" cy="25" r="8" fill="#FFFFFF" stroke="#333" stroke-width="2"/>
+  <circle cx="80" cy="50" r="8" fill="#FFFFFF" stroke="#333" stroke-width="2"/>
+</svg>

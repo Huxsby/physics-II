@@ -1,0 +1,32 @@
+ACKNOWLEDGMENTS
+
+This project has benefited from a number of sources—thank you to all of them for the inspiration and guidance:
+
+## Algorithm & Core Concept
+
+- **FABRIK: A fast, iterative solver for the inverse kinematics problem**  
+  Andreas Aristidou & Joan Lasenby (Graphical Models, 2011). This paper introduces the FABRIK algorithm—a heuristic, forward‑and‑backward iterative method that avoids complex angle/matrix math and converges quickly while producing realistic poses.
+
+- **Extending FABRIK with Model Constraints**  
+  Andreas Aristidou, Yiorgos Chrysanthou & Joan Lasenby (Computer Animation and Virtual Worlds, first online February 2015). This work enhances FABRIK with support for closed-loop chains, leaf joints, inter-joint constraints, unreachable-target optimization, and convergence proofs.
+
+## Inspirational Implementations
+
+- **mintyleaf’s ufabrik repository** – A clear, structured implementation of FABRIK that helped me understand the algorithm in code form: https://github.com/mintyleaf/ufabrik
+
+- **rjgilmour’s p5.js sketches** – These visual examples were extremely helpful for interactive testing and learning:
+  - https://editor.p5js.org/rjgilmour/sketches/S-_nJmnUc  
+  - https://editor.p5js.org/rjgilmour/sketches/wwA3D1ZUg
+
+## Video Tutorials & Educators
+
+- **YouTube Tutorials on FABRIK**  
+  The following video walkthroughs provided clear visual explanations that complemented the theoretical references:
+  - "How to make a FABRIK IK solver with rotation constraints" by mintyleaf: https://www.youtube.com/watch?v=lJCeHXXPf5w  
+  - "FABRIK - A simple algorithm for Inverse Kinematics" by MoreJPEG: https://www.youtube.com/watch?v=Ihp6tOCYHug
+
+---
+
+## About the Authors & Core References
+
+- **Dr. Andreas Aristidou** and colleagues are the original authors of FABRIK. Their publications (2011 and 2015) are foundational to both understanding and extending the algorithm.
