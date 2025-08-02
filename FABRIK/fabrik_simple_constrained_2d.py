@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-import math
 
 # Traducción y adaptación de un script de GDScript a Python con Matplotlib.
 # El script original implementa el algoritmo FABRIK para cinemática inversa.

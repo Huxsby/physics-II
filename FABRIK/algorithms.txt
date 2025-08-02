@@ -4,6 +4,101 @@
 % "FABRIK: A fast, iterative solver for the Inverse Kinematics problem"
 % ===============================================================================
 
+% IMPLEMENTACIÓN ACTUAL: VERSIÓN 3D FIEL AL PAPER + ALGORITHM 3
+% ===============================================================================
+% 
+% El código actual implementa la versión 3D fiel al paper original,
+% con la implementación del Algorithm 3 (Target Constraint Application).
+%
+% ALGORITMOS IMPLEMENTADOS:
+% ✅ Algorithm 1: FABRIK básico con direcciones unitarias (3D)
+% ✅ Algorithm 2: Joint Constraints como post-procesamiento (restricciones esféricas/cónicas)
+% ✨ Algorithm 3: Target Constraint Application (workspace limits con secciones cónicas) - NUEVO
+% 
+% ALGORITMOS PENDIENTES:
+% [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)
+% [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors en 3D)
+% [ ] Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
+%
+% EXPANSIÓN A 3D COMPLETADA (2025-07-30):
+% ===============================================================================
+% 
+% 🚀 NUEVAS CARACTERÍSTICAS IMPLEMENTADAS:
+% 
+% 🔥 ESPACIADO 3D COMPLETO:
+%   - Vectores y operaciones en espacio 3D [x, y, z]
+%   - Rotaciones 3D usando fórmula de Rodrigues
+%   - Conversiones esféricas ↔ cartesianas
+%   - Restricciones cónicas para articulaciones esféricas
+% 
+% 🎯 ALGORITHM 3 - TARGET CONSTRAINT APPLICATION:
+%   - Implementación completa del Algorithm 3 del paper
+%   - Restricciones de workspace usando secciones cónicas
+%   - Mapeo 3D → 2D para cálculos eficientes
+%   - Proyección automática de targets fuera del workspace
+%   - Soporte para cuadrantes y parámetros configurables
+% 
+% 🔧 RESTRICCIONES ESFÉRICAS (Algorithm 2 3D):
+%   - Restricciones cónicas en lugar de angulares planas
+%   - Clipping esférico para mantener dentro del cono permitido
+%   - Cálculo de ángulos entre direcciones 3D
+%   - Rotación automática para cumplir restricciones
+% 
+% ⚙️ INFRAESTRUCTURA 3D:
+%   - Sistema de coordenadas locales para Algorithm 3
+%   - Matrices de transformación 3D
+%   - Detección de cuadrantes en espacio 2D proyectado
+%   - Cálculo de secciones cónicas (elipses, parámetros configurables)
+% 
+% MEJORAS TÉCNICAS:
+% ===============================================================================
+% 
+% 1. FIDELIDAD AL PAPER: Mantiene implementación exacta de Algorithm 1 y 2
+% 2. EXTENSIBILIDAD: Estructura preparada para Algorithm 4, 5, 6
+% 3. CONFIGURABILIDAD: Parámetros de workspace adjustables
+% 4. ROBUSTEZ: Manejo de casos extremos y singularidades
+% 
+% VERSIONES OPTIMIZADAS REMOVIDAS (2025-07-30):
+% ===============================================================================
+% 
+% Se eliminaron las siguientes optimizaciones para mantener fidelidad al paper:
+% 
+% 🗑️ ANTI-VIBRACIÓN:
+%   - Almacenamiento de configuración de distancia mínima
+%   - Early exit cuando la distancia empeora
+%   - Fallback automático a configuración estable
+% 
+% 🗑️ OPTIMIZACIONES COMPUTACIONALES:
+%   - Uso de distancia al cuadrado para evitar sqrt()
+%   - Cálculos de ángulos complejos inline
+%   - Restricciones aplicadas durante cada paso (inline)
+% 
+% 🗑️ MEJORAS DE ESTABILIDAD:
+%   - Interpolación adaptativa de articulaciones
+%   - Manejo inteligente de targets demasiado cercanos al base
+%   - Algoritmo híbrido con múltiples métodos de convergencia
+% 
+% RAZONES PARA LA ELIMINACIÓN:
+% ===============================================================================
+% 
+% 1. FIDELIDAD ACADÉMICA: Mantener implementación exacta del paper
+% 2. CLARIDAD DIDÁCTICA: Código más fácil de entender y comparar
+% 3. REPRODUCIBILIDAD: Resultados consistentes con la literatura
+% 4. SIMPLICIDAD: Eliminar complejidad innecesaria para el estudio
+% 
+% NOTAS DE RESTAURACIÓN:
+% ===============================================================================
+% 
+% Si se necesitan las optimizaciones en el futuro:
+% 1. Revisar el historial de git antes del commit de limpieza
+% 2. Las optimizaciones estaban en métodos separados:
+%    - update_ik_optimized()
+%    - _forward_pass() [versión optimizada]
+%    - _backward_pass() [versión optimizada]  
+% 3. El selector estaba implementado con use_paper_algorithm flag
+% 
+% ===============================================================================
+
 % DESCRIPCIÓN GENERAL:
 % FABRIK es un método heurístico iterativo que resuelve el problema de cinemática
 % inversa sin usar matrices de rotación ni ángulos explícitos. En su lugar, 

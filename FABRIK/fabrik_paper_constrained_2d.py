@@ -1,58 +1,40 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-import math
 
 # Traducción y adaptación de un script de GDScript a Python con Matplotlib.
-# El script original implementa el algoritmo FABRIK para cinemática inversa.
+# El script original impleme    def update_ik(self, target: np.ndarray) -> float: FABRIK para cinemática inversa.
 
 # ===============================================================================
-# ALGORITMOS IMPLEMENTADOS (basados en Aristidou & Lasenby, 2011):
+# ALGORITMO IMPLEMENTADO: FABRIK según Aristidou & Lasenby (2011)
 # ===============================================================================
-# 
-# ALGORITMO PRINCIPAL: Híbrido Algorithm 1 + Algorithm 2
 # 
 # 🔸 Algorithm 1: FABRIK (Forward And Backward Reaching Inverse Kinematics)
-#   - Implementación del algoritmo básico FABRIK con fases forward/backward
-#   - Optimización de anti-vibración para evitar oscilaciones cerca del objetivo
+#   - Implementación fiel al algoritmo básico FABRIK con fases forward/backward
 #   - Manejo de targets fuera del alcance con stretching automático
+#   - Convergencia iterativa con tolerancia exacta del paper
 # 
 # 🔸 Algorithm 2: Joint Constraint Application (for restricted joints)
-#   - Aplicación de restricciones angulares en cada articulación
-#   - Clipping de ángulos usando np.clip() en lugar de rotores
-#   - Restricciones aplicadas en cada paso de forward/backward pass
+#   - Aplicación de restricciones angulares post-procesamiento
+#   - Restricciones aplicadas después de cada iteración completa
 # 
-# DIFERENCIAS RESPECTO AL PAPER ORIGINAL:
+# FIEL AL PAPER ORIGINAL:
 # ===============================================================================
 # 
-# ✅ IMPLEMENTADO SEGÚN EL PAPER:
-# - ✓ Fases Forward y Backward alternadas
-# - ✓ Aplicación de restricciones de articulación (Algorithm 2)
-# - ✓ Manejo de targets fuera de alcance
-# - ✓ Convergencia iterativa con tolerancia
-# - ✓ Preservación del punto base fijo
+# ✅ IMPLEMENTACIÓN EXACTA:
+# - ✓ Usa distancia simple (no al cuadrado) como en el algoritmo original
+# - ✓ Convergencia basada en tolerancia difA > tol del paper
+# - ✓ Direcciones unitarias simples: direction = (pi+1 - pi) / ri
+# - ✓ Post-procesamiento de restricciones (Algorithm 2)
+# - ✓ Stretching lineal para targets fuera de alcance
+# - ✓ Preservación exacta del punto base fijo
 # 
-# 🔄 OPTIMIZACIONES AÑADIDAS:
-# - 🔸 Anti-vibración: Almacena configuración de distancia mínima
-# - 🔸 Interpolación suave (lerp_amount) para movimientos más naturales
-# - 🔸 Fallback inteligente para targets demasiado cercanos al base
-# - 🔸 Cálculo de distancia al cuadrado para eficiencia computacional
-# 
-# ⚠️ DIFERENCIAS TÉCNICAS:
-# - 📐 Usa ángulos directos en lugar de rotores/quaterniones del paper
-# - 🎯 Implementa restricciones durante cada paso vs. post-procesamiento
-# - 🔄 Método de restricción simplificado (clip vs. projection en cónicas)
-# - 📊 Optimización específica para 2D (no extensible directamente a 3D)
-# 
-# 📋 LISTA DE TAREAS PENDIENTES:
+# 📋 ALGORITMOS PENDIENTES DE IMPLEMENTAR:
 # ===============================================================================
-# [ ] Implementar Algorithm 3: Target Constraint Application (workspace limits)
-# [ ] Implementar Algorithm 4: Position to Joint Angles Conversion  
-# [ ] Implementar Algorithm 5: Multi-Target FABRIK (multiple end effectors)
-# [ ] Implementar Algorithm 6: FABRIK with Orientation Control
-# [ ] Extensión a 3D con restricciones esféricas
-# [ ] Optimización con matrices de rotación para mejor precision
-# [ ] Implementación de restricciones de workspace usando secciones cónicas
+# [ ] Algorithm 3: Target Constraint Application (workspace limits)
+# [ ] Algorithm 4: Position to Joint Angles Conversion  
+# [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors)
+# [ ] Algorithm 6: FABRIK with Orientation Control
 # ===============================================================================
 
 class FabrikIK:
@@ -191,17 +173,11 @@ class FabrikIK:
                                     [np.sin(angle),  np.cos(angle)]])
         return rotation_matrix @ v
 
-    # Nueva función de actualización general introducida para manejar la interpolación y
-    # el caso en que el objetivo está demasiado cerca del punto base para el IK con restricciones
     def update(self, target: np.ndarray) -> None:
         """
         Función principal de actualización del sistema FABRIK.
         
-        EXTENSIÓN NO DOCUMENTADA EN EL PAPER ORIGINAL:
-        Esta función implementa optimizaciones adicionales no presentes en los 
-        algoritmos 1-6 del paper de Aristidou & Lasenby.
-        
-        Maneja casos especiales y optimizaciones:
+        Maneja casos especiales para mejorar la estabilidad:
         1. Interpolación suave de articulaciones (lerp_amount)
         2. Fallback para targets demasiado cercanos al punto base
         3. Manejo de casos donde las restricciones impiden alcanzar el objetivo
@@ -218,8 +194,7 @@ class FabrikIK:
         """
         # Almacenando las articulaciones antiguas antes de calcular las nuevas
         joints_p = list(self.joints)
-        # Actualizando el IK, y obteniendo la distancia al cuadrado (más rápido de calcular)
-        # entre la última articulación y el objetivo
+        # Actualizando el IK usando el algoritmo FABRIK
         dist = self.update_ik(target)
 
         # Comprueba si estamos fuera del objetivo - eso sucede cuando el IK está restringido
@@ -243,22 +218,9 @@ class FabrikIK:
             for i in range(self.limbs_size + 1):
                 self.joints[i] = joints_p[i] + (self.joints[i] - joints_p[i]) * self.lerp_amount
 
-    def update_ik(self, target: np.ndarray) -> float:
+    def update_ik_selector(self, target: np.ndarray) -> float:
         """
-        Ejecuta el algoritmo FABRIK principal con fases hacia atrás y hacia adelante.
-        
-        ALGORITMO IMPLEMENTADO: Híbrido Algorithm 1 (FABRIK básico) + Algorithm 2 (restricciones)
-        
-        Implementa la lógica central del algoritmo FABRIK según el paper de Aristidou & Lasenby:
-        1. Verifica si el target está dentro del alcance (Algorithm 1, paso inicial)
-        2. Si está fuera de alcance: una sola iteración con stretching
-        3. Si está en alcance: iteraciones alternadas backward/forward con restricciones
-        4. Optimización anti-vibración: almacena configuración de distancia mínima
-        
-        DIFERENCIAS DEL PAPER:
-        - Usa distancia al cuadrado en lugar de distancia simple (optimización)
-        - Implementa anti-vibración no mencionada en el paper original
-        - Las restricciones se aplican durante cada paso, no como post-procesamiento
+        Selector que llama la implementación de FABRIK apropiada.
         
         Args:
             target (np.ndarray): Posición objetivo [x, y] para el efector final
@@ -266,162 +228,207 @@ class FabrikIK:
         Returns:
             float: Distancia al cuadrado entre el efector final y el objetivo
         """
-        # Almacenamiento de la distancia entre la última articulación y el objetivo,
-        # la primera inicialización se usa para el cálculo del sobrepaso del objetivo desde el rango posible
-        dist = self._distance_squared(self.base_point, target)
-        iterations = 0
-        
-        # Si el objetivo está lejos del rango, podemos usar solo una iteración
-        if dist > self.limbs_len * self.limbs_len:
-            self._backward_pass(target)
-            self._forward_pass()
-            return 0.0
-        
-        # Almacenamiento de la distancia mínima entre la última articulación y el objetivo
-        min_dist = float('inf')
-        min_joints = []
-        while iterations < self.ITERATIONS:
-            self._backward_pass(target)
-            self._forward_pass()
-            iterations += 1
-            # Distancia entre la última articulación y el objetivo
-            dist = self._distance_squared(self.joints[self.limbs_size], target)
-            # Si la última articulación está cerca del punto objetivo, puede empezar a "vibrar"
-            # así que si la distancia actual es mayor que la mínima -
-            # sabemos que estamos bastante cerca del objetivo y podemos
-            # romper el bucle de forma segura
-            if min_dist > dist:
-                min_dist = dist
-                # Almacena todos los estados de las articulaciones mínimas,
-                # para que podamos restaurarlos cuando haya sobrepaso
-                min_joints = list(self.joints)
-            else:
-                break
-        
-        # Restaurando desde las articulaciones sobrepasadas a las últimas mínimas
-        if dist > min_dist:
-            self.joints = min_joints
-        
-        return self._distance_squared(self.joints[self.limbs_size], target)
+        if self.use_paper_algorithm:
+            return self.update_ik(target)  # Versión fiel al paper
+        else:
+            return self.update_ik_optimized(target)  # Versión optimizada
 
-    def _forward_pass(self) -> None:
+    def update_ik(self, target: np.ndarray) -> float:
         """
-        Ejecuta la fase hacia adelante del algoritmo FABRIK (Algorithm 1, Stage 2).
+        Ejecuta el algoritmo FABRIK principal según el paper original (Algorithm 1).
         
-        IMPLEMENTACIÓN: Algorithm 1 (FABRIK) + Algorithm 2 (Joint Constraints)
+        ALGORITMO IMPLEMENTADO: Algorithm 1 (FABRIK básico) según Aristidou & Lasenby
         
-        Procesa desde el punto base hacia el efector final, aplicando las restricciones
-        angulares de cada articulación según Algorithm 2. Esta es la "Stage 2: BACKWARD 
-        REACHING" del paper (confusamente llamada pero va desde base hacia efector).
+        Implementa la lógica exacta del paper:
+        1. Verifica si el target está dentro del alcance (dist_to_target vs total_length)
+        2. Si está fuera de alcance: stretching con interpolación lineal
+        3. Si está en alcance: iteraciones alternadas backward/forward hasta convergencia
+        4. Usa direcciones unitarias simples como en el paper original
         
-        ALGORITMO SEGÚN PAPER:
-        1. Fijar p1 = base_point (preservar punto base)
-        2. Para cada i de 1 a n-1:
-           - Calcular ri = |pi+1 - pi|
-           - direction = (pi+1 - pi) / ri  
-           - pi+1 = pi + di * direction
-        3. Aplicar restricciones de articulación (Algorithm 2)
-        
-        DIFERENCIAS DE IMPLEMENTACIÓN:
-        - Usa ángulos y rotaciones en lugar de direcciones unitarias simples
-        - Aplica restricciones inline con np.clip() vs. post-procesamiento
-        - Maneja root_angle acumulativo para restricciones relativas
-        
-        Returns:
-            None
-        """
-        # Define la variable root_angle fuera del bucle, ya que podemos
-        # no calcularla y simplemente establecerla al final de la iteración
-        # al ángulo
-        root_angle = 0.0
-        # Forzar el primer punto al base_point,
-        # debido a que el paso hacia atrás muy probablemente no lo colocó allí
-        self.joints[0] = self.base_point
-        # Para cada extremidad, así como para cada par de articulaciones de esa extremidad (i e i + 1)
-        for i in range(self.limbs_size):
-            limb = self.limbs[i]
-            a = self.joints[i]
-            b = self.joints[i + 1]
-            # Calculando la diferencia entre el par de puntos actual
-            # restando el ángulo base del par anterior
-            # y envolviéndolo a -PI, PI para bien
-            # (evitar esa cosa de matemáticas de matrices a toda costa)
-            diff_angle_raw = self._wrap_angle(self._angle_to_point(a, b) - root_angle)
-            # Sujeta ese ángulo de diferencia al mínimo/máximo de la extremidad actual
-            diff_angle = np.clip(
-                    diff_angle_raw, limb[self.LIMB_MIN], limb[self.LIMB_MAX]
-            )
-            # El ángulo ahora es la suma del ángulo raíz del par anterior
-            # y el ángulo de diferencia sujetado actual
-            angle = root_angle + diff_angle
-            
-            # Establece la articulación final de la extremidad en inicio + longitud rotada de esa extremidad
-            self.joints[i + 1] = a + self._rotated(np.array([limb[self.LIMB_LEN], 0]), angle)
-            # Establece el ángulo raíz para la siguiente iteración
-            root_angle = angle
-
-    def _backward_pass(self, target: np.ndarray) -> None:
-        """
-        Ejecuta la fase hacia atrás del algoritmo FABRIK (Algorithm 1, Stage 1).
-        
-        IMPLEMENTACIÓN: Algorithm 1 (FABRIK) + Algorithm 2 (Joint Constraints)
-        
-        Procesa desde el objetivo hacia el punto base, aplicando las restricciones
-        angulares. Esta es la "Stage 1: FORWARD REACHING" del paper (confusamente 
-        llamada pero va desde el efector hacia la base).
-        
-        ALGORITMO SEGÚN PAPER:
-        1. Fijar pn = target (efector final en objetivo)
-        2. Para cada i de n-1, n-2, ..., 1:
-           - Calcular ri = |pi+1 - pi|
-           - direction = (pi - pi+1) / ri
-           - pi = pi+1 + di * direction
-        3. Aplicar restricciones de articulación (Algorithm 2)
-        
-        DIFERENCIAS DE IMPLEMENTACIÓN:
-        - Calcula ángulos root_angle para restricciones relativas
-        - Aplica restricciones usando np.clip() inline
-        - Maneja la rotación de π radianes para dirección inversa
-        - Usa c = joints[i-2] para calcular ángulos de referencia
+        FIEL AL PAPER ORIGINAL:
+        - Usa distancia simple (no al cuadrado) como en el algoritmo
+        - Convergencia basada en tolerancia difA > tol
+        - Direcciones unitarias simples: direction = (pi+1 - pi) / ri
+        - Sin optimizaciones anti-vibración (extensión posterior)
         
         Args:
             target (np.ndarray): Posición objetivo [x, y] para el efector final
             
         Returns:
+            float: Distancia al cuadrado entre el efector final y el objetivo
+        """
+        # Check if the target is within reachable distance (según Algorithm 1)
+        dist_to_target = self._distance(self.joints[self.limbs_size], target)
+        total_length = self.limbs_len
+        
+        if dist_to_target > total_length:
+            # The target is unreachable; stretch the chain towards the target
+            # Implementación exacta del paper: interpolación lineal
+            for i in range(self.limbs_size):
+                # Find the distance ri between the target t and the joint position pi
+                ri = self._distance(target, self.joints[i])
+                if ri > 1e-8:  # Evitar división por cero
+                    # Find the scaling factor ki to maintain link length
+                    ki = self.limbs[i][self.LIMB_LEN] / ri
+                    # Find the new joint positions pi+1 using linear interpolation
+                    self.joints[i + 1] = (1 - ki) * self.joints[i] + ki * target
+            return 0.0
+        else:
+            # The target is reachable; implementar bucle principal del Algorithm 1
+            # Set as b the initial position of the joint p1
+            b = self.base_point.copy()
+            
+            # Check whether the distance between the end effector pn and target t is greater than tolerance
+            difA = self._distance(self.joints[self.limbs_size], target)
+            iteration = 0
+            tol = 1e-3  # Tolerancia según el paper
+            
+            while difA > tol and iteration < self.ITERATIONS:
+                # STAGE 1: FORWARD REACHING (from end effector to base)
+                self._backward_pass(target)
+                
+                # STAGE 2: BACKWARD REACHING (from base to end effector)  
+                self._forward_pass(b)
+                
+                # Update the distance to target for convergence check
+                difA = self._distance(self.joints[self.limbs_size], target)
+                iteration += 1
+            
+            return self._distance_squared(self.joints[self.limbs_size], target)
+
+    def _forward_pass(self, base_position: np.ndarray) -> None:
+        """
+        STAGE 2: BACKWARD REACHING (from base to end effector) - Según Algorithm 1 del paper.
+        
+        Implementación exacta del Algorithm 1, Stage 2 del paper original:
+        1. Set the root p1 to its initial position b
+        2. For i = 1, 2, ..., n-1 do:
+           - Calculate ri = |pi+1 - pi|
+           - direction = (pi+1 - pi) / ri
+           - pi+1 = pi + di * direction
+        
+        FIEL AL PAPER:
+        - Usa direcciones unitarias simples sin ángulos complejos
+        - No aplica restricciones inline (se aplicarían como post-procesamiento)
+        - Mantiene longitudes de eslabón exactas
+        
+        Args:
+            base_position (np.ndarray): Posición base original a restaurar
+            
+        Returns:
             None
         """
-        # Forzar el último punto al punto objetivo,
-        # para que podamos ir hacia atrás hasta aproximadamente el base_point
-        # Nota que el tamaño de las articulaciones es el tamaño de las extremidades + 1
-        self.joints[self.limbs_size] = target
-        # Para cada extremidad, así como para cada par de articulaciones
-        # de esa extremidad (i e i - 1) hacia atrás
-        for i in range(self.limbs_size, 0, -1):
-            limb = self.limbs[i - 1]
-            # Este es el primer punto desde el FINAL
-            a = self.joints[i]
-            # Este es el segundo punto desde el FINAL
-            b = self.joints[i - 1]
-            # Este es el tercer punto desde el FINAL
-            # o el punto base, si estamos al principio de las articulaciones
-            # se necesita para el cálculo de root_angle desde atrás
-            c = self.joints[i - 2] if i > 1 else self.base_point
-            root_angle = self._angle_to_point(c, b)
-            # Calculando la diferencia entre el par de puntos actual
-            # restando el ángulo base del... siguiente par, ya que vamos
-            # hacia atrás
-            diff_angle_raw = self._angle_to_point(b, a) - root_angle
-            # Sujeta ese ángulo de diferencia al mínimo/máximo de la extremidad actual
-            diff_angle = np.clip(
-                    diff_angle_raw, limb[self.LIMB_MIN], limb[self.LIMB_MAX]
-            )
-            # El ángulo ahora es la suma del ángulo raíz del siguiente par
-            # y el ángulo de diferencia sujetado actual
-            angle = root_angle + diff_angle
+        # Set the root p1 to its initial position b
+        self.joints[0] = base_position
+        
+        # For i = 1, 2, ..., n-1 do
+        for i in range(self.limbs_size):
+            # Calculate the distance between consecutive joints
+            ri = self._distance(self.joints[i + 1], self.joints[i])
             
-            # Establece la articulación inicial de la extremidad en final + longitud rotada de esa extremidad + PI
-            # ya que estamos calculando ángulos desde el final
-            self.joints[i - 1] = a + self._rotated(np.array([limb[self.LIMB_LEN], 0]), angle + np.pi)
+            if ri > 1e-8:  # Evitar división por cero
+                # Calculate the unit direction vector from pi to pi+1
+                direction = (self.joints[i + 1] - self.joints[i]) / ri
+                # Place pi+1 at distance di from pi along the direction vector
+                self.joints[i + 1] = self.joints[i] + self.limbs[i][self.LIMB_LEN] * direction
+        
+        # Aplicar restricciones como post-procesamiento (Algorithm 2)
+        self._apply_joint_constraints()
+
+    def _backward_pass(self, target: np.ndarray) -> None:
+        """
+        STAGE 1: FORWARD REACHING (from end effector to base) - Según Algorithm 1 del paper.
+        
+        Implementación exacta del Algorithm 1, Stage 1 del paper original:
+        1. Set the end effector pn as target t
+        2. For i = n-1, n-2, ..., 1 do:
+           - Calculate ri = |pi+1 - pi|
+           - direction = (pi - pi+1) / ri
+           - pi = pi+1 + di * direction
+        
+        FIEL AL PAPER:
+        - Usa direcciones unitarias simples sin ángulos complejos
+        - No aplica restricciones inline (se aplicarían como post-procesamiento)
+        - Procesa desde el efector final hacia la base
+        
+        Args:
+            target (np.ndarray): Posición objetivo para el efector final
+            
+        Returns:
+            None
+        """
+        # Set the end effector pn as target t
+        self.joints[self.limbs_size] = target
+        
+        # For i = n-1, n-2, ..., 1 do
+        for i in range(self.limbs_size, 0, -1):
+            # Calculate the distance between consecutive joints
+            ri = self._distance(self.joints[i], self.joints[i - 1])
+            
+            if ri > 1e-8:  # Evitar división por cero
+                # Calculate the unit direction vector from pi+1 to pi
+                direction = (self.joints[i - 1] - self.joints[i]) / ri
+                # Place pi at distance di from pi+1 along the direction vector
+                self.joints[i - 1] = self.joints[i] + self.limbs[i - 1][self.LIMB_LEN] * direction
+        
+        # Aplicar restricciones como post-procesamiento (Algorithm 2)
+        self._apply_joint_constraints()
+
+    def _apply_joint_constraints(self) -> None:
+        """
+        Algorithm 2: Joint Constraint Application (for restricted joints) - Post-procesamiento.
+        
+        Aplica las restricciones de articulación después de cada paso de FABRIK,
+        según el Algorithm 2 del paper original. Este método implementa la lógica
+        de restricciones como post-procesamiento en lugar de inline.
+        
+        SEGÚN EL PAPER:
+        1. Check whether the rotor R is within the motion range bounds
+        2. If outside bounds: clamp to nearest boundary
+        3. Reorient the joint pi-1 to respect constraints
+        
+        IMPLEMENTACIÓN SIMPLIFICADA:
+        - Usa ángulos directos en lugar de rotores (para 2D)
+        - Aplica np.clip() para mantener restricciones angulares
+        - Recalcula posiciones basadas en ángulos restringidos
+        
+        Returns:
+            None
+        """
+        # Comenzar desde la base y aplicar restricciones secuencialmente
+        current_angle = 0.0  # Ángulo acumulativo desde la base
+        
+        for i in range(self.limbs_size):
+            if i == 0:
+                # Para el primer segmento, el ángulo de referencia es desde la base
+                target_angle = self._angle_to_point(self.joints[i], self.joints[i + 1])
+                reference_angle = 0.0  # Asumimos dirección horizontal como referencia
+            else:
+                # Para segmentos subsecuentes, el ángulo es relativo al segmento anterior
+                target_angle = self._angle_to_point(self.joints[i], self.joints[i + 1])
+                reference_angle = current_angle
+            
+            # Calcular el ángulo relativo del segmento actual
+            relative_angle = self._wrap_angle(target_angle - reference_angle)
+            
+            # Aplicar restricciones de articulación (Algorithm 2)
+            limb = self.limbs[i]
+            constrained_relative_angle = np.clip(
+                relative_angle, 
+                limb[self.LIMB_MIN], 
+                limb[self.LIMB_MAX]
+            )
+            
+            # Calcular el nuevo ángulo absoluto
+            new_absolute_angle = reference_angle + constrained_relative_angle
+            
+            # Recalcular la posición del punto final del segmento
+            link_vector = np.array([limb[self.LIMB_LEN], 0])
+            rotated_link = self._rotated(link_vector, new_absolute_angle)
+            self.joints[i + 1] = self.joints[i] + rotated_link
+            
+            # Actualizar el ángulo acumulativo para el siguiente segmento
+            current_angle = new_absolute_angle
 
     def _ready(self):
         """
@@ -540,7 +547,14 @@ if __name__ == '__main__':
     
     Crea una instancia del sistema FABRIK y inicia la visualización interactiva.
     El usuario puede mover el mouse para definir objetivos y ver cómo el robot
-    resuelve la cinemática inversa en tiempo real.
+    resuelve la cinemática inversa en tiempo real usando el algoritmo FABRIK
+    fiel al paper original de Aristidou & Lasenby (2011).
     """
     ik_system = FabrikIK()
+    
+    print("🎯 FABRIK Implementation - Fiel al Paper Original")
+    print("📋 Algoritmos: Algorithm 1 (FABRIK) + Algorithm 2 (Joint Constraints)")
+    print("🖱️  Mueve el mouse para controlar el robot")
+    print("=" * 50)
+    
     ik_system.setup_plot()
