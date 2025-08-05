@@ -2,43 +2,43 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-
-# Traducción y adaptación de un script de GDScript a Python con Matplotlib.
-# El script original implementa el algoritmo FABRIK para cinemática inversa.
+from animation import guardar_animacion
+from core import Robot, Link, cargar_robot_desde_yaml
+from calculations.class_helicoidales import CinematicaDirecta, calcular_posiciones_articulaciones
 
 # ===============================================================================
 # ALGORITMO IMPLEMENTADO: FABRIK 3D según Aristidou & Lasenby (2011)
 # ===============================================================================
 # 
-# 🔸 Algorithm 1: FABRIK (Forward And Backward Reaching Inverse Kinematics) 3D
-#   - Implementación fiel al algoritmo básico FABRIK con fases forward/backward
-#   - Expansión completa a espacio 3D con vectores y restricciones espaciales
-#   - Manejo de targets fuera del alcance con stretching automático
-#   - Convergencia iterativa con tolerancia exacta del paper
+# Algorithm 1: FABRIK (Forward And Backward Reaching Inverse Kinematics) 3D
+# - Implementación fiel al algoritmo básico FABRIK con fases forward/backward
+# - Expansión completa a espacio 3D con vectores y restricciones espaciales
+# - Manejo de targets fuera del alcance con stretching automático
+# - Convergencia iterativa con tolerancia exacta del paper
 # 
-# 🔸 Algorithm 2: Joint Constraint Application (for restricted joints) 3D
-#   - Aplicación de restricciones angulares esféricas post-procesamiento
-#   - Restricciones aplicadas después de cada iteración completa
-#   - Soporte para restricciones cónicas en articulaciones esféricas
+# Algorithm 2: Joint Constraint Application (for restricted joints) 3D
+# - Aplicación de restricciones angulares esféricas post-procesamiento
+# - Restricciones aplicadas después de cada iteración completa
+# - Soporte para restricciones cónicas en articulaciones esféricas
 # 
-# 🔸 Algorithm 3: Target Constraint Application (workspace limits) 3D ✨ NUEVO
-#   - Implementación de restricciones de workspace usando secciones cónicas
-#   - Mapeo de problemas 3D a 2D para cálculos eficientes
-#   - Aplicación de límites de workspace en tiempo real
+# Algorithm 3: Target Constraint Application (workspace limits) 3D NUEVO
+# - Implementación de restricciones de workspace usando secciones cónicas
+# - Mapeo de problemas 3D a 2D para cálculos eficientes
+# - Aplicación de límites de workspace en tiempo real
 # 
 # FIEL AL PAPER ORIGINAL + EXTENSIÓN 3D:
 # ===============================================================================
 # 
-# ✅ IMPLEMENTACIÓN EXACTA:
-# - ✓ Usa distancia simple (no al cuadrado) como en el algoritmo original
-# - ✓ Convergencia basada en tolerancia difA > tol del paper
-# - ✓ Direcciones unitarias simples: direction = (pi+1 - pi) / ri en 3D
-# - ✓ Post-procesamiento de restricciones (Algorithm 2) para articulaciones esféricas
-# - ✓ Stretching lineal para targets fuera de alcance en espacio 3D
-# - ✓ Preservación exacta del punto base fijo
-# - ✨ Workspace constraints usando secciones cónicas (Algorithm 3)
+# IMPLEMENTACIÓN EXACTA:
+# - [X] Usa distancia simple (no al cuadrado) como en el algoritmo original
+# - [X] Convergencia basada en tolerancia difA > tol del paper
+# - [X] Direcciones unitarias simples: direction = (pi+1 - pi) / ri en 3D
+# - [X] Post-procesamiento de restricciones (Algorithm 2) para articulaciones esféricas
+# - [X] Stretching lineal para targets fuera de alcance en espacio 3D
+# - [X] Preservación exacta del punto base fijo
+# - [ ] Workspace constraints usando secciones cónicas (Algorithm 3)
 # 
-# 📋 ALGORITMOS PENDIENTES DE IMPLEMENTAR:
+#  ALGORITMOS PENDIENTES DE IMPLEMENTAR:
 # ===============================================================================
 # [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)
 # [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors en 3D)
@@ -59,6 +59,8 @@ class FabrikIK3D:
     Adaptado y traducido de GDScript a Python con Matplotlib para visualización 3D.
     """
     
+    # CONSTRUCTOR Y CONFIGURACIÓN INICIAL
+    
     def __init__(self):
         """
         Inicializa el sistema de cinemática inversa FABRIK 3D.
@@ -66,10 +68,11 @@ class FabrikIK3D:
         Configura las constantes, parámetros del algoritmo y estructura inicial
         de las articulaciones del robot en espacio 3D.
         """
-        # Índices para el almacenamiento de las extremidades, autoexplicativos
-        self.LIMB_LEN = 0  # Índice para la longitud de la extremidad
-        self.LIMB_MIN = 1  # Índice para el ángulo mínimo de restricción (esférica)
-        self.LIMB_MAX = 2  # Índice para el ángulo máximo de restricción (esférica)
+        
+        self.name = "FABRIK_3D" # Configuración del nombre del sistema FABRIK 3D
+
+        # Índices para el almacenamiento de las extremidades: Longitud ; Ángulo mínimo ; Ángulo máximo.
+        self.LIMB_LEN = 0 ; self.LIMB_MIN = 1 ; self.LIMB_MAX = 2 # (restricción esférica)
         
         # Usado para calcular cuánto falla el IK en alcanzar el objetivo
         self.BIAS = 3.0  # Tolerancia de error para considerar el objetivo alcanzado
@@ -109,7 +112,91 @@ class FabrikIK3D:
             np.deg2rad(30),  # θ4 - ángulo de restricción cuadrante 4
         ]
 
+        # Sistema de grabación avanzado
+        self.recording_state = 'stopped'  # 'stopped', 'recording', 'paused'
+        self.recording_frames = []  # Buffer para frames de grabación
+        self.frame_buffer = []  # Buffer circular para últimos 10 segundos
+        self.max_buffer_size = 200  # 10 segundos a 20 fps
+        self.recording_fps = 20
+        self.recording_dpi = 300
+        self.current_frame_count = 0
+
         self._ready()
+
+    # MÉTODOS DE REPRESENTACIÓN Y DEPURACIÓN
+
+    def __str__(self):
+        """
+        Representación en cadena de texto completa del sistema FABRIK 3D.
+        
+        Incluye toda la información relevante de la clase: configuración del algoritmo,
+        estructura del robot, estado actual, restricciones y parámetros de workspace.
+        
+        Returns:
+            str: Descripción detallada del sistema FABRIK 3D
+        """
+        info = []
+        info.append("=" * 60)
+        info.append("FABRIK 3D - Forward And Backward Reaching Inverse Kinematics")
+        info.append("=" * 60)
+        
+        # Configuración del algoritmo
+        info.append("\nCONFIGURACIÓN DEL ALGORITMO:")
+        info.append(f" - Máximo de iteraciones: {self.ITERATIONS}")
+        info.append(f" - Tolerancia (BIAS): {self.BIAS}")
+        info.append(f" - Factor de interpolación (lerp): {self.lerp_amount}")
+        
+        # Estado del target
+        info.append("\nESTADO DEL TARGET:")
+        info.append(f" - Posición objetivo: [{self.target[0]:.3f}, {self.target[1]:.3f}, {self.target[2]:.3f}]")
+        info.append(f" - Paso de movimiento: {self.target_step:.3f}")
+        
+        # Estructura del robot
+        info.append("\nESTRUCTURA DEL ROBOT:")
+        info.append(f" - Punto base: [{self.base_point[0]:.3f}, {self.base_point[1]:.3f}, {self.base_point[2]:.3f}]")
+        info.append(f" - Número de eslabones: {self.limbs_size}")
+        info.append(f" - Longitud total: {self.limbs_len:.3f}")
+        
+        # Información de eslabones y restricciones
+        info.append("\nESLABONES Y RESTRICCIONES:")
+        for i, limb in enumerate(self.limbs):
+            length = limb[self.LIMB_LEN]
+            min_angle = np.rad2deg(limb[self.LIMB_MIN])
+            max_angle = np.rad2deg(limb[self.LIMB_MAX])
+            info.append(f" - Eslabón {i+1}: Longitud={length:.2f}, Ángulos=[{min_angle:.1f}°, {max_angle:.1f}°]")
+        
+        # Posiciones actuales de las articulaciones
+        info.append("\nPOSICIONES ACTUALES DE ARTICULACIONES:")
+        for i, joint in enumerate(self.joints):
+            if i == 0:
+                info.append(f" - Base: [{joint[0]:.3f}, {joint[1]:.3f}, {joint[2]:.3f}]")
+            elif i == len(self.joints) - 1:
+                info.append(f" - Efector final: [{joint[0]:.3f}, {joint[1]:.3f}, {joint[2]:.3f}]")
+            else:
+                info.append(f" - Articulación {i}: [{joint[0]:.3f}, {joint[1]:.3f}, {joint[2]:.3f}]")
+        
+        # Restricciones de workspace
+        info.append("\nRESTRICCIONES DE WORKSPACE:")
+        info.append(f" - Restricciones habilitadas: {'SÍ' if self.workspace_constraints_enabled else 'NO'}")
+        
+        # Métricas actuales
+        info.append("\nMÉTRICAS ACTUALES:")
+        if len(self.joints) > 0:
+            end_effector = self.joints[-1]
+            distance_to_target = np.linalg.norm(end_effector - self.target)
+            distance_from_base = np.linalg.norm(end_effector - self.base_point)
+            reachability = (distance_to_target / self.limbs_len) * 100 if self.limbs_len > 0 else 0
+            
+            info.append(f" - Distancia al objetivo: {distance_to_target:.6f}")
+            info.append(f" - Distancia desde la base: {distance_from_base:.3f}")
+            info.append(f" - Alcanzabilidad del objetivo: {reachability:.1f}% del alcance máximo")
+            info.append(f" - ¿Objetivo alcanzable?: {'SÍ' if distance_to_target <= self.limbs_len else 'NO'}")
+        
+        info.append("\n" + "=" * 80)
+        
+        return "\n".join(info)
+
+    # FUNCIONES AUXILIARES MATEMÁTICAS
 
     def _wrap_angle(self, angle):
         """
@@ -238,6 +325,8 @@ class FabrikIK3D:
         theta = np.arccos(v[2] / r)  # Ángulo polar
         phi = np.arctan2(v[1], v[0])  # Ángulo azimutal
         return r, theta, phi
+
+    # ALGORITMOS PRINCIPALES DE FABRIK 3D
 
     def update(self, target: np.ndarray) -> None:
         """
@@ -431,6 +520,8 @@ class FabrikIK3D:
         # Aplicar restricciones como post-procesamiento (Algorithm 2)
         self._apply_joint_constraints()
 
+    # ALGORITMOS DE RESTRICCIONES Y WORKSPACE
+
     def _apply_joint_constraints(self) -> None:
         """
         Algorithm 2: Joint Constraint Application (for restricted joints) - Post-procesamiento 3D.
@@ -454,13 +545,50 @@ class FabrikIK3D:
         """
         # Comenzar desde la base y aplicar restricciones secuencialmente
         for i in range(self.limbs_size):
+            # NUEVA IMPLEMENTACIÓN: Reorientación basada en Algorithm 3
+            # En lugar de usar la dirección del eslabón anterior como referencia,
+            # calcular la dirección neutral real basada en joint_limits del robot
+            
             if i == 0:
-                # Para el primer segmento, la dirección de referencia es el eje X
-                reference_direction = np.array([1.0, 0.0, 0.0])
+                # Para el primer segmento, usar la dirección de extensión por defecto
+                default_direction = np.array([1.0, 0.0, 0.0])
             else:
-                # Para segmentos subsecuentes, la dirección de referencia es el segmento anterior
+                # Para segmentos subsecuentes, la dirección por defecto es la extensión lineal
                 prev_segment = self.joints[i] - self.joints[i - 1]
-                reference_direction = self._normalized(prev_segment)
+                default_direction = self._normalized(prev_segment)
+            
+            # CLAVE: Verificar si tenemos información de orientación neutral del robot real
+            limb = self.limbs[i]
+            if len(limb) > 3 and isinstance(limb[3], dict):
+                # Si tenemos metadata del robot (neutral_angle, range_type)
+                constraint_metadata = limb[3]
+                if 'neutral_angle' in constraint_metadata and 'range_type' in constraint_metadata:
+                    # Calcular la dirección neutral real basada en el ángulo del robot
+                    neutral_angle = constraint_metadata['neutral_angle']
+                    
+                    # Crear matriz de rotación para orientar hacia la posición neutral
+                    # (esto simula la orientación real de la articulación del robot)
+                    if i > 0:
+                        # Rotar la dirección por defecto según el ángulo neutral real
+                        axis = np.array([0.0, 0.0, 1.0])  # Asumir rotación en Z por defecto
+                        cos_theta = np.cos(neutral_angle)
+                        sin_theta = np.sin(neutral_angle)
+                        
+                        # Aplicar rotación de Rodrigues para reorientar hacia neutral
+                        K = np.array([[0, -axis[2], axis[1]],
+                                     [axis[2], 0, -axis[0]],
+                                     [-axis[1], axis[0], 0]])
+                        
+                        R_neutral = np.eye(3) + sin_theta * K + (1 - cos_theta) * K @ K
+                        reference_direction = R_neutral @ default_direction
+                    else:
+                        reference_direction = default_direction
+                else:
+                    # Fallback al método original
+                    reference_direction = default_direction
+            else:
+                # Método original: usar dirección del eslabón anterior
+                reference_direction = default_direction
             
             # Dirección actual del segmento
             current_segment = self.joints[i + 1] - self.joints[i]
@@ -709,6 +837,8 @@ class FabrikIK3D:
         # Para otros tipos de cónicas, implementar algoritmos específicos
         return point
 
+    # INICIALIZACIÓN Y CONFIGURACIÓN
+
     def _ready(self):
         """
         Inicializa la estructura de articulaciones del robot en 3D.
@@ -733,6 +863,185 @@ class FabrikIK3D:
         # Convertir a arrays de float para operaciones numéricas
         self.joints = [np.array(j, dtype=float) for j in self.joints]
 
+    # SISTEMA DE GRABACIÓN Y ANIMACIÓN
+
+    def start_recording(self):
+        """Inicia la grabación de la animación."""
+        if self.recording_state == 'recording':
+            print("ADVERTENCIA: Ya se está grabando")
+            return
+        
+        self.recording_state = 'recording'
+        self.recording_frames = []
+        self.current_frame_count = 0
+        print("GRABACION INICIADA")
+        print("   Presiona P para pausar, X para parar")
+    
+    def pause_recording(self):
+        """Pausa o reanuda la grabación."""
+        if self.recording_state == 'recording':
+            self.recording_state = 'paused'
+            print("GRABACION PAUSADA")
+            print("   Presiona P para reanudar")
+        elif self.recording_state == 'paused':
+            self.recording_state = 'recording'
+            print("GRABACION REANUDADA")
+        else:
+            print("ADVERTENCIA: No hay grabación activa para pausar")
+    
+    def stop_recording(self):
+        """Detiene la grabación y guarda el archivo."""
+        if self.recording_state == 'stopped':
+            print("ADVERTENCIA: No hay grabación activa")
+            return
+        
+        if len(self.recording_frames) == 0:
+            print("ADVERTENCIA: No hay frames grabados")
+            self.recording_state = 'stopped'
+            return
+        
+        self.recording_state = 'stopped'
+        frame_count = len(self.recording_frames)
+        duration = frame_count / self.recording_fps
+        
+        print(f"GRABACION DETENIDA")
+        print(f"   Frames capturados: {frame_count}")
+        print(f"   Duración: {duration:.1f} segundos")
+        
+        # Crear animación temporal con los frames grabados
+        self._save_recorded_frames("recording")
+    
+    def capture_recap(self):
+        """Captura los últimos 10 segundos del buffer."""
+        if len(self.frame_buffer) == 0:
+            print("ADVERTENCIA: No hay frames en el buffer para recap")
+            return
+        
+        frame_count = len(self.frame_buffer)
+        duration = frame_count / self.recording_fps
+        
+        print(f"CAPTURANDO RECAP")
+        print(f"   Frames disponibles: {frame_count}")
+        print(f"   Duración: {duration:.1f} segundos")
+        
+        # Usar todos los frames del buffer
+        self._save_buffer_frames("recap")
+    
+    def _save_recorded_frames(self, prefix):
+        """Guarda los frames grabados como animación."""
+        if len(self.recording_frames) == 0:
+            return
+        
+        # Crear una animación temporal con frames específicos
+        temp_fig, temp_ax = plt.subplots(figsize=(12, 9), subplot_kw={'projection': '3d'})
+        temp_ax.set_xlim(self.ax.get_xlim())
+        temp_ax.set_ylim(self.ax.get_ylim())
+        temp_ax.set_zlim(self.ax.get_zlim())
+        temp_ax.set_xlabel('X')
+        temp_ax.set_ylabel('Y')
+        temp_ax.set_zlabel('Z')
+        temp_ax.set_title('FABRIK 3D - Animación Grabada')
+        
+        def animate_recorded(frame_idx):
+            temp_ax.clear()
+            temp_ax.set_xlim(self.ax.get_xlim())
+            temp_ax.set_ylim(self.ax.get_ylim())
+            temp_ax.set_zlim(self.ax.get_zlim())
+            temp_ax.set_xlabel('X')
+            temp_ax.set_ylabel('Y')
+            temp_ax.set_zlabel('Z')
+            temp_ax.set_title('FABRIK 3D - Animación Grabada')
+            
+            # Obtener el frame grabado
+            frame_data = self.recording_frames[frame_idx]
+            joints_data = frame_data['joints']
+            target_data = frame_data['target']
+            
+            # Dibujar robot
+            points = np.array(joints_data)
+            temp_ax.plot(points[:, 0], points[:, 1], points[:, 2], 'o-', 
+                        color='blue', lw=2, markersize=6, markerfacecolor='red')
+            
+            # Dibujar target
+            temp_ax.plot([target_data[0]], [target_data[1]], [target_data[2]], 
+                        'o', color='green', markersize=10, alpha=0.7)
+            
+            # Dibujar base
+            temp_ax.plot([self.base_point[0]], [self.base_point[1]], [self.base_point[2]], 
+                        'o', color='black', markersize=8, markerfacecolor='yellow')
+        
+        # Crear animación
+        temp_anim = FuncAnimation(temp_fig, animate_recorded, frames=len(self.recording_frames),
+                                 interval=50, blit=False, cache_frame_data=False, repeat=False)
+        
+        # Guardar
+        filename = f'FABRIK/fabrik_3d_{prefix}_{self.name if self.name else "default"}'
+        try:
+            print(f"Guardando {filename.split('/')[-1]}...")
+            guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)
+        except Exception as e:
+            print(f"Error guardando animación: {e}")
+        finally:
+            plt.close(temp_fig)
+    
+    def _save_buffer_frames(self, prefix):
+        """Guarda los frames del buffer como animación."""
+        if len(self.frame_buffer) == 0:
+            return
+        
+        # Crear una animación temporal con frames del buffer
+        temp_fig, temp_ax = plt.subplots(figsize=(12, 9), subplot_kw={'projection': '3d'})
+        temp_ax.set_xlim(self.ax.get_xlim())
+        temp_ax.set_ylim(self.ax.get_ylim())
+        temp_ax.set_zlim(self.ax.get_zlim())
+        temp_ax.set_xlabel('X')
+        temp_ax.set_ylabel('Y')
+        temp_ax.set_zlabel('Z')
+        temp_ax.set_title('FABRIK 3D - Recap Últimos 10s')
+        
+        def animate_buffer(frame_idx):
+            temp_ax.clear()
+            temp_ax.set_xlim(self.ax.get_xlim())
+            temp_ax.set_ylim(self.ax.get_ylim())
+            temp_ax.set_zlim(self.ax.get_zlim())
+            temp_ax.set_xlabel('X')
+            temp_ax.set_ylabel('Y')
+            temp_ax.set_zlabel('Z')
+            temp_ax.set_title('FABRIK 3D - Recap Últimos 10s')
+            
+            # Obtener el frame del buffer
+            frame_data = self.frame_buffer[frame_idx]
+            joints_data = frame_data['joints']
+            target_data = frame_data['target']
+            
+            # Dibujar robot
+            points = np.array(joints_data)
+            temp_ax.plot(points[:, 0], points[:, 1], points[:, 2], 'o-', 
+                        color='blue', lw=2, markersize=6, markerfacecolor='red')
+            
+            # Dibujar target
+            temp_ax.plot([target_data[0]], [target_data[1]], [target_data[2]], 
+                        'o', color='green', markersize=10, alpha=0.7)
+            
+            # Dibujar base
+            temp_ax.plot([self.base_point[0]], [self.base_point[1]], [self.base_point[2]], 
+                        'o', color='black', markersize=8, markerfacecolor='yellow')
+        
+        # Crear animación
+        temp_anim = FuncAnimation(temp_fig, animate_buffer, frames=len(self.frame_buffer),
+                                 interval=50, blit=False, cache_frame_data=False, repeat=False)
+        
+        # Guardar
+        filename = f'FABRIK/fabrik_3d_{prefix}_{self.name if self.name else "default"}'
+        try:
+            print(f"Guardando {filename.split('/')[-1]}...")
+            guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)
+        except Exception as e:
+            print(f"Error guardando recap: {e}")
+        finally:
+            plt.close(temp_fig)
+
+    # INTERFAZ GRÁFICA Y VISUALIZACIÓN
 
     def setup_plot(self):
         """
@@ -812,13 +1121,14 @@ class FabrikIK3D:
             # Hacer que la figura sea focuseable
             self.fig.canvas.manager.set_window_title("FABRIK 3D - Presiona H para ayuda")
             
-            # Inicializar target en una posición visible
-            self.target = np.array([100.0, 50.0, 30.0])
+            # Inicializar target en una posición visible proporcional al robot
+            self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2])
             
-            # Variables para controlar la velocidad de movimiento
-            self.target_step = 10.0  # Paso de movimiento del target
+            # Variables para controlar la velocidad de movimiento (proporcional al robot)
+            self.target_step = self.limbs_len * 0.05  # 5% de la longitud total del robot
             
             self.anim = FuncAnimation(self.fig, self.animate, interval=50, blit=False, cache_frame_data=False)
+
             plt.show()
 
     def on_key_press(self, event):
@@ -856,13 +1166,15 @@ class FabrikIK3D:
         elif key == 'j':  # J - Bajar en Z
             self.target[2] -= self.target_step
         elif key == 'r':  # Reset posición
-            self.target = np.array([100.0, 50.0, 30.0])
+            self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2])
             print(f"Target reseteado a: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}]")
         elif key == '+' or key == '=':  # Aumentar velocidad
-            self.target_step = min(self.target_step + 2.0, 50.0)
+            max_step = self.limbs_len * 0.2  # Máximo 20% de la longitud total
+            self.target_step = min(self.target_step * 1.5, max_step)
             print(f"Velocidad aumentada: {self.target_step:.1f}")
         elif key == '-':  # Disminuir velocidad
-            self.target_step = max(self.target_step - 2.0, 1.0)
+            min_step = self.limbs_len * 0.01  # Mínimo 1% de la longitud total
+            self.target_step = max(self.target_step / 1.5, min_step)
             print(f"Velocidad reducida: {self.target_step:.1f}")
         elif key == 'h':  # Ayuda
             self.print_help()
@@ -878,6 +1190,14 @@ class FabrikIK3D:
             self.target[2] += self.target_step
         elif key == 'e':  # E - Bajar en Z
             self.target[2] -= self.target_step
+        elif key == 'g':  # G - Iniciar grabación
+            self.start_recording()
+        elif key == 'p':  # P - Pausar/Reanudar grabación
+            self.pause_recording()
+        elif key == 'x':  # X - Parar grabación
+            self.stop_recording()
+        elif key == 'c':  # C - Capturar recap
+            self.capture_recap()
         
         # Limitar el target dentro del área visible
         plot_range = self.limbs_len * 1.2
@@ -887,36 +1207,41 @@ class FabrikIK3D:
 
     def print_help(self):
         """
-        Imprime la ayuda de controles en la consola.
+        Imprime la ayuda de controles en la consola con formato mejorado.
         """
         print("\n" + "="*60)
-        print("CONTROLES DEL TARGET - FABRIK 3D")
+        print("CONTROLES DE LA SIMULACIÓN - FABRIK 3D")
         print("="*60)
-        print("Movimiento del Target:")
-        print("   FLECHAS DIRECCIONALES:")
-        print("      ↑/↓  - Mover en eje Y (adelante/atrás)")
-        print("      ←/→  - Mover en eje X (izquierda/derecha)")
-        print("   CONTROLES WASD:")
-        print("      W/S  - Mover en eje Y (adelante/atrás)")
-        print("      A/D  - Mover en eje X (izquierda/derecha)")
-        print("   EJE Z (vertical):")
-        print("      Q/E  - Subir/Bajar en Z")
-        print("      U/J  - Subir/Bajar en Z (alternativo)")
-        print("\nConfiguración:")
-        print("   R    - Reset target a posición inicial")
-        print("   +/-  - Aumentar/disminuir velocidad")
-        print("   H    - Mostrar esta ayuda")
-        print("\nVista 3D:")
-        print("   Mouse - Rotar vista (nativo matplotlib)")
-        print("   Scroll - Zoom in/out")
-        print("\nNota: Los keymaps de matplotlib están deshabilitados")
-        print("   para permitir el uso de Q, S y otras teclas.")
-        print("="*60)
-        print(f"Estado actual:")
-        print(f"   Target: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}]")
-        print(f"   Velocidad: {self.target_step:.1f}")
-        print("="*60 + "\n")
 
+        print("┌──────────────────────────────────────┐")
+        print("│         MOVIMIENTO DEL TARGET        │")
+        print("├──────────────────────────────────────┤")
+        print("│  WASD   │ Movimiento primario XY     │")
+        print("│  Q/E    │ Eje Z (arriba/abajo)       │")
+        print("│ Flechas │ Movimiento alternativo XY  │")
+        print("│  U/J    │ Eje Z alternativo          │")
+        print("│  Mouse  │ Rotar vista (matplotlib)   │")
+        print("│   R     │ Reset a posición inicial   │")
+        print("│  +/-    │ Velocidad de movimiento    │")
+        print("├──────────────────────────────────────┤")
+        print("│         SISTEMA DE GRABACIÓN         │")
+        print("├──────────────────────────────────────┤")
+        print("│   G     │ Iniciar grabación          │")
+        print("│   P     │ Pausar/Reanudar            │")
+        print("│   X     │ Parar y guardar            │")
+        print("│   C     │ Recap últimos 10s          │")
+        print("├──────────────────────────────────────┤")
+        print("│   H     │ Ayuda completa             │")
+        print("└──────────────────────────────────────┘")
+        
+        # Mostrar estado actual de grabación
+        if self.recording_state != 'stopped':
+            estado_indicador = "[REC]" if self.recording_state == 'recording' else "[PAUSADO]"
+            frames_grabados = len(self.recording_frames)
+            duracion = frames_grabados / self.recording_fps if frames_grabados > 0 else 0
+            print(f"\n{estado_indicador} Estado: {self.recording_state.upper()}")
+            print(f"Frames grabados: {frames_grabados} ({duracion:.1f}s)")
+        
     def _rotated(self, v, angle):
         """
         Rota un vector 2D por un ángulo dado (para visualización).
@@ -941,6 +1266,7 @@ class FabrikIK3D:
         
         Se ejecuta continuamente para actualizar la visualización del robot,
         incluyendo las articulaciones, enlaces y restricciones angulares en 3D.
+        También maneja el sistema de grabación y buffer de frames.
         
         Args:
             i (int): Número de frame de la animación (no utilizado)
@@ -949,6 +1275,23 @@ class FabrikIK3D:
             list: Lista de elementos gráficos actualizados
         """
         self.update(self.target)
+        
+        # Capturar frame actual para el sistema de grabación
+        current_frame = {
+            'joints': [joint.copy() for joint in self.joints],
+            'target': self.target.copy(),
+            'timestamp': i
+        }
+        
+        # Agregar al buffer circular (últimos 10 segundos)
+        self.frame_buffer.append(current_frame)
+        if len(self.frame_buffer) > self.max_buffer_size:
+            self.frame_buffer.pop(0)  # Eliminar frame más antiguo
+        
+        # Si estamos grabando, agregar al buffer de grabación
+        if self.recording_state == 'recording':
+            self.recording_frames.append(current_frame.copy())
+            self.current_frame_count += 1
         
         # Actualizar las articulaciones del robot en 3D
         points = np.array(self.joints)
@@ -976,7 +1319,7 @@ class FabrikIK3D:
                 
                 # Dibujar cono de restricción simplificado
                 # Crear círculo en el plano perpendicular a la dirección anterior
-                cone_radius = 30.0  # Radio visual del cono
+                cone_radius = self.limbs[i-1][self.LIMB_LEN] * 0.3  # Radio proporcional al link
                 min_angle = self.limbs[i-1][self.LIMB_MIN]
                 max_angle = self.limbs[i-1][self.LIMB_MAX]
                 
@@ -1018,12 +1361,230 @@ class FabrikIK3D:
                                         color='red', lw=0.5, alpha=0.6)
                     self.constraint_lines.extend([l_min, l_max])
 
-        # Actualizar información del target (sin crear nuevo texto)
+        # Actualizar información del target y estado de grabación
         target_info = f"Target: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}] | Step: {self.target_step:.1f}"
+        
+        # Agregar indicador de estado de grabación
+        if self.recording_state == 'recording':
+            target_info += f" | [REC] ({len(self.recording_frames)} frames)"
+        elif self.recording_state == 'paused':
+            target_info += f" | [PAUSADO] ({len(self.recording_frames)} frames)"
+        
         self.info_text.set_text(target_info)
 
         return [self.line, self.target_point, self.base_indicator, self.info_text] + self.constraint_lines
 
+    # MÉTODOS DE CARGA Y CONFIGURACIÓN DESDE YAML
+
+    @classmethod
+    def from_robot_yaml(cls, robot: Robot, **kwargs):
+        """
+        Carga un robot desde un archivo YAML y convierte al formato FABRIK.
+        
+        Este método actúa como puente entre el TAD Robot/Link del proyecto
+        y el sistema FABRIK, convirtiendo coordenadas relativas a absolutas
+        y transformando restricciones de articulaciones a formato FABRIK.
+        
+        Args:
+            yaml_file_path (str): Ruta al archivo YAML del robot
+            **kwargs: Argumentos adicionales para el constructor de FabrikIK3D
+                     (max_iterations, tolerance, etc.)
+        
+        Returns:
+            FabrikIK3D: Instancia configurada desde el robot YAML
+            
+        Raises:
+            ImportError: Si no se pueden importar las clases Robot/Link
+            FileNotFoundError: Si el archivo YAML no existe
+            ValueError: Si el robot YAML no tiene estructura válida
+        
+        Ejemplo:
+            robot_fabrik = FabrikIK3D.from_robot_yaml(robot)
+            resultado, exito = robot_fabrik.solve_ik([0.3, 0.2, 0.4])
+        """
+        if robot is None:
+            raise ImportError("No se pueden cargar las clases Robot/Link. Verifica la instalación del módulo core.class_robot_structure")
+        
+        # Convertir coordenadas relativas del TAD a absolutas para FABRIK
+        joints_pos = []
+        current_pos = np.array([0.0, 0.0, 0.0])  # Base en origen
+        joints_pos.append(current_pos.copy())
+        
+        # Calcular posiciones absolutas de las articulaciones
+        for i, link in enumerate(robot.links):
+            if hasattr(link, 'joint_coords') and link.joint_coords is not None:
+                # Las coordenadas del joint están en el sistema local del link
+                joint_offset = np.array(link.joint_coords)
+            else:
+                # Si no hay coordenadas específicas, usar la longitud del link
+                if hasattr(link, 'length') and link.length is not None:
+                    joint_offset = np.array([link.length, 0.0, 0.0])
+                else:
+                    # Longitud por defecto
+                    joint_offset = np.array([1.0, 0.0, 0.0])
+            
+            current_pos = current_pos + joint_offset
+            joints_pos.append(current_pos.copy())
+        
+        # Convertir restricciones de articulaciones del TAD a restricciones FABRIK
+        joint_constraints = []
+        for i, link in enumerate(robot.links):
+            constraint_info = {
+                'type': 'conic',
+                'center_direction': [1.0, 0.0, 0.0],  # Dirección por defecto
+                'max_angle': np.pi/4  # 45 grados por defecto
+            }
+            
+            if hasattr(link, 'joint_limits') and link.joint_limits is not None:
+                limits = link.joint_limits
+                if isinstance(limits, (tuple, list)) and len(limits) == 2:
+                    # Límites como tupla/lista (min, max) del YAML
+                    min_limit, max_limit = limits
+                    
+                    # NUEVA ESTRATEGIA: Inspirada en Algorithm 3 (secciones cónicas)
+                    # En lugar de heurística arbitraria, usar matemática de restricciones cónicas
+                    range_radians = abs(max_limit - min_limit)
+                    center_angle = (max_limit + min_limit) / 2.0  # Posición neutral real
+                    
+                    # El radio del cono es la mitad del rango total (máxima desviación desde neutral)
+                    # Esto es matemáticamente correcto: si el rango es [-175°, +175°], 
+                    # entonces podemos desviarnos ±175° desde neutral (0°)
+                    constraint_info['max_angle'] = min(range_radians / 2.0, np.pi)  # Máximo 180°
+                    constraint_info['min_angle'] = 0.0  # Sin restricción hacia el centro del cono
+                    
+                    # CLAVE: Guardar la orientación neutral para reorientar la cónica
+                    constraint_info['neutral_angle'] = center_angle
+                    constraint_info['range_type'] = 'symmetric_from_neutral'
+                    constraint_info['original_limits'] = (min_limit, max_limit)  # Preservar originales
+                elif isinstance(limits, dict):
+                    # Extraer límites en diferentes ejes y convertir a restricción cónica
+                    angles = []
+                    for key in ['min_theta', 'max_theta', 'min_phi', 'max_phi', 'min_angle', 'max_angle']:
+                        if key in limits:
+                            angles.append(abs(limits[key]))
+                    
+                    if angles:
+                        max_angle = max(angles)
+                        constraint_info['max_angle'] = min(max_angle, np.pi/2)  # Limitar a 90 grados máximo
+                elif isinstance(limits, (int, float)):
+                    # Límite escalar
+                    constraint_info['max_angle'] = min(abs(limits), np.pi/2)
+            
+            # Calcular dirección del link para la restricción cónica
+            if i > 0 and len(joints_pos) > i:
+                direction = joints_pos[i] - joints_pos[i-1]
+                if np.linalg.norm(direction) > 1e-6:
+                    direction = direction / np.linalg.norm(direction)
+                    constraint_info['center_direction'] = direction.tolist()
+            
+            joint_constraints.append(constraint_info)
+        
+        print(f"\nRobot cargado desde YAML: {len(joints_pos)} articulaciones, {len(joint_constraints)} restricciones")
+        print(f"\nPosiciones: {[f'[{p[0]:.2f}, {p[1]:.2f}, {p[2]:.2f}]' for p in joints_pos]}")
+        print(f"\nRestricciones: {joint_constraints}")
+        
+        # Crear instancia FABRIK básica
+        instance = cls()
+        instance.name = robot.name
+
+        # Configurar las posiciones de articulaciones desde el YAML
+        instance.joints = [np.array(pos, dtype=float) for pos in joints_pos]
+        instance.limbs_size = len(joints_pos) - 1
+        
+        # Configurar las restricciones desde el YAML
+        instance.limbs = []
+        for i, constraint in enumerate(joint_constraints):
+            if i < len(joints_pos) - 1:
+                # Calcular longitud del link en metros, convertir a unidades de visualización
+                link_length_meters = np.linalg.norm(joints_pos[i+1] - joints_pos[i])
+                link_length_viz = link_length_meters * 1000  # Convertir metros a milímetros para visualización
+                max_angle = constraint.get('max_angle', np.pi/4)
+                min_angle = constraint.get('min_angle', 0.0)  # Usar el ángulo mínimo real
+                
+                # NUEVA IMPLEMENTACIÓN: Incluir metadatos de restricción del robot
+                limb_entry = [
+                    link_length_viz,  # [0] Longitud escalada
+                    min_angle,        # [1] Ángulo mínimo real
+                    max_angle         # [2] Ángulo máximo real
+                ]
+                
+                # Si tenemos información de orientación neutral, agregarla como metadatos
+                if 'neutral_angle' in constraint and 'range_type' in constraint:
+                    robot_metadata = {
+                        'neutral_angle': constraint['neutral_angle'],
+                        'range_type': constraint['range_type'],
+                        'original_limits': constraint.get('original_limits', None)
+                    }
+                    limb_entry.append(robot_metadata)  # [3] Metadatos del robot
+                
+                instance.limbs.append(limb_entry)
+        
+        # Recalcular longitud total
+        instance.limbs_len = sum(limb[instance.LIMB_LEN] for limb in instance.limbs)
+        
+        # Inicializar propiedades de target y visualización
+        instance.target = np.array([instance.limbs_len * 0.6, instance.limbs_len * 0.3, instance.limbs_len * 0.2])
+        instance.target_step = instance.limbs_len * 0.05  # 5% de la longitud total del robot
+        
+        # Reconfigurar las articulaciones con las longitudes correctas para visualización
+        instance.joints = [np.zeros(3) for _ in range(len(joints_pos))]
+        instance.joints[0] = instance.base_point.copy()
+        
+        for i in range(len(instance.limbs)):
+            # Usar las direcciones originales pero con longitudes escaladas
+            if i < len(joints_pos) - 1:
+                direction = joints_pos[i+1] - joints_pos[i]
+                direction_norm = np.linalg.norm(direction)
+                if direction_norm > 0:
+                    direction = direction / direction_norm
+                    # Aplicar la longitud escalada
+                    instance.joints[i + 1] = instance.joints[i] + direction * instance.limbs[i][instance.LIMB_LEN]
+        
+        return instance
+    
+    # MÉTODOS DE UTILIDAD Y API PÚBLICA
+    
+    def solve_ik(self, target_pos, verbose=False):
+        """
+        Resuelve la cinemática inversa para alcanzar la posición objetivo.
+        
+        Método simplificado que encapsula la lógica del algoritmo FABRIK
+        para uso con robots cargados desde YAML.
+        
+        Args:
+            target_pos (list/array): Posición objetivo [x, y, z]
+            verbose (bool): Si imprimir información de convergencia
+            
+        Returns:
+            tuple: (joints_positions, converged)
+                - joints_positions: Lista de posiciones finales de articulaciones
+                - converged: True si alcanzó la tolerancia, False si no
+        """
+        if not hasattr(self, 'joints') or len(self.joints) == 0:
+            raise ValueError("La cadena cinemática debe ser inicializada antes de resolver")
+        
+        target_np = np.array(target_pos)
+        
+        # Aplicar el algoritmo FABRIK principal usando update_ik
+        residual = self.update_ik(target_np)
+        
+        # Comprobar convergencia con tolerancia más permisiva
+        final_distance = np.linalg.norm(self.joints[-1] - target_np)
+        converged = final_distance < 0.02  # Tolerancia más permisiva: 2cm
+        
+        if verbose:
+            print(f"Solución FABRIK:")
+            print(f"  Target: [{target_pos[0]:.3f}, {target_pos[1]:.3f}, {target_pos[2]:.3f}]")
+            print(f"  End effector final: [{self.joints[-1][0]:.3f}, {self.joints[-1][1]:.3f}, {self.joints[-1][2]:.3f}]")
+            print(f"  Distancia final: {final_distance:.6f}")
+            print(f"  Convergencia: {'SÍ' if converged else 'NO'}")
+        
+        # Convertir posiciones a lista de listas para compatibilidad
+        joints_list = [joint.tolist() for joint in self.joints]
+        
+        return joints_list, converged
+
+# PUNTO DE ENTRADA PRINCIPAL
 
 if __name__ == '__main__':
     """
@@ -1036,25 +1597,31 @@ if __name__ == '__main__':
     """
     ik_system = FabrikIK3D()
     
+    # Intentar cargar robot desde YAML
+    try:
+        ik_system = ik_system.from_robot_yaml('config/robot-niryo.yaml')
+        print(f"Robot Niryo cargado desde YAML: {len(ik_system.joints)} articulaciones")
+        print(f"\tLongitud total: {ik_system.limbs_len:.1f} unidades")
+    except Exception as e:
+        print(f"Error cargando robot: {e}")
+        print("\tUsando configuración por defecto")
+
     print("FABRIK 3D Implementation - Visualización 3D Real")
     print("Algoritmos implementados:")
     print("   Algorithm 1: FABRIK básico (3D)")
     print("   Algorithm 2: Joint Constraints (restricciones esféricas)")
     print("   Algorithm 3: Target Constraint Application (workspace limits)")
-    print("\nControles de Teclado:")
-    print("   • WASD: mover target en plano XY (primario)")
-    print("   • QE: subir/bajar target en Z (primario)")
-    print("   • Flechas direccionales: mover target XY (alternativo)")
-    print("   • U/J: subir/bajar target en Z (alternativo)")
-    print("   • R: reset target a posición inicial")
-    print("   • +/-: aumentar/disminuir velocidad")
-    print("   • H: mostrar ayuda completa")
-    print("\nMouse: controla la vista 3D (rotar/zoom)")
-    print("VISUALIZACIÓN 3D REAL: Conos de restricción, articulaciones espaciales")
-    print("Colores: Robot (azul), Target (verde), Base (amarillo), Restricciones (naranja/rojo)")
-    print("=" * 70)
-    print("Presiona 'H' en la ventana para ayuda detallada")
-    print("Nota: Q y S ahora funcionan sin conflictos gracias a mpl.rc_context()")
-    print("=" * 70)
+    print("\nControles:")
+    print("   - WASD / Flechas: mover target en XY")
+    print("   - QE / UJ: mover target en Z")
+    print("   - R: reset | +/-: velocidad | H: ayuda completa")
+    print("\nSistema de Grabación Avanzado:")
+    print("   - G: Iniciar grabación")
+    print("   - P: Pausar/Reanudar")
+    print("   - X: Parar y guardar")
+    print("   - C: Recap últimos 10s")
+    print("\nMouse: rotar/zoom vista 3D")
+    print('='*60, "\n", ik_system)
     
+
     ik_system.setup_plot()

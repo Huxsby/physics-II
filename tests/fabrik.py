@@ -302,7 +302,7 @@ def main():
         print("2. Ejecutar FABRIK con restricciones")
         print("3. Depurar ejes de giro")
         print("4. Generar trayectoria circular")
-        print("5. Salir")
+        print("0. Salir")
 
         opcion = input("Ingrese el número de la opción deseada: ")
 
@@ -316,7 +316,7 @@ def main():
 
             steps = fabrik_steps_3d(positions, lengths, target)
             ax, fig, anim = animate_fabrik(steps, target, positions)
-            guardar_animacion(anim, "output/animations/fabrik_test_animation_vector_assemble", fps=2)
+            guardar_animacion(anim, "abrik_test_animation_vector_assemble", fps=2)
 
         elif opcion == "2":  # Ejecutar FABRIK con restricciones
             robot = cargar_robot_desde_yaml('config/robot.yaml')
@@ -329,7 +329,7 @@ def main():
             target = np.array([0.25, 0.25, 0.25])
             steps_with_restrictions = fabrik_steps_3d_con_restricciones(robot, r_positions, r_lengths, target)
             ax, fig, anim = animate_fabrik(steps_with_restrictions, target, r_positions)
-            guardar_animacion(anim, "output/animations/fabrik_test_animation_restricciones", fps=2)
+            guardar_animacion(anim, "fabrik_test_animation_restricciones", fps=2)
 
         elif opcion == "3":  # Depurar ejes de giro
             robot = cargar_robot_desde_yaml('config/robot.yaml')
@@ -356,14 +356,13 @@ def main():
                 circular_steps.append(steps[-1])
 
             ax, fig, anim = animate_fabrik(circular_steps, center, positions)
-            guardar_animacion(anim, "output/animations/fabrik_circular_leg_animation", fps=10)
+            guardar_animacion(anim, "fabrik_circular_leg_animation", fps=10)
 
-        elif opcion == "5":  # Salir del programa
+        elif opcion == "0":  # Salir del programa
             print("Saliendo del programa.")
             break
 
         else:
             print("Opción no válida. Intente nuevamente.")
-
 if __name__ == "__main__":
     main()

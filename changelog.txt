@@ -49,3 +49,8 @@ El proyecto ahora sigue una organización modular y escalable:
 - [ ] En cinemática inversa se calculan dos determinantes aunque no sea necesario (caso robot-niryo.yaml).
 - [ ] Método actual para hacer cinemática inversa no respeta los limites de las articulaciones.
   - [ ] Probar con fabric.
+- [x]  **CONVERSIÓN DE RESTRICCIONES ROBOT→FABRIK (RESUELTO)**
+--------------------------------------------------
+- **PROBLEMA ORIGINAL:** max_angle = max_angle * 0.3 (completamente arbitrario)
+- **MEJORA INICIAL:** max_angle = min(range_radians/3.0, π/3) (heurística razonable)
+- **SOLUCIÓN FINAL:** Algorithm 3 con reorientación de cónicas basada en neutral_angle

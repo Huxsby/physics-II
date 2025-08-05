@@ -1,8 +1,8 @@
 """
 Ejemplos de uso para la visualización del robot manipulador
 """
-from animation import plot_robot, guardar_animacion, graficar_workspace                         # Para la visualización del robot
-from calculations import IK_Jacobian, CinematicaDirecta                       # Para la cinemática inversa
+from animation import plot_robot, guardar_animacion, graficar_workspace, graficar_limites               # Para la visualización del robot
+from calculations import IK_Jacobian, CinematicaDirecta                                                 # Para la cinemática inversa
 from core import Robot, str_config, thetas_aleatorias, thetas_limite, filtrar_configuraciones, cargar_robot_desde_yaml  # Para la manipulación de configuraciones
 from calculations.class_rotaciones import Rp2Trans, Euler2R                                                          # Para la matriz de transformación homogénea
 from calculations.class_jacobian import calcular_jacobiana, prueba_singularidades                                    # Para la matriz jacobiana
@@ -298,6 +298,7 @@ def menu_plotter():
         os.system('cls' if os.name == 'nt' else 'clear')
 
     robot = cargar_robot_desde_yaml("config/robot.yaml")
+    robot_niryo = cargar_robot_desde_yaml("config/robot-niryo.yaml")
     robot_dron = cargar_robot_desde_yaml("config/robot-dron.yaml")
 
     while True:
@@ -314,7 +315,8 @@ def menu_plotter():
         print("8. Cinemática inversa con trayectoria circular (robot-dron.yaml)")
         print("9. Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
         print("10. Prueba de singularidades (robot.yaml)")
-        print("11. Probar todos los graficos y animaciones")
+        print("11. Graficar limites articulaciones (robot-niryo.yaml)")
+        print("12. Probar todos los graficos y animaciones")
         print("-"*90)   # Separador
         print("0. Salir")
 
@@ -354,13 +356,17 @@ def menu_plotter():
         
         elif opcion == '9':
             print("Ejecutando: Cinemática inversa con trayectoria circular (robot-niryo.yaml)")
-            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_niryo")
+            ejemplo_cinematica_inversa_circular(robot_niryo, nombre_archivo="trayectoria_circular_niryo")
         
         elif opcion == '10':
             print("Ejecutando: Prueba de singularidades")
             ejemplo_prueba_singularidades(robot)
 
         elif opcion == '11':
+            print("Ejecutando: Graficar limites articulaciones (robot-niryo.yaml)")
+            graficar_limites(robot_niryo)
+
+        elif opcion == '12':
             print("Ejecutando: Probar todos los graficos y animaciones")
             ejemplo_visualizacion_simple(robot)
             ejemplo_configuracion_personalizada(robot)
@@ -370,8 +376,9 @@ def menu_plotter():
             ejemplo_cinematica_directa(robot)
             ejemplo_animacion_prismatica(robot)
             ejemplo_cinematica_inversa_circular(robot_dron, nombre_archivo="trayectoria_circular_robot_dron")
-            ejemplo_cinematica_inversa_circular(robot, nombre_archivo="trayectoria_circular_robot_niryo")
+            ejemplo_cinematica_inversa_circular(robot_niryo, nombre_archivo="trayectoria_circular_robot_niryo")
             ejemplo_prueba_singularidades(robot)
+            graficar_limites(robot_niryo)
             
         elif opcion == '0':
             print("Saliendo del programa.")

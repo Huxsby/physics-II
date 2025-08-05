@@ -179,7 +179,7 @@ class Robot:
                 raise ValueError(f"Tipo desconocido: {link.tipo} para el eslabón {link.id}")
 
             ejes_helicoidales.append(np.hstack((w, v)))
-        print(f"\t\033[92mTiempo de ejecución de get_ejes_helicoidales: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
+        # print(f"\t\033[92mTiempo de ejecución de get_ejes_helicoidales: {time.time() - tiempo_inicio:.4f} segundos\033[0m")
         return ejes_helicoidales
 
 class Link:

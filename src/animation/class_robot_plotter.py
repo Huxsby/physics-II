@@ -21,7 +21,7 @@ Ejemplo de uso:
 """
 import sys
 import os
-from core import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive
+from core import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, cargar_robot_desde_yaml
 from calculations.class_helicoidales import CinematicaDirecta
 
 import numpy as np                              # Import NumPy for numerical operations
@@ -95,6 +95,98 @@ def calcular_transformaciones(robot: Robot, thetas):
     
     return transformaciones
 
+""" Funciones para importar y exportar series de configuraciones """
+def importar_trayectoria_cartesian(path):
+    """
+    Importa una trayectoria desde un archivo CSV en formato XYZ.
+    
+    Args:
+        path (str): Ruta al archivo CSV.
+        
+    Returns:
+        list: Lista de numpy.ndarray con posiciones [x, y, z] del efector final.
+    """
+    full_path = os.path.join("data/motion/cartesian", path)
+    try:
+        df = pd.read_csv(full_path, header=None)
+        # Siempre devolver arrays de NumPy para consistencia
+        trayectoria = [np.array(row, dtype=float) for row in df.values]
+        print(f"\t\033[92mTrayectoria importada exitosamente desde '{full_path}'\033[0m")
+        print(f"\t\033[94m{len(trayectoria)} puntos como numpy.ndarray\033[0m")
+        return trayectoria
+    except Exception as e:
+        print(f"\t\033[31mError al importar trayectoria desde '{full_path}': {e}\033[0m")
+        return []
+
+def exportar_trayectoria_cartesian(path, trayectoria):
+    """
+    Exporta una trayectoria a un archivo CSV en formato XYZ.
+    
+    Args:
+        path (str): Ruta al archivo CSV.
+        trayectoria (list): Lista de posiciones [x, y, z] del efector final.
+                           Acepta tanto numpy.ndarray como listas de Python.
+    """
+    full_path = os.path.join("data/motion/cartesian", path)
+    try:
+        if len(trayectoria) > 0: # Convertir todo a arrays de NumPy para uniformidad
+            # Asegurar que todos los puntos son arrays de NumPy
+            data_for_export = []
+            for punto in trayectoria:
+                if isinstance(punto, np.ndarray):
+                    data_for_export.append(punto.tolist())
+                else:
+                    # Convertir lista a array y luego a lista para pandas
+                    data_for_export.append(np.array(punto).tolist())
+        else:
+            data_for_export = []
+        
+        df = pd.DataFrame(data_for_export)
+        df.to_csv(full_path, index=False, header=False)
+        print(f"\t\033[92mTrayectoria exportada exitosamente a '{full_path}'\033[0m")
+        print(f"\t\033[94m{len(data_for_export)} puntos exportados\033[0m")
+        
+    except Exception as e:
+        print(f"\t\033[31mError al exportar trayectoria a '{full_path}': {e}\033[0m")
+
+def importar_trayectoria_angular(path):
+    """
+    Importa configuraciones desde un archivo CSV.
+    
+    Args:
+        path (str): Ruta al archivo CSV.
+        
+    Returns:
+        list: Lista de configuraciones como listas de ángulos.
+    """
+    full_path = os.path.join("data/motion/angular", path)
+    try:
+        df = pd.read_csv(full_path)
+        print(f"\t\033[92mConfiguraciones importadas exitosamente desde '{full_path}'\033[0m")
+        print(f"\t\033[94m{len(df)} configuraciones importadas\033[0m")
+        return df.values.tolist()
+    except Exception as e:
+        print(f"\t\033[31mError al importar configuraciones desde '{full_path}': {e}\033[0m")
+        return []
+
+def exportar_trayectoria_angular(path, configuraciones):
+    """
+    Exporta configuraciones a un archivo CSV.
+    
+    Args:
+        path (str): Ruta al archivo CSV.
+        configuraciones (list): Lista de configuraciones como listas de ángulos.
+    """
+    full_path = os.path.join("data/motion/angular", path)
+    
+    try:
+        df = pd.DataFrame(configuraciones)
+        df.to_csv(full_path, index=False)
+        print(f"\t\033[92mConfiguraciones exportadas exitosamente a '{full_path}'\033[0m")
+        print(f"\t\033[94m{len(configuraciones)} configuraciones exportadas\033[0m")
+    except Exception as e:
+        print(f"\t\033[31mError al exportar configuraciones a '{full_path}': {e}\033[0m")
+
 """ Funciones para guardar animaciones en diferentes formatos """
 def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
     # Extraer solo el nombre de archivo (sin path) para mostrar al usuario
@@ -103,23 +195,16 @@ def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
     if ask:
         print("\tAnimación no guardada.")
         return 
+    nombre_archivo = 'output/animations/' + nombre_archivo
     if not anim:
         print("No hay animación para guardar.")
         return
     print(f"Guardando animación ({nombre_archivo})...")
     try:
-        if sys.platform.startswith("linux"):
-            try:
-                _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
-            except Exception as e:
-                print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
-                _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
-        else:
-            try:
-                _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
-            except Exception as e:
-                print(f"\t\033[31mError al guardar con Pillow: {e}\033[0m")
-                _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
+        _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
+    except Exception as e:
+        print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
+        _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
     except Exception as e_final:
         print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
         print(f"\t\033[31mError: {e_final}\033[0m")
@@ -518,6 +603,206 @@ def _log_performance_data(robot: Robot, N, execution_time):
         # Si ya existe, se añaden los datos sin cabeceras
         df_new.to_csv(log_file, mode='a', index=False, header=False)
 
+""" Función para graficar los rangos de los límites del robot """
+def graficar_limites(robot: Robot, ax=None, show=True):
+    """
+    Visualiza los límites de las articulaciones del robot en gráficos de rueda (dial/gauge).
+    
+    Parameters
+    ----------
+    robot : Robot
+        Objeto Robot que contiene la información cinemática del robot.
+    ax : matplotlib.axes.Axes, optional
+        No se usa en esta implementación de ruedas. Default: None.
+    show : bool, optional
+        Si es True, muestra el plot inmediatamente. Si es False, 
+        permite manipulaciones adicionales antes de mostrarlo. Default: True.
+        
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        La figura de Matplotlib que contiene la visualización.
+    axes : list
+        Lista de objetos de ejes que contienen cada rueda.
+    """
+    import matplotlib.patches as patches
+    
+    # Calcular el número de articulaciones
+    num_joints = robot.num_links
+    
+    # Determinar el layout de subplots
+    if num_joints <= 3:
+        rows, cols = 1, num_joints
+    elif num_joints <= 6:
+        rows, cols = 2, 3
+    else:
+        rows = int(np.ceil(num_joints / 4))
+        cols = 4
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 4*rows))
+    if num_joints == 1:
+        axes = [axes]
+    elif rows == 1 or cols == 1:
+        axes = axes.flatten() if hasattr(axes, 'flatten') else [axes]
+    else:
+        axes = axes.flatten()
+    
+    # Ocultar ejes no utilizados
+    for i in range(num_joints, len(axes)):
+        axes[i].set_visible(False)
+    
+    for i in range(num_joints):
+        ax = axes[i]
+        link = robot.links[i]
+        
+        # Obtener límites de la articulación
+        if robot.limits_dict and f'joint_{i+1}' in robot.limits_dict:
+            limit_min, limit_max = robot.limits_dict[f'joint_{i+1}']
+        else:
+            limit_min, limit_max = -np.pi, np.pi
+        
+        # Configurar el eje
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        if link.tipo == "revolute":
+            # Dibujar el círculo base
+            circle = plt.Circle((0, 0), 1, fill=False, color='black', linewidth=2)
+            ax.add_patch(circle)
+            
+            # Convertir límites a grados para visualización
+            angle_min_deg = np.degrees(limit_min)
+            angle_max_deg = np.degrees(limit_max)
+            
+            # Crear arco de rango válido
+            if limit_max > limit_min:
+                # Ángulos en coordenadas matplotlib (0° = este, 90° = norte)
+                theta_start = np.radians(90 - angle_max_deg)  # Inicio del arco
+                theta_end = np.radians(90 - angle_min_deg)    # Final del arco
+                
+                # Si el arco cruza el meridiano 0°, dividirlo en dos partes
+                if theta_start > theta_end:
+                    # Crear dos arcos separados
+                    angles1 = np.linspace(theta_start, 2*np.pi, 50)
+                    angles2 = np.linspace(0, theta_end, 50)
+                    angles = np.concatenate([angles1, angles2])
+                else:
+                    angles = np.linspace(theta_start, theta_end, 100)
+                
+                # Crear el sector circular para el rango válido
+                angles_fill = np.concatenate([[0], angles, [0]])
+                x_fill = np.concatenate([[0], 0.9 * np.cos(angles), [0]])
+                y_fill = np.concatenate([[0], 0.9 * np.sin(angles), [0]])
+                ax.fill(x_fill, y_fill, alpha=0.3, color='green', label='Rango válido')
+                
+                # Líneas de límites más gruesas y mejor posicionadas
+                x_min = np.cos(theta_end)
+                y_min = np.sin(theta_end)
+                x_max = np.cos(theta_start)
+                y_max = np.sin(theta_start)
+                
+                ax.plot([0, x_min], [0, y_min], 'r-', linewidth=4, label=f'Límite mín')
+                ax.plot([0, x_max], [0, y_max], 'b-', linewidth=4, label=f'Límite máx')
+                
+                # Añadir puntos en los extremos de los límites
+                ax.scatter([x_min], [y_min], color='red', s=100, zorder=5)
+                ax.scatter([x_max], [y_max], color='blue', s=100, zorder=5)
+            
+            # Marcas de graduación cada 30 grados
+            for angle_deg in range(0, 360, 30):
+                x_outer = 1.0 * np.cos(np.radians(90 - angle_deg))
+                y_outer = 1.0 * np.sin(np.radians(90 - angle_deg))
+                x_inner = 0.85 * np.cos(np.radians(90 - angle_deg))
+                y_inner = 0.85 * np.sin(np.radians(90 - angle_deg))
+                
+                ax.plot([x_inner, x_outer], [y_inner, y_outer], 'k-', linewidth=1)
+                
+                # Etiquetas cada 90 grados mostrando grados y radianes
+                if angle_deg % 90 == 0:
+                    x_label = 1.2 * np.cos(np.radians(90 - angle_deg))
+                    y_label = 1.2 * np.sin(np.radians(90 - angle_deg))
+                    angle_rad = np.radians(angle_deg)
+                    ax.text(x_label, y_label, f'{angle_deg}°\n{angle_rad:.2f}rad', 
+                           ha='center', va='center', fontsize=7, 
+                           bbox=dict(boxstyle="round,pad=0.1", facecolor="white", alpha=0.8))
+            
+            # Mostrar valores de límites con mejor formato en la esquina inferior derecha
+            limit_min_deg = np.degrees(limit_min)
+            limit_max_deg = np.degrees(limit_max)
+            
+            limit_text = f'Min: {limit_min_deg:.1f}° ({limit_min:.3f} rad)\n'
+            limit_text += f'Max: {limit_max_deg:.1f}° ({limit_max:.3f} rad)\n'
+            limit_text += f'Rango: {limit_max_deg - limit_min_deg:.1f}°'
+            
+            ax.text(1.4, -1.4, limit_text, ha='right', va='bottom', fontsize=6,
+                   bbox=dict(boxstyle="round,pad=0.2", facecolor="lightblue", alpha=0.8))
+            
+            color = 'darkgreen'
+            joint_type = 'Revoluta'
+            
+        elif link.tipo == "prismatic":
+            # Para articulaciones prismáticas, mostrar como barra vertical
+            ax.set_xlim(-1.0, 1.0)
+            ax.set_ylim(-1.5, 1.5)
+            
+            # Dibujar barra vertical
+            bar_width = 0.4
+            bar_height = 2.5
+            rect = patches.Rectangle((-bar_width/2, -bar_height/2), bar_width, bar_height, 
+                                   linewidth=2, edgecolor='black', facecolor='lightblue', alpha=0.3)
+            ax.add_patch(rect)
+            
+            # Marcas de límites
+            if limit_max > limit_min:
+                # Normalizar límites al rango de la barra
+                range_total = limit_max - limit_min
+                if range_total > 0:
+                    y_min_norm = -bar_height/2 + (0) / range_total * bar_height
+                    y_max_norm = -bar_height/2 + (range_total) / range_total * bar_height
+                    
+                    # Región válida
+                    valid_rect = patches.Rectangle((-bar_width/2, y_min_norm), bar_width, 
+                                                 y_max_norm - y_min_norm, 
+                                                 facecolor='green', alpha=0.3, label='Rango válido')
+                    ax.add_patch(valid_rect)
+                    
+                    # Líneas de límites
+                    ax.plot([-bar_width/2, bar_width/2], [y_min_norm, y_min_norm], 'r-', linewidth=4)
+                    ax.plot([-bar_width/2, bar_width/2], [y_max_norm, y_max_norm], 'b-', linewidth=4)
+                    
+                    # Puntos en los límites
+                    ax.scatter([0], [y_min_norm], color='red', s=100, zorder=5)
+                    ax.scatter([0], [y_max_norm], color='blue', s=100, zorder=5)
+                    
+                    # Etiquetas de límites
+                    ax.text(bar_width/2 + 0.2, y_min_norm, f'Min: {limit_min:.3f}m', 
+                           va='center', fontsize=8, color='red', weight='bold')
+                    ax.text(bar_width/2 + 0.2, y_max_norm, f'Max: {limit_max:.3f}m', 
+                           va='center', fontsize=8, color='blue', weight='bold')
+                    
+                    # Información adicional en la esquina inferior derecha
+                    range_text = f'Rango: {limit_max - limit_min:.3f}m'
+                    ax.text(0.9, -1.4, range_text, ha='right', va='bottom', fontsize=6,
+                           bbox=dict(boxstyle="round,pad=0.2", facecolor="lightgreen", alpha=0.8))
+            
+            color = 'darkblue'
+            joint_type = 'Prismática'
+        
+        # Título de cada rueda/articulación usando link.id
+        ax.set_title(f'{link.id}: {joint_type}', fontsize=8, color=color, weight='bold')
+    
+    # Título general
+    fig.suptitle(f'Límites de Articulaciones - {robot.name}', fontsize=14, weight='bold')
+    
+    if show:
+        plt.tight_layout()
+        plt.show()
+    
+    return fig, axes
+
+""" Función para graficar el espacio de trabajo del robot manipulador """
 def graficar_workspace(robot: Robot, N=2000, show_points=True, half_space_axis=None,
                        thetas_anim=None, animation_speed=200, view_angles=(30, 45),
                        save_animation_name=None, subtitle=None, show_plot=True):

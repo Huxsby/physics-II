@@ -13,7 +13,7 @@
 % ALGORITMOS IMPLEMENTADOS:
 % ✅ Algorithm 1: FABRIK básico con direcciones unitarias (3D)
 % ✅ Algorithm 2: Joint Constraints como post-procesamiento (restricciones esféricas/cónicas)
-% ✨ Algorithm 3: Target Constraint Application (workspace limits con secciones cónicas) - NUEVO
+% ✨ Algorithm 3: Target Constraint Application (workspace limits con secciones cónicas) - Actualizado para ajustarse a restriccines asimétricas
 % 
 % ALGORITMOS PENDIENTES:
 % [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)

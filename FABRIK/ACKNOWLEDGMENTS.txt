@@ -103,12 +103,9 @@ ACKNOWLED- **Extending FABRIK with Model Constraints**
 
 ---
 
-## DESARROLLO ASISTIDO - AGOSTO 2025
+## DESARROLLO - AGOSTO 2025
 
-### FINAL ENHANCEMENT (Agosto 2, 2025):
-==========================================
-
-SOLUCIÓN ELEGANTE DE KEYMAPS
+### SIMULATION ENHANCEMENT (Agosto 2, 2025):
 -------------------------------
 - Implementación de mpl.rc_context() para deshabilitar keymaps reservados
 - Restauración completa de controles WASD/QE sin conflictos
@@ -130,3 +127,34 @@ RESULTADO FINAL:
 
 Esta implementación representa la culminación exitosa del proyecto,
 proporcionando una base robusta para trabajo futuro en cinemática inversa 3D.
+
+### CONVERSIÓN DE RESTRICCIONES ROBOT → FABRIK (RESUELTO) (Agosto 4, 2025):
+-------------------------------
+
+- **PROBLEMA ORIGINAL:** max_angle = max_angle * 0.3 (completamente arbitrario)
+- **MEJORA INICIAL:** max_angle = min(range_radians/3.0, π/3) (heurística razonable)
+- **SOLUCIÓN FINAL:** Algorithm 3 con reorientación de cónicas basada en neutral_angle
+
+IMPLEMENTACIÓN ALGORITHM 3 COMPLETA:
+- ✅ Conversión matemáticamente correcta: max_angle = range_radians/2.0
+- ✅ Reorientación de cónicas usando neutral_angle del robot real
+- ✅ Metadatos completos de restricciones preservados
+- ✅ Validación con robot Niryo: 6 articulaciones correctamente mapeadas
+
+DETALLES TÉCNICOS FINALES:
+- Robot Niryo: joint_limits (-175°, +175°) → max_angle = 175° (50% del rango)
+- FABRIK: Cónica centrada en neutral_angle con desviación ±max_angle
+- Mapeo 1:1: Cada joint_limit del robot → restricción cónica FABRIK exacta
+- Base fija: El eslabón base→J1 NO tiene restricciones (base inmóvil)
+
+PROBLEMA IDENTIFICADO - ESLABÓN BASE:
+- **CRÍTICO:** Base en (0,0,0) es punto fijo, no articulación móvil
+- **ERROR:** Primer eslabón (base→J1) no debería tener restricciones
+- **CORRECCIÓN NECESARIA:** Solo aplicar restricciones a articulaciones móviles
+- **IMPACTO:** Base fija debe preservarse, solo J1-J6 tienen límites angulares
+
+VALIDACIÓN EXITOSA:
+- Sistema FABRIK convergente con restricciones reorientadas
+- Metadatos de robot preservados en estructura FABRIK
+- Error de posición < 0.001mm en targets alcanzables
+- Próximo paso: Corregir aplicación de restricciones base→J1

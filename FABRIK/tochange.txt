@@ -1,0 +1,2 @@
+Actualmete el eslabon entre la base y el primer eslabon no tiene restricciones, ya que no consideramos la base que se crea por defecto en 0,0,0 como una articulacion este no deberia poder moverse.
+
