@@ -8,7 +8,7 @@ import numpy as np
 from core import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite, Robot
 from calculations import Rp2Trans
 from animation import importar_trayectoria_cartesian, exportar_trayectoria_cartesian
-from fabrik_paper_constrained_3d import FabrikIK3D
+from fabrik_paper_constrained_3d import Fabrik_3D
 
 def demo_keyboard_controls(robot: Robot = None):
     """
@@ -18,7 +18,7 @@ def demo_keyboard_controls(robot: Robot = None):
     print("=" * 60)
     
     # Crear instancia del sistema
-    ik_system = FabrikIK3D.from_robot_yaml(robot)
+    ik_system = Fabrik_3D.from_robot_yaml(robot)
     ik_system.print_help()
     
     # Ejecutar automáticamente algunos comandos para demostración
@@ -207,11 +207,11 @@ def create_trajectory_demo(robot: Robot):
     
     # Crear instancia del sistema FABRIK
     try:
-        ik_system = FabrikIK3D.from_robot_yaml(robot)
+        ik_system = Fabrik_3D.from_robot_yaml(robot)
         print("Sistema FABRIK inicializado desde YAML")
     except Exception as e:
         print(f"Error cargando FABRIK desde YAML: {e}")
-        ik_system = FabrikIK3D()
+        ik_system = Fabrik_3D()
         print("Usando sistema FABRIK por defecto")
     
     # Generar trayectoria mejorada

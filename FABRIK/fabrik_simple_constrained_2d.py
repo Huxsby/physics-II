@@ -5,7 +5,7 @@ from matplotlib.animation import FuncAnimation
 # Traducción y adaptación de un script de GDScript a Python con Matplotlib.
 # El script original implementa el algoritmo FABRIK para cinemática inversa.
 
-class FabrikIK:
+class Fabrik_2D:
     def __init__(self):
         # Índices para el almacenamiento de las extremidades, autoexplicativos
         self.LIMB_LEN = 0
@@ -14,7 +14,7 @@ class FabrikIK:
         
         # Usado para calcular cuánto falla el IK en alcanzar el objetivo
         self.BIAS = 3.0
-        self.ITERATIONS = 32
+        self.MAX_ITERATIONS = 32
 
         # Autoexplicativo
         self.base_point = np.array([0.0, 0.0])
@@ -113,7 +113,7 @@ class FabrikIK:
         # Almacenamiento de la distancia mínima entre la última articulación y el objetivo
         min_dist = float('inf')
         min_joints = []
-        while iterations < self.ITERATIONS:
+        while iterations < self.MAX_ITERATIONS:
             self._backward_pass(target)
             self._forward_pass()
             iterations += 1
@@ -270,5 +270,5 @@ class FabrikIK:
 
 
 if __name__ == '__main__':
-    ik_system = FabrikIK()
+    ik_system = Fabrik_2D()
     ik_system.setup_plot()

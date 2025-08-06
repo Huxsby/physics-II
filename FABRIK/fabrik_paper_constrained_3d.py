@@ -5,6 +5,11 @@ from matplotlib.animation import FuncAnimation
 from animation import guardar_animacion
 from core import Robot, Link, cargar_robot_desde_yaml
 from calculations.class_helicoidales import CinematicaDirecta, calcular_posiciones_articulaciones
+from visualization import RecordingSystem
+from fabrik_core.math_utils import (
+    wrap_angle, angle_to_point, distance_squared, distance, 
+    normalized, rotated_3d, spherical_to_cartesian, cartesian_to_spherical, rotated
+)
 
 # ===============================================================================
 # ALGORITMO IMPLEMENTADO: FABRIK 3D según Aristidou & Lasenby (2011)
@@ -45,7 +50,7 @@ from calculations.class_helicoidales import CinematicaDirecta, calcular_posicion
 # [ ] Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
 # ===============================================================================
 
-class FabrikIK3D:
+class Fabrik_3D:
     """
     Implementación del algoritmo FABRIK 3D (Forward And Backward Reaching Inverse Kinematics)
     para cinemática inversa con restricciones angulares en 3D.
@@ -69,17 +74,15 @@ class FabrikIK3D:
         de las articulaciones del robot en espacio 3D.
         """
         
-        self.name = "FABRIK_3D" # Configuración del nombre del sistema FABRIK 3D
-
+        self.name = "FABRIK_3D" # Nombre del sistema FABRIK 3D por defecto
         # Índices para el almacenamiento de las extremidades: Longitud ; Ángulo mínimo ; Ángulo máximo.
         self.LIMB_LEN = 0 ; self.LIMB_MIN = 1 ; self.LIMB_MAX = 2 # (restricción esférica)
         
         # Usado para calcular cuánto falla el IK en alcanzar el objetivo
-        self.BIAS = 3.0  # Tolerancia de error para considerar el objetivo alcanzado
-        self.ITERATIONS = 32  # Número máximo de iteraciones del algoritmo
-
-        # Punto base fijo del robot en 3D
-        self.base_point = np.array([0.0, 0.0, 0.0])
+        self.BIAS = 3.0         # Tolerancia de error para considerar el objetivo alcanzado
+        self.MAX_ITERATIONS = 48    # Número máximo de iteraciones del algoritmo
+        self.iteration = 0      # Contador de iteraciones para el algoritmo FABRIK
+        self.base_point = np.array([0.0, 0.0, 0.0]) # Punto base fijo del robot en 3D
         
         # Longitudes de cada extremidad y restricciones angulares esféricas
         # [longitud, ángulo_mín_cono, ángulo_máx_cono] en radianes
@@ -89,20 +92,13 @@ class FabrikIK3D:
             [80, np.deg2rad(25), np.deg2rad(135)],  # Articulación final
         ]
         
-        # Los puntos con los que trabajamos (articulaciones del robot) en 3D
-        self.joints = []
+        self.info_joint_constraints = []
+        self.joints = [] # Los puntos con los que trabajamos (articulaciones del robot) en 3D
+        self.limbs_size = len(self.limbs) # Para no llamar a len(limbs) cada vez
+        self.limbs_len = 0.0 # Usado para calcular el sobrepaso del objetivo desde el rango posible
+        self.lerp_amount = 0.5 # Cantidad de interpolación (lerp) de las articulaciones antiguas a las nuevas
+        self.target = np.array([0.0, 0.0, 0.0]) # Posición objetivo del efector final en 3D
 
-        # Para no llamar a len(limbs) cada vez
-        self.limbs_size = len(self.limbs)
-        # Usado para calcular el sobrepaso del objetivo desde el rango posible
-        self.limbs_len = 0.0
-
-        # Cantidad de interpolación (lerp) de las articulaciones antiguas a las nuevas
-        self.lerp_amount = 0.5
-        
-        # Posición objetivo del efector final en 3D
-        self.target = np.array([0.0, 0.0, 0.0])
-        
         # Parámetros para Algorithm 3 - Target Constraint Application
         self.workspace_constraints_enabled = True
         self.workspace_angles = [
@@ -112,14 +108,8 @@ class FabrikIK3D:
             np.deg2rad(30),  # θ4 - ángulo de restricción cuadrante 4
         ]
 
-        # Sistema de grabación avanzado
-        self.recording_state = 'stopped'  # 'stopped', 'recording', 'paused'
-        self.recording_frames = []  # Buffer para frames de grabación
-        self.frame_buffer = []  # Buffer circular para últimos 10 segundos
-        self.max_buffer_size = 200  # 10 segundos a 20 fps
-        self.recording_fps = 20
-        self.recording_dpi = 300
-        self.current_frame_count = 0
+        # Sistema de grabación avanzado (delegado al módulo de grabación)
+        self.recorder = RecordingSystem(fps=20, dpi=300, max_buffer_seconds=10)
 
         self._ready()
 
@@ -140,31 +130,24 @@ class FabrikIK3D:
         info.append("FABRIK 3D - Forward And Backward Reaching Inverse Kinematics")
         info.append("=" * 60)
         
-        # Configuración del algoritmo
         info.append("\nCONFIGURACIÓN DEL ALGORITMO:")
-        info.append(f" - Máximo de iteraciones: {self.ITERATIONS}")
+        info.append(f" - Máximo de iteraciones: {self.MAX_ITERATIONS}")
         info.append(f" - Tolerancia (BIAS): {self.BIAS}")
         info.append(f" - Factor de interpolación (lerp): {self.lerp_amount}")
         
-        # Estado del target
         info.append("\nESTADO DEL TARGET:")
         info.append(f" - Posición objetivo: [{self.target[0]:.3f}, {self.target[1]:.3f}, {self.target[2]:.3f}]")
         info.append(f" - Paso de movimiento: {self.target_step:.3f}")
         
-        # Estructura del robot
         info.append("\nESTRUCTURA DEL ROBOT:")
         info.append(f" - Punto base: [{self.base_point[0]:.3f}, {self.base_point[1]:.3f}, {self.base_point[2]:.3f}]")
         info.append(f" - Número de eslabones: {self.limbs_size}")
         info.append(f" - Longitud total: {self.limbs_len:.3f}")
         
-        # Información de eslabones y restricciones
         info.append("\nESLABONES Y RESTRICCIONES:")
-        for i, limb in enumerate(self.limbs):
-            length = limb[self.LIMB_LEN]
-            min_angle = np.rad2deg(limb[self.LIMB_MIN])
-            max_angle = np.rad2deg(limb[self.LIMB_MAX])
-            info.append(f" - Eslabón {i+1}: Longitud={length:.2f}, Ángulos=[{min_angle:.1f}°, {max_angle:.1f}°]")
-        
+
+        info += self.info_joint_constraints
+
         # Posiciones actuales de las articulaciones
         info.append("\nPOSICIONES ACTUALES DE ARTICULACIONES:")
         for i, joint in enumerate(self.joints):
@@ -195,136 +178,6 @@ class FabrikIK3D:
         info.append("\n" + "=" * 80)
         
         return "\n".join(info)
-
-    # FUNCIONES AUXILIARES MATEMÁTICAS
-
-    def _wrap_angle(self, angle):
-        """
-        Envuelve el ángulo entre -PI y PI.
-        
-        Args:
-            angle (float): Ángulo en radianes a normalizar
-            
-        Returns:
-            float: Ángulo normalizado en el rango [-π, π]
-        """
-        return (angle + np.pi) % (2 * np.pi) - np.pi
-
-    def _angle_to_point(self, p1, p2):
-        """
-        Calcula el ángulo de p1 a p2.
-        
-        Args:
-            p1 (np.ndarray): Punto de origen [x, y]
-            p2 (np.ndarray): Punto de destino [x, y]
-            
-        Returns:
-            float: Ángulo en radianes desde p1 hacia p2
-        """
-        return np.arctan2(p2[1] - p1[1], p2[0] - p1[0])
-
-    def _distance_squared(self, p1, p2):
-        """
-        Calcula la distancia al cuadrado entre dos puntos.
-        
-        Más eficiente que calcular la distancia completa cuando solo
-        se necesita comparar distancias.
-        
-        Args:
-            p1 (np.ndarray): Primer punto [x, y]
-            p2 (np.ndarray): Segundo punto [x, y]
-            
-        Returns:
-            float: Distancia al cuadrado entre los puntos
-        """
-        return np.sum((p1 - p2)**2)
-
-    def _distance(self, p1, p2):
-        """
-        Calcula la distancia entre dos puntos.
-        
-        Args:
-            p1 (np.ndarray): Primer punto [x, y]
-            p2 (np.ndarray): Segundo punto [x, y]
-            
-        Returns:
-            float: Distancia euclidiana entre los puntos
-        """
-        return np.linalg.norm(p1 - p2)
-        
-    def _normalized(self, v):
-        """
-        Normaliza un vector 3D.
-        
-        Args:
-            v (np.ndarray): Vector 3D a normalizar [x, y, z]
-            
-        Returns:
-            np.ndarray: Vector normalizado (magnitud = 1) o vector original si magnitud = 0
-        """
-        norm = np.linalg.norm(v)
-        if norm == 0: 
-           return v
-        return v / norm
-
-    def _rotated_3d(self, v, axis, angle):
-        """
-        Rota un vector 3D alrededor de un eje dado usando la fórmula de Rodrigues.
-        
-        Args:
-            v (np.ndarray): Vector 3D a rotar [x, y, z]
-            axis (np.ndarray): Eje de rotación normalizado [x, y, z]
-            angle (float): Ángulo de rotación en radianes
-            
-        Returns:
-            np.ndarray: Vector rotado en 3D
-        """
-        axis = self._normalized(axis)
-        cos_angle = np.cos(angle)
-        sin_angle = np.sin(angle)
-        
-        # Fórmula de Rodrigues: v_rot = v*cos(θ) + (k × v)*sin(θ) + k*(k·v)*(1-cos(θ))
-        cross_product = np.cross(axis, v)
-        dot_product = np.dot(axis, v)
-        
-        return (v * cos_angle + 
-                cross_product * sin_angle + 
-                axis * dot_product * (1 - cos_angle))
-
-    def _spherical_to_cartesian(self, r, theta, phi):
-        """
-        Convierte coordenadas esféricas a cartesianas.
-        
-        Args:
-            r (float): Radio/distancia desde el origen
-            theta (float): Ángulo polar desde el eje Z (0 a π)
-            phi (float): Ángulo azimutal desde el eje X (0 a 2π)
-            
-        Returns:
-            np.ndarray: Vector cartesiano [x, y, z]
-        """
-        x = r * np.sin(theta) * np.cos(phi)
-        y = r * np.sin(theta) * np.sin(phi)
-        z = r * np.cos(theta)
-        return np.array([x, y, z])
-
-    def _cartesian_to_spherical(self, v):
-        """
-        Convierte coordenadas cartesianas a esféricas.
-        
-        Args:
-            v (np.ndarray): Vector cartesiano [x, y, z]
-            
-        Returns:
-            tuple: (r, theta, phi) - radio, ángulo polar, ángulo azimutal
-        """
-        r = np.linalg.norm(v)
-        if r == 0:
-            return 0, 0, 0
-        
-        theta = np.arccos(v[2] / r)  # Ángulo polar
-        phi = np.arctan2(v[1], v[0])  # Ángulo azimutal
-        return r, theta, phi
 
     # ALGORITMOS PRINCIPALES DE FABRIK 3D
 
@@ -362,8 +215,8 @@ class FabrikIK3D:
             # pero alejado a la distancia de la última articulación, para que sea
             # posible de alcanzar, y esté posiblemente cerca del objetivo deseado
             self.update_ik(
-                self.base_point + self._normalized(target - self.base_point) *
-                self._distance(self.base_point, self.joints[self.limbs_size])
+                self.base_point + normalized(target - self.base_point) *
+                distance(self.base_point, self.joints[self.limbs_size])
             )
             return
             
@@ -404,7 +257,7 @@ class FabrikIK3D:
         constrained_target = self.apply_target_constraints(target)
         
         # Check if the target is within reachable distance (según Algorithm 1)
-        dist_to_target = self._distance(self.joints[self.limbs_size], constrained_target)
+        dist_to_target = distance(self.joints[self.limbs_size], constrained_target)
         total_length = self.limbs_len
         
         if dist_to_target > total_length:
@@ -412,7 +265,7 @@ class FabrikIK3D:
             # Implementación exacta del paper: interpolación lineal en 3D
             for i in range(self.limbs_size):
                 # Find the distance ri between the target t and the joint position pi
-                ri = self._distance(constrained_target, self.joints[i])
+                ri = distance(constrained_target, self.joints[i])
                 if ri > 1e-8:  # Evitar división por cero
                     # Find the scaling factor ki to maintain link length
                     ki = self.limbs[i][self.LIMB_LEN] / ri
@@ -425,11 +278,11 @@ class FabrikIK3D:
             b = self.base_point.copy()
             
             # Check whether the distance between the end effector pn and target t is greater than tolerance
-            difA = self._distance(self.joints[self.limbs_size], constrained_target)
-            iteration = 0
+            difA = distance(self.joints[self.limbs_size], constrained_target)
+            self.iteration = 0
             tol = 1e-3  # Tolerancia según el paper
-            
-            while difA > tol and iteration < self.ITERATIONS:
+
+            while difA > tol and self.iteration < self.MAX_ITERATIONS:
                 # STAGE 1: FORWARD REACHING (from end effector to base)
                 self._backward_pass(constrained_target)
                 
@@ -437,10 +290,10 @@ class FabrikIK3D:
                 self._forward_pass(b)
                 
                 # Update the distance to target for convergence check
-                difA = self._distance(self.joints[self.limbs_size], constrained_target)
-                iteration += 1
+                difA = distance(self.joints[self.limbs_size], constrained_target)
+                self.iteration += 1
             
-            return self._distance_squared(self.joints[self.limbs_size], constrained_target)
+            return distance_squared(self.joints[self.limbs_size], constrained_target)
 
     def _forward_pass(self, base_position: np.ndarray) -> None:
         """
@@ -470,7 +323,7 @@ class FabrikIK3D:
         # For i = 1, 2, ..., n-1 do
         for i in range(self.limbs_size):
             # Calculate the distance between consecutive joints
-            ri = self._distance(self.joints[i + 1], self.joints[i])
+            ri = distance(self.joints[i + 1], self.joints[i])
             
             if ri > 1e-8:  # Evitar división por cero
                 # Calculate the unit direction vector from pi to pi+1
@@ -509,7 +362,7 @@ class FabrikIK3D:
         # For i = n-1, n-2, ..., 1 do
         for i in range(self.limbs_size, 0, -1):
             # Calculate the distance between consecutive joints
-            ri = self._distance(self.joints[i], self.joints[i - 1])
+            ri = distance(self.joints[i], self.joints[i - 1])
             
             if ri > 1e-8:  # Evitar división por cero
                 # Calculate the unit direction vector from pi+1 to pi
@@ -555,7 +408,7 @@ class FabrikIK3D:
             else:
                 # Para segmentos subsecuentes, la dirección por defecto es la extensión lineal
                 prev_segment = self.joints[i] - self.joints[i - 1]
-                default_direction = self._normalized(prev_segment)
+                default_direction = normalized(prev_segment)
             
             # CLAVE: Verificar si tenemos información de orientación neutral del robot real
             limb = self.limbs[i]
@@ -592,7 +445,7 @@ class FabrikIK3D:
             
             # Dirección actual del segmento
             current_segment = self.joints[i + 1] - self.joints[i]
-            current_direction = self._normalized(current_segment)
+            current_direction = normalized(current_segment)
             
             # Calcular el ángulo entre la dirección de referencia y la actual
             dot_product = np.clip(np.dot(reference_direction, current_direction), -1.0, 1.0)
@@ -620,7 +473,7 @@ class FabrikIK3D:
                     rotation_axis = rotation_axis / rotation_axis_norm
                     
                     # Rotar la dirección de referencia por el ángulo restringido
-                    constrained_direction = self._rotated_3d(reference_direction, rotation_axis, constrained_angle)
+                    constrained_direction = rotated_3d(reference_direction, rotation_axis, constrained_angle)
                 else:
                     # Direcciones paralelas, usar la dirección de referencia
                     constrained_direction = reference_direction
@@ -683,11 +536,11 @@ class FabrikIK3D:
             x_axis = np.cross(z_axis, np.array([0, 0, 1]))
         else:
             x_axis = np.cross(z_axis, np.array([1, 0, 0]))
-        x_axis = self._normalized(x_axis)
+        x_axis = normalized(x_axis)
         
         # Y es perpendicular a ambos
         y_axis = np.cross(z_axis, x_axis)
-        y_axis = self._normalized(y_axis)
+        y_axis = normalized(y_axis)
         
         # Matriz de transformación a coordenadas locales
         transform_matrix = np.column_stack([x_axis, y_axis, z_axis])
@@ -863,183 +716,77 @@ class FabrikIK3D:
         # Convertir a arrays de float para operaciones numéricas
         self.joints = [np.array(j, dtype=float) for j in self.joints]
 
-    # SISTEMA DE GRABACIÓN Y ANIMACIÓN
+    # SISTEMA DE GRABACIÓN Y ANIMACIÓN (delegado al módulo de grabación)
 
     def start_recording(self):
         """Inicia la grabación de la animación."""
-        if self.recording_state == 'recording':
-            print("ADVERTENCIA: Ya se está grabando")
-            return
-        
-        self.recording_state = 'recording'
-        self.recording_frames = []
-        self.current_frame_count = 0
-        print("GRABACION INICIADA")
-        print("   Presiona P para pausar, X para parar")
+        self.recorder.start_recording()
     
     def pause_recording(self):
         """Pausa o reanuda la grabación."""
-        if self.recording_state == 'recording':
-            self.recording_state = 'paused'
-            print("GRABACION PAUSADA")
-            print("   Presiona P para reanudar")
-        elif self.recording_state == 'paused':
-            self.recording_state = 'recording'
-            print("GRABACION REANUDADA")
-        else:
-            print("ADVERTENCIA: No hay grabación activa para pausar")
+        self.recorder.pause_recording()
     
     def stop_recording(self):
         """Detiene la grabación y guarda el archivo."""
-        if self.recording_state == 'stopped':
-            print("ADVERTENCIA: No hay grabación activa")
-            return
+        # Configurar límites de plot antes de guardar
+        if hasattr(self, 'ax'):
+            ax_limits = {
+                'x': self.ax.get_xlim(),
+                'y': self.ax.get_ylim(), 
+                'z': self.ax.get_zlim()
+            }
+        else:
+            ax_limits = None
         
-        if len(self.recording_frames) == 0:
-            print("ADVERTENCIA: No hay frames grabados")
-            self.recording_state = 'stopped'
-            return
+        # Temporal monkey patch para pasar contexto
+        original_save_recorded = self.recorder._save_recorded_frames
+        original_save_buffer = self.recorder._save_buffer_frames
         
-        self.recording_state = 'stopped'
-        frame_count = len(self.recording_frames)
-        duration = frame_count / self.recording_fps
+        def patched_save_recorded(prefix, robot_name, base_point=None, limits=None):
+            return original_save_recorded(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
         
-        print(f"GRABACION DETENIDA")
-        print(f"   Frames capturados: {frame_count}")
-        print(f"   Duración: {duration:.1f} segundos")
+        def patched_save_buffer(prefix, robot_name, base_point=None, limits=None):
+            return original_save_buffer(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
         
-        # Crear animación temporal con los frames grabados
-        self._save_recorded_frames("recording")
+        self.recorder._save_recorded_frames = patched_save_recorded
+        self.recorder._save_buffer_frames = patched_save_buffer
+        
+        self.recorder.stop_recording(self.name)
+        
+        # Restaurar métodos originales
+        self.recorder._save_recorded_frames = original_save_recorded
+        self.recorder._save_buffer_frames = original_save_buffer
     
     def capture_recap(self):
         """Captura los últimos 10 segundos del buffer."""
-        if len(self.frame_buffer) == 0:
-            print("ADVERTENCIA: No hay frames en el buffer para recap")
-            return
+        # Configurar límites de plot antes de guardar
+        if hasattr(self, 'ax'):
+            ax_limits = {
+                'x': self.ax.get_xlim(),
+                'y': self.ax.get_ylim(),
+                'z': self.ax.get_zlim()
+            }
+        else:
+            ax_limits = None
         
-        frame_count = len(self.frame_buffer)
-        duration = frame_count / self.recording_fps
+        # Temporal monkey patch para pasar contexto
+        original_save_recorded = self.recorder._save_recorded_frames
+        original_save_buffer = self.recorder._save_buffer_frames
         
-        print(f"CAPTURANDO RECAP")
-        print(f"   Frames disponibles: {frame_count}")
-        print(f"   Duración: {duration:.1f} segundos")
+        def patched_save_recorded(prefix, robot_name, base_point=None, limits=None):
+            return original_save_recorded(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
         
-        # Usar todos los frames del buffer
-        self._save_buffer_frames("recap")
-    
-    def _save_recorded_frames(self, prefix):
-        """Guarda los frames grabados como animación."""
-        if len(self.recording_frames) == 0:
-            return
+        def patched_save_buffer(prefix, robot_name, base_point=None, limits=None):
+            return original_save_buffer(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
         
-        # Crear una animación temporal con frames específicos
-        temp_fig, temp_ax = plt.subplots(figsize=(12, 9), subplot_kw={'projection': '3d'})
-        temp_ax.set_xlim(self.ax.get_xlim())
-        temp_ax.set_ylim(self.ax.get_ylim())
-        temp_ax.set_zlim(self.ax.get_zlim())
-        temp_ax.set_xlabel('X')
-        temp_ax.set_ylabel('Y')
-        temp_ax.set_zlabel('Z')
-        temp_ax.set_title('FABRIK 3D - Animación Grabada')
+        self.recorder._save_recorded_frames = patched_save_recorded
+        self.recorder._save_buffer_frames = patched_save_buffer
         
-        def animate_recorded(frame_idx):
-            temp_ax.clear()
-            temp_ax.set_xlim(self.ax.get_xlim())
-            temp_ax.set_ylim(self.ax.get_ylim())
-            temp_ax.set_zlim(self.ax.get_zlim())
-            temp_ax.set_xlabel('X')
-            temp_ax.set_ylabel('Y')
-            temp_ax.set_zlabel('Z')
-            temp_ax.set_title('FABRIK 3D - Animación Grabada')
-            
-            # Obtener el frame grabado
-            frame_data = self.recording_frames[frame_idx]
-            joints_data = frame_data['joints']
-            target_data = frame_data['target']
-            
-            # Dibujar robot
-            points = np.array(joints_data)
-            temp_ax.plot(points[:, 0], points[:, 1], points[:, 2], 'o-', 
-                        color='blue', lw=2, markersize=6, markerfacecolor='red')
-            
-            # Dibujar target
-            temp_ax.plot([target_data[0]], [target_data[1]], [target_data[2]], 
-                        'o', color='green', markersize=10, alpha=0.7)
-            
-            # Dibujar base
-            temp_ax.plot([self.base_point[0]], [self.base_point[1]], [self.base_point[2]], 
-                        'o', color='black', markersize=8, markerfacecolor='yellow')
+        self.recorder.capture_recap(self.name)
         
-        # Crear animación
-        temp_anim = FuncAnimation(temp_fig, animate_recorded, frames=len(self.recording_frames),
-                                 interval=50, blit=False, cache_frame_data=False, repeat=False)
-        
-        # Guardar
-        filename = f'FABRIK/fabrik_3d_{prefix}_{self.name if self.name else "default"}'
-        try:
-            print(f"Guardando {filename.split('/')[-1]}...")
-            guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)
-        except Exception as e:
-            print(f"Error guardando animación: {e}")
-        finally:
-            plt.close(temp_fig)
-    
-    def _save_buffer_frames(self, prefix):
-        """Guarda los frames del buffer como animación."""
-        if len(self.frame_buffer) == 0:
-            return
-        
-        # Crear una animación temporal con frames del buffer
-        temp_fig, temp_ax = plt.subplots(figsize=(12, 9), subplot_kw={'projection': '3d'})
-        temp_ax.set_xlim(self.ax.get_xlim())
-        temp_ax.set_ylim(self.ax.get_ylim())
-        temp_ax.set_zlim(self.ax.get_zlim())
-        temp_ax.set_xlabel('X')
-        temp_ax.set_ylabel('Y')
-        temp_ax.set_zlabel('Z')
-        temp_ax.set_title('FABRIK 3D - Recap Últimos 10s')
-        
-        def animate_buffer(frame_idx):
-            temp_ax.clear()
-            temp_ax.set_xlim(self.ax.get_xlim())
-            temp_ax.set_ylim(self.ax.get_ylim())
-            temp_ax.set_zlim(self.ax.get_zlim())
-            temp_ax.set_xlabel('X')
-            temp_ax.set_ylabel('Y')
-            temp_ax.set_zlabel('Z')
-            temp_ax.set_title('FABRIK 3D - Recap Últimos 10s')
-            
-            # Obtener el frame del buffer
-            frame_data = self.frame_buffer[frame_idx]
-            joints_data = frame_data['joints']
-            target_data = frame_data['target']
-            
-            # Dibujar robot
-            points = np.array(joints_data)
-            temp_ax.plot(points[:, 0], points[:, 1], points[:, 2], 'o-', 
-                        color='blue', lw=2, markersize=6, markerfacecolor='red')
-            
-            # Dibujar target
-            temp_ax.plot([target_data[0]], [target_data[1]], [target_data[2]], 
-                        'o', color='green', markersize=10, alpha=0.7)
-            
-            # Dibujar base
-            temp_ax.plot([self.base_point[0]], [self.base_point[1]], [self.base_point[2]], 
-                        'o', color='black', markersize=8, markerfacecolor='yellow')
-        
-        # Crear animación
-        temp_anim = FuncAnimation(temp_fig, animate_buffer, frames=len(self.frame_buffer),
-                                 interval=50, blit=False, cache_frame_data=False, repeat=False)
-        
-        # Guardar
-        filename = f'FABRIK/fabrik_3d_{prefix}_{self.name if self.name else "default"}'
-        try:
-            print(f"Guardando {filename.split('/')[-1]}...")
-            guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)
-        except Exception as e:
-            print(f"Error guardando recap: {e}")
-        finally:
-            plt.close(temp_fig)
+        # Restaurar métodos originales
+        self.recorder._save_recorded_frames = original_save_recorded
+        self.recorder._save_buffer_frames = original_save_buffer
 
     # INTERFAZ GRÁFICA Y VISUALIZACIÓN
 
@@ -1065,7 +812,7 @@ class FabrikIK3D:
             'keymap.home': [],        # Deshabilitar 'h' y 'r' para home/reset vista
             'keymap.back': [],        # Deshabilitar navegación
             'keymap.forward': [],     # Deshabilitar navegación
-            'keymap.fullscreen': [],  # Deshabilitar 'f' para fullscreen
+          # 'keymap.fullscreen': [],  # Deshabilitar 'f' para fullscreen
             'keymap.grid': [],        # Deshabilitar 'g' para grid
             'keymap.yscale': [],      # Deshabilitar 'l' para log scale
             'keymap.xscale': [],      # Deshabilitar 'k' para log scale
@@ -1132,78 +879,44 @@ class FabrikIK3D:
             plt.show()
 
     def on_key_press(self, event):
-        """
-        Manejador de eventos para las teclas presionadas.
-        
-        Controla el movimiento del target usando el teclado (evitando teclas reservadas de matplotlib):
-        - Flechas direccionales: Movimiento en el plano XY
-        - U/J: Movimiento en el eje Z (arriba/abajo)
-        - R: Reset del target a posición inicial
-        - +/-: Aumentar/disminuir velocidad de movimiento
-        
-        Args:
-            event: Evento de tecla presionada de Matplotlib
-            
-        Returns:
-            None
-        """
-        if event.key is None:
+        """Manejador de eventos para las teclas presionadas."""
+        if not event.key:
             return
             
         key = event.key.lower()
         
-        # Movimiento del target usando flechas direccionales
-        if key == 'up':  # Flecha arriba - Avanzar en Y
-            self.target[1] += self.target_step
-        elif key == 'down':  # Flecha abajo - Retroceder en Y
-            self.target[1] -= self.target_step
-        elif key == 'left':  # Flecha izquierda - Izquierda en X
-            self.target[0] -= self.target_step
-        elif key == 'right':  # Flecha derecha - Derecha en X
-            self.target[0] += self.target_step
-        elif key == 'u':  # U - Subir en Z
-            self.target[2] += self.target_step
-        elif key == 'j':  # J - Bajar en Z
-            self.target[2] -= self.target_step
-        elif key == 'r':  # Reset posición
-            self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2])
-            print(f"Target reseteado a: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}]")
-        elif key == '+' or key == '=':  # Aumentar velocidad
-            max_step = self.limbs_len * 0.2  # Máximo 20% de la longitud total
-            self.target_step = min(self.target_step * 1.5, max_step)
-            print(f"Velocidad aumentada: {self.target_step:.1f}")
-        elif key == '-':  # Disminuir velocidad
-            min_step = self.limbs_len * 0.01  # Mínimo 1% de la longitud total
-            self.target_step = max(self.target_step / 1.5, min_step)
-            print(f"Velocidad reducida: {self.target_step:.1f}")
-        elif key == 'h':  # Ayuda
-            self.print_help()
-        elif key == 'w':  # W - Avanzar en Y
-            self.target[1] += self.target_step
-        elif key == 'a':  # A - Izquierda en X
-            self.target[0] -= self.target_step
-        elif key == 's':  # S - Retroceder en Y (ahora disponible sin conflictos)
-            self.target[1] -= self.target_step
-        elif key == 'd':  # D - Derecha en X
-            self.target[0] += self.target_step
-        elif key == 'q':  # Q - Subir en Z (ahora disponible sin conflictos)
-            self.target[2] += self.target_step
-        elif key == 'e':  # E - Bajar en Z
-            self.target[2] -= self.target_step
-        elif key == 'g':  # G - Iniciar grabación
-            self.start_recording()
-        elif key == 'p':  # P - Pausar/Reanudar grabación
-            self.pause_recording()
-        elif key == 'x':  # X - Parar grabación
-            self.stop_recording()
-        elif key == 'c':  # C - Capturar recap
-            self.capture_recap()
-        
+        match key:
+            # === MOVIMIENTO DEL TARGET ===
+            case 'up' | 'w':     self.target[1] += self.target_step # Y+
+            case 'down' | 's':   self.target[1] -= self.target_step # Y-
+            case 'left' | 'a':   self.target[0] -= self.target_step # X-
+            case 'right' | 'd':  self.target[0] += self.target_step # X+
+            case 'u' | 'q':      self.target[2] += self.target_step # Z+
+            case 'j' | 'e':      self.target[2] -= self.target_step # Z-
+            # === CONTROLES ESPECIALES ===
+            case 'r':       self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2]) # Reset posición
+            case '+' | '=': self._adjust_speed(1.5)     # Aumentar velocidad
+            case '-':       self._adjust_speed(1/1.5)   # Disminuir velocidad  
+            case 'h':       self.print_help()           # Ayuda
+            # === SISTEMA DE GRABACIÓN ===
+            case 'g': self.start_recording()    # Iniciar
+            case 'p': self.pause_recording()    # Pausar/Reanudar
+            case 'x': self.stop_recording()     # Parar y guardar
+            case 'c': self.capture_recap()      # Recap
+            
         # Limitar el target dentro del área visible
         plot_range = self.limbs_len * 1.2
-        self.target[0] = np.clip(self.target[0], -plot_range, plot_range)
-        self.target[1] = np.clip(self.target[1], -plot_range, plot_range) 
-        self.target[2] = np.clip(self.target[2], -plot_range, plot_range)
+        self.target = np.clip(self.target, -plot_range, plot_range)
+
+    def _adjust_speed(self, factor: float):
+        """Ajusta la velocidad de movimiento."""
+        self.target_step = np.clip(
+            self.target_step * factor,
+            self.limbs_len * 0.01,
+            self.limbs_len * 0.2
+        )
+        # Sobrescribir la línea anterior en lugar de crear nueva
+        print(f"\rVelocidad {'aumentada:' if factor > 1 else 'reducida: '} {self.target_step:6.1f}", end='', flush=True)
 
     def print_help(self):
         """
@@ -1234,31 +947,12 @@ class FabrikIK3D:
         print("│   H     │ Ayuda completa             │")
         print("└──────────────────────────────────────┘")
         
-        # Mostrar estado actual de grabación
-        if self.recording_state != 'stopped':
-            estado_indicador = "[REC]" if self.recording_state == 'recording' else "[PAUSADO]"
-            frames_grabados = len(self.recording_frames)
-            duracion = frames_grabados / self.recording_fps if frames_grabados > 0 else 0
-            print(f"\n{estado_indicador} Estado: {self.recording_state.upper()}")
-            print(f"Frames grabados: {frames_grabados} ({duracion:.1f}s)")
-        
-    def _rotated(self, v, angle):
-        """
-        Rota un vector 2D por un ángulo dado (para visualización).
-        
-        Args:
-            v (np.ndarray): Vector 2D a rotar [x, y]
-            angle (float): Ángulo de rotación en radianes
-            
-        Returns:
-            np.ndarray: Vector rotado en 2D
-        """
-        cos_a = np.cos(angle)
-        sin_a = np.sin(angle)
-        return np.array([
-            v[0] * cos_a - v[1] * sin_a,
-            v[0] * sin_a + v[1] * cos_a
-        ])
+        # Mostrar estado actual de grabación usando el nuevo sistema
+        status = self.recorder.get_recording_status()
+        if status['state'] != 'stopped':
+            estado_indicador = "[REC]" if status['state'] == 'recording' else "[PAUSADO]"
+            print(f"\n{estado_indicador} Estado: {status['state'].upper()}")
+            print(f"Frames grabados: {status['frames_recorded']} ({status['duration']:.1f}s)")
 
     def animate(self, i):
         """
@@ -1277,21 +971,7 @@ class FabrikIK3D:
         self.update(self.target)
         
         # Capturar frame actual para el sistema de grabación
-        current_frame = {
-            'joints': [joint.copy() for joint in self.joints],
-            'target': self.target.copy(),
-            'timestamp': i
-        }
-        
-        # Agregar al buffer circular (últimos 10 segundos)
-        self.frame_buffer.append(current_frame)
-        if len(self.frame_buffer) > self.max_buffer_size:
-            self.frame_buffer.pop(0)  # Eliminar frame más antiguo
-        
-        # Si estamos grabando, agregar al buffer de grabación
-        if self.recording_state == 'recording':
-            self.recording_frames.append(current_frame.copy())
-            self.current_frame_count += 1
+        self.recorder.capture_frame(self.joints, self.target, i)
         
         # Actualizar las articulaciones del robot en 3D
         points = np.array(self.joints)
@@ -1313,7 +993,7 @@ class FabrikIK3D:
                 
                 # Dirección del segmento anterior para establecer referencia
                 if i > 1:
-                    prev_direction = self._normalized(self.joints[i] - self.joints[i-1])
+                    prev_direction = normalized(self.joints[i] - self.joints[i-1])
                 else:
                     prev_direction = np.array([1.0, 0.0, 0.0])  # Eje X como referencia
                 
@@ -1336,16 +1016,16 @@ class FabrikIK3D:
                         perp1 = np.cross(prev_direction, np.array([0, 0, 1]))
                     else:
                         perp1 = np.cross(prev_direction, np.array([1, 0, 0]))
-                    perp1 = self._normalized(perp1)
+                    perp1 = normalized(perp1)
                     perp2 = np.cross(prev_direction, perp1)
-                    perp2 = self._normalized(perp2)
+                    perp2 = normalized(perp2)
                     
                     # Puntos en el círculo
                     circle_point = perp1 * np.cos(theta) + perp2 * np.sin(theta)
                     
                     # Rotar para crear el cono
-                    min_direction = self._rotated_3d(prev_direction, circle_point, min_angle)
-                    max_direction = self._rotated_3d(prev_direction, circle_point, max_angle)
+                    min_direction = rotated_3d(prev_direction, circle_point, min_angle)
+                    max_direction = rotated_3d(prev_direction, circle_point, max_angle)
                     
                     min_cone_points.append(p_base + min_direction * cone_radius)
                     max_cone_points.append(p_base + max_direction * cone_radius)
@@ -1362,13 +1042,14 @@ class FabrikIK3D:
                     self.constraint_lines.extend([l_min, l_max])
 
         # Actualizar información del target y estado de grabación
-        target_info = f"Target: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}] | Step: {self.target_step:.1f}"
+        target_info = f"Target: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}] | Stress: {self.iteration/self.MAX_ITERATIONS*100:5.2f}%"
         
-        # Agregar indicador de estado de grabación
-        if self.recording_state == 'recording':
-            target_info += f" | [REC] ({len(self.recording_frames)} frames)"
-        elif self.recording_state == 'paused':
-            target_info += f" | [PAUSADO] ({len(self.recording_frames)} frames)"
+        # Agregar indicador de estado de grabación usando el nuevo sistema
+        status = self.recorder.get_recording_status()
+        if status['state'] == 'recording':
+            target_info += f" | [REC] ({status['frames_recorded']} frames)"
+        elif status['state'] == 'paused':
+            target_info += f" | [PAUSADO] ({status['frames_recorded']} frames)"
         
         self.info_text.set_text(target_info)
 
@@ -1387,11 +1068,11 @@ class FabrikIK3D:
         
         Args:
             yaml_file_path (str): Ruta al archivo YAML del robot
-            **kwargs: Argumentos adicionales para el constructor de FabrikIK3D
+            **kwargs: Argumentos adicionales para el constructor de Fabrik_3D
                      (max_iterations, tolerance, etc.)
         
         Returns:
-            FabrikIK3D: Instancia configurada desde el robot YAML
+            Fabrik_3D: Instancia configurada desde el robot YAML
             
         Raises:
             ImportError: Si no se pueden importar las clases Robot/Link
@@ -1399,7 +1080,7 @@ class FabrikIK3D:
             ValueError: Si el robot YAML no tiene estructura válida
         
         Ejemplo:
-            robot_fabrik = FabrikIK3D.from_robot_yaml(robot)
+            robot_fabrik = Fabrik_3D.from_robot_yaml(robot)
             resultado, exito = robot_fabrik.solve_ik([0.3, 0.2, 0.4])
         """
         if robot is None:
@@ -1478,14 +1159,33 @@ class FabrikIK3D:
                     constraint_info['center_direction'] = direction.tolist()
             
             joint_constraints.append(constraint_info)
-        
-        print(f"\nRobot cargado desde YAML: {len(joints_pos)} articulaciones, {len(joint_constraints)} restricciones")
-        print(f"\nPosiciones: {[f'[{p[0]:.2f}, {p[1]:.2f}, {p[2]:.2f}]' for p in joints_pos]}")
-        print(f"\nRestricciones: {joint_constraints}")
+            
+        print(f"\033[92mRobot cargado desde YAML: {len(joints_pos)} articulaciones, {len(joint_constraints)} restricciones\033[0m")
         
         # Crear instancia FABRIK básica
         instance = cls()
         instance.name = robot.name
+        info = instance.info_joint_constraints
+        
+        # Construir información de restricciones de articulaciones para la representación
+        for i, constraint in enumerate(joint_constraints):
+            center_direction = constraint.get('center_direction', [1.0, 0.0, 0.0])
+            min_angle = constraint.get('min_angle', 0.0)
+            max_angle = constraint.get('max_angle', np.pi/4)
+            neutral_angle = constraint.get('neutral_angle', 0.0)
+            range_type = constraint.get('range_type', 'default')
+            original_limits = constraint.get('original_limits', (None, None))
+            
+            info.append(f"Articulación ({i+1}):")
+            info.append(f"  ├─ Tipo: {constraint.get('type', 'conic')}")
+            info.append(f"  ├─ Dirección central: [{center_direction[0]:.3f}, {center_direction[1]:.3f}, {center_direction[2]:.3f}]")
+            info.append(f"  ├─ Ángulo (mínimo, máximo): ({np.rad2deg(min_angle):.1f}°, {np.rad2deg(max_angle):.1f}°)")
+            info.append(f"  ├─ Ángulo neutral: {np.rad2deg(neutral_angle):.1f}°")
+            info.append(f"  ├─ Tipo de rango: {range_type}")
+            if original_limits[0] is not None and original_limits[1] is not None:
+                info.append(f"  └─ Límites originales: ({np.rad2deg(original_limits[0]):.1f}°, {np.rad2deg(original_limits[1]):.1f}°)")
+            else:
+                info.append(f"  └─ Límites originales: No especificados")
 
         # Configurar las posiciones de articulaciones desde el YAML
         instance.joints = [np.array(pos, dtype=float) for pos in joints_pos]
@@ -1584,44 +1284,18 @@ class FabrikIK3D:
         
         return joints_list, converged
 
-# PUNTO DE ENTRADA PRINCIPAL
-
+# Demostración de uso del sistema FABRIK 3D
 if __name__ == '__main__':
-    """
-    Punto de entrada principal del programa.
-    
-    Crea una instancia del sistema FABRIK y inicia la visualización interactiva.
-    El usuario puede mover el mouse para definir objetivos y ver cómo el robot
-    resuelve la cinemática inversa en tiempo real usando el algoritmo FABRIK
-    fiel al paper original de Aristidou & Lasenby (2011).
-    """
-    ik_system = FabrikIK3D()
+    print("FABRIK 3D Implementation - Visualización 3D Real")
+    ik_system = Fabrik_3D()
     
     # Intentar cargar robot desde YAML
     try:
-        ik_system = ik_system.from_robot_yaml('config/robot-niryo.yaml')
-        print(f"Robot Niryo cargado desde YAML: {len(ik_system.joints)} articulaciones")
-        print(f"\tLongitud total: {ik_system.limbs_len:.1f} unidades")
+        robot = cargar_robot_desde_yaml('config/robot-niryo.yaml')
+        ik_system = ik_system.from_robot_yaml(robot)
     except Exception as e:
         print(f"Error cargando robot: {e}")
         print("\tUsando configuración por defecto")
 
-    print("FABRIK 3D Implementation - Visualización 3D Real")
-    print("Algoritmos implementados:")
-    print("   Algorithm 1: FABRIK básico (3D)")
-    print("   Algorithm 2: Joint Constraints (restricciones esféricas)")
-    print("   Algorithm 3: Target Constraint Application (workspace limits)")
-    print("\nControles:")
-    print("   - WASD / Flechas: mover target en XY")
-    print("   - QE / UJ: mover target en Z")
-    print("   - R: reset | +/-: velocidad | H: ayuda completa")
-    print("\nSistema de Grabación Avanzado:")
-    print("   - G: Iniciar grabación")
-    print("   - P: Pausar/Reanudar")
-    print("   - X: Parar y guardar")
-    print("   - C: Recap últimos 10s")
-    print("\nMouse: rotar/zoom vista 3D")
-    print('='*60, "\n", ik_system)
-    
-
+    print(ik_system)
     ik_system.setup_plot()

@@ -37,7 +37,7 @@ from matplotlib.animation import FuncAnimation
 # [ ] Algorithm 6: FABRIK with Orientation Control
 # ===============================================================================
 
-class FabrikIK:
+class Fabrik_2D:
     """
     Implementación del algoritmo FABRIK (Forward And Backward Reaching Inverse Kinematics)
     para cinemática inversa con restricciones angulares en 2D.
@@ -63,7 +63,7 @@ class FabrikIK:
         
         # Usado para calcular cuánto falla el IK en alcanzar el objetivo
         self.BIAS = 3.0  # Tolerancia de error para considerar el objetivo alcanzado
-        self.ITERATIONS = 32  # Número máximo de iteraciones del algoritmo
+        self.MAX_ITERATIONS = 32  # Número máximo de iteraciones del algoritmo
 
         # Autoexplicativo
         self.base_point = np.array([0.0, 0.0])  # Punto base fijo del robot
@@ -283,7 +283,7 @@ class FabrikIK:
             iteration = 0
             tol = 1e-3  # Tolerancia según el paper
             
-            while difA > tol and iteration < self.ITERATIONS:
+            while difA > tol and iteration < self.MAX_ITERATIONS:
                 # STAGE 1: FORWARD REACHING (from end effector to base)
                 self._backward_pass(target)
                 
@@ -550,7 +550,7 @@ if __name__ == '__main__':
     resuelve la cinemática inversa en tiempo real usando el algoritmo FABRIK
     fiel al paper original de Aristidou & Lasenby (2011).
     """
-    ik_system = FabrikIK()
+    ik_system = Fabrik_2D()
     
     print("🎯 FABRIK Implementation - Fiel al Paper Original")
     print("📋 Algoritmos: Algorithm 1 (FABRIK) + Algorithm 2 (Joint Constraints)")

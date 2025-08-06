@@ -26,7 +26,7 @@ ACKNOWLED- **Extending FABRIK with Model Constraints**
 - **Algorithm adaptations**:
   - Algorithm 1: FABRIK basic with 3D unit directions
   - Algorithm 2: Joint constraints with spherical/conic restrictions
-- **Class restructure**: FabrikIK → FabrikIK3D with complete method overhaul
+- **Class restructure**: Fabrik_2D → Fabrik_3D with complete method overhaul
 
 **Phase 3: Algorithm 3 Implementation**
 - **Target Constraint Application**: Implemented workspace limits using conic sections

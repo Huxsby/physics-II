@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-class FabrikIK:
+class Fabrik_2D:
     def __init__(self, limbs, base_point):
         # Longitudes de cada miembro en px
         self.limbs = np.array(limbs)
@@ -21,7 +21,7 @@ class FabrikIK:
             self.joints[i + 1] = self.joints[i] + np.array([self.limbs[i], 0])
 
         # Constante para las iteraciones
-        self.ITERATIONS = 32
+        self.MAX_ITERATIONS = 32
         
         # Para el benchmark de iteraciones, puede ser eliminado
         self.all_iterations = 0
@@ -86,7 +86,7 @@ class FabrikIK:
             # Almacenamiento de la distancia mínima entre la última articulación y el objetivo
             min_dist_sq = np.inf
             min_joints = None
-            while iterations < self.ITERATIONS:
+            while iterations < self.MAX_ITERATIONS:
                 self._backward_pass()
                 self._forward_pass()
                 iterations += 1
@@ -122,7 +122,7 @@ ax.set_xlim(0, 500)
 ax.set_ylim(0, 500)
 
 # Instancia de la clase IK
-fabrik = FabrikIK(limbs=[80, 60, 80], base_point=[250, 250])
+fabrik = Fabrik_2D(limbs=[80, 60, 80], base_point=[250, 250])
 
 # Elementos del gráfico a actualizar
 line, = ax.plot([], [], 'o-', lw=2, color='gray')
