@@ -23,6 +23,7 @@ import sys
 import os
 from core import thetas_aleatorias, Robot, limits, get_limits_negative, get_limits_positive, cargar_robot_desde_yaml
 from calculations.class_helicoidales import CinematicaDirecta
+from matplotlib.animation import writers
 
 import numpy as np                              # Import NumPy for numerical operations
 import matplotlib.pyplot as plt                 # Import Matplotlib for 3D plotting
@@ -199,25 +200,35 @@ def guardar_animacion(anim, nombre_archivo, fps=30, dpi=225):
     if not anim:
         print("No hay animación para guardar.")
         return
-    print(f"Guardando animación ({nombre_archivo})...")
+    # Obtener writers disponibles
+    available_writers = []
     try:
-        _guardar_animacion_ffmpeg(anim, nombre_archivo, fps, dpi)
-    except Exception as e:
-        print(f"\t\033[31mError al guardar con ffmpeg: {e}\033[0m")
-        _guardar_animacion_pillow(anim, nombre_archivo, fps, dpi)
-    except Exception as e_final:
-        print(f"\t\033[31mNo se pudo guardar la animación '{nombre_archivo}'.\n\tAsegúrate de tener ffmpeg o Pillow instalado correctamente.\033[0m")
-        print(f"\t\033[31mError: {e_final}\033[0m")
-
-def _guardar_animacion_ffmpeg(anim, nombre_archivo, fps=30, dpi=225):
-    print("\tIntentando guardar la animación como MP4 con ffmpeg...")
-    anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=fps, dpi=dpi)
-    print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.mp4' usando ffmpeg.\033[0m")
-
-def _guardar_animacion_pillow(anim, nombre_archivo, fps=30, dpi=225):
-    print("\tIntentando guardar la animación como GIF con Pillow...")
-    anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=fps, dpi=dpi)
-    print(f"\t\033[92mAnimación guardada como '{nombre_archivo}.gif' usando Pillow.\033[0m")
+        available_writers = list(writers.list())
+        print(f"\t\033[94mWriters disponibles: {', '.join(available_writers)}\033[0m")
+    except Exception:
+        print("\t\033[93mNo se pudieron detectar los writers disponibles\033[0m")
+    
+    # Intentar guardar con el primer writer disponible
+    if 'ffmpeg' in available_writers:
+        try:
+            print("\tGuardando animación como MP4 con ffmpeg...")
+            anim.save(f"{nombre_archivo}.mp4", writer="ffmpeg", fps=fps, dpi=dpi)
+            print(f"\t\033[92mAnimación guardada como \033[93m'{nombre_archivo}.mp4'\033[0m")
+            return
+        except Exception as e:
+            print(f"\t\033[31mError con ffmpeg: {e}\033[0m")
+    
+    if 'pillow' in available_writers:
+        try:
+            print("\tGuardando animación como GIF con Pillow...")
+            anim.save(f"{nombre_archivo}.gif", writer="pillow", fps=fps, dpi=dpi)
+            print(f"\t\033[92mAnimación guardada como \033[93m'{nombre_archivo}.gif'\033[0m")
+            return
+        except Exception as e:
+            print(f"\t\033[31mError con Pillow: {e}\033[0m")
+    
+    # Si no hay writers disponibles o fallan todos
+    print(f"\t\033[31mNo se pudo guardar la animación. Instala ffmpeg o Pillow.\033[0m")
 
 """ Función principal para visualizar el robot manipulador en 3D """
 def plot_robot(robot: Robot, thetas, ax=None, show=True, trayectoria=None, 

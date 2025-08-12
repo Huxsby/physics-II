@@ -63,12 +63,14 @@ class RecordingSystem:
         else:
             print("ADVERTENCIA: No hay grabación activa para pausar")
     
-    def stop_recording(self, robot_name="default"):
+    def stop_recording(self, robot_name="default", base_point=None, ax=None):
         """
         Detiene la grabación y guarda el archivo.
         
         Args:
             robot_name (str): Nombre del robot para el archivo
+            base_point (np.ndarray, optional): Punto base del robot para visualización
+            ax (matplotlib.axes.Axes, optional): Eje 3D para obtener límites automáticamente
         """
         if self.recording_state == 'stopped':
             print("ADVERTENCIA: No hay grabación activa")
@@ -87,15 +89,26 @@ class RecordingSystem:
         print(f"   Frames capturados: {frame_count}")
         print(f"   Duración: {duration:.1f} segundos")
         
+        # Extraer límites del eje si se proporciona
+        ax_limits = None
+        if ax is not None and hasattr(ax, 'get_xlim'):
+            ax_limits = {
+                'x': ax.get_xlim(),
+                'y': ax.get_ylim(),
+                'z': ax.get_zlim()
+            }
+        
         # Crear animación temporal con los frames grabados
-        self._save_recorded_frames("recording", robot_name)
+        self._save_recorded_frames("recording", robot_name, base_point, ax_limits)
     
-    def capture_recap(self, robot_name="default"):
+    def capture_recap(self, robot_name="default", base_point=None, ax=None):
         """
         Captura los últimos N segundos del buffer.
         
         Args:
             robot_name (str): Nombre del robot para el archivo
+            base_point (np.ndarray, optional): Punto base del robot para visualización
+            ax (matplotlib.axes.Axes, optional): Eje 3D para obtener límites automáticamente
         """
         if len(self.frame_buffer) == 0:
             print("ADVERTENCIA: No hay frames en el buffer para recap")
@@ -108,8 +121,17 @@ class RecordingSystem:
         print(f"   Frames disponibles: {frame_count}")
         print(f"   Duración: {duration:.1f} segundos")
         
+        # Extraer límites del eje si se proporciona
+        ax_limits = None
+        if ax is not None and hasattr(ax, 'get_xlim'):
+            ax_limits = {
+                'x': ax.get_xlim(),
+                'y': ax.get_ylim(),
+                'z': ax.get_zlim()
+            }
+        
         # Usar todos los frames del buffer
-        self._save_buffer_frames("recap", robot_name)
+        self._save_buffer_frames("recap", robot_name, base_point, ax_limits)
     
     def capture_frame(self, joints, target, timestamp):
         """

@@ -1,3 +1,42 @@
+"""
+ALGORITMO IMPLEMENTADO: FABRIK 3D según Aristidou & Lasenby (2011)
+===============================================================================
+
+
+Algorithm 1: FABRIK (Forward And Backward Reaching Inverse Kinematics) 3D
+- Implementación fiel al algoritmo básico FABRIK con fases forward/backward
+- Expansión completa a espacio 3D con vectores y restricciones espaciales
+- Manejo de targets fuera del alcance con stretching automático
+- Convergencia iterativa con tolerancia exacta del paper
+
+Algorithm 2: Joint Constraint Application (for restricted joints) 3D
+- Aplicación de restricciones angulares esféricas post-procesamiento
+- Restricciones aplicadas después de cada iteración completa
+- Soporte para restricciones cónicas en articulaciones esféricas
+
+Algorithm 3: Target Constraint Application (workspace limits) 3D
+- Implementación de restricciones de workspace usando secciones cónicas
+- Mapeo de problemas 3D a 2D para cálculos eficientes
+- Aplicación de límites de workspace en tiempo real
+
+FIEL AL PAPER ORIGINAL + EXTENSIÓN 3D:
+===============================================================================
+
+IMPLEMENTACIÓN EXACTA:
+- [X] Usa distancia simple (no al cuadrado) como en el algoritmo original
+- [X] Convergencia basada en tolerancia difA > tol del paper
+- [X] Direcciones unitarias simples: direction = (pi+1 - pi) / ri en 3D
+- [X] Post-procesamiento de restricciones (Algorithm 2) para articulaciones esféricas
+- [X] Stretching lineal para targets fuera de alcance en espacio 3D
+- [X] Preservación exacta del punto base fijo
+- [ ] Workspace constraints usando secciones cónicas (Algorithm 3)
+
+ALGORITMOS PENDIENTES DE IMPLEMENTAR:
+===============================================================================
+- [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)
+- [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors en 3D)
+- [ ] Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
+"""
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -10,45 +49,6 @@ from fabrik_core.math_utils import (
     wrap_angle, angle_to_point, distance_squared, distance, 
     normalized, rotated_3d, spherical_to_cartesian, cartesian_to_spherical, rotated
 )
-
-# ===============================================================================
-# ALGORITMO IMPLEMENTADO: FABRIK 3D según Aristidou & Lasenby (2011)
-# ===============================================================================
-# 
-# Algorithm 1: FABRIK (Forward And Backward Reaching Inverse Kinematics) 3D
-# - Implementación fiel al algoritmo básico FABRIK con fases forward/backward
-# - Expansión completa a espacio 3D con vectores y restricciones espaciales
-# - Manejo de targets fuera del alcance con stretching automático
-# - Convergencia iterativa con tolerancia exacta del paper
-# 
-# Algorithm 2: Joint Constraint Application (for restricted joints) 3D
-# - Aplicación de restricciones angulares esféricas post-procesamiento
-# - Restricciones aplicadas después de cada iteración completa
-# - Soporte para restricciones cónicas en articulaciones esféricas
-# 
-# Algorithm 3: Target Constraint Application (workspace limits) 3D NUEVO
-# - Implementación de restricciones de workspace usando secciones cónicas
-# - Mapeo de problemas 3D a 2D para cálculos eficientes
-# - Aplicación de límites de workspace en tiempo real
-# 
-# FIEL AL PAPER ORIGINAL + EXTENSIÓN 3D:
-# ===============================================================================
-# 
-# IMPLEMENTACIÓN EXACTA:
-# - [X] Usa distancia simple (no al cuadrado) como en el algoritmo original
-# - [X] Convergencia basada en tolerancia difA > tol del paper
-# - [X] Direcciones unitarias simples: direction = (pi+1 - pi) / ri en 3D
-# - [X] Post-procesamiento de restricciones (Algorithm 2) para articulaciones esféricas
-# - [X] Stretching lineal para targets fuera de alcance en espacio 3D
-# - [X] Preservación exacta del punto base fijo
-# - [ ] Workspace constraints usando secciones cónicas (Algorithm 3)
-# 
-#  ALGORITMOS PENDIENTES DE IMPLEMENTAR:
-# ===============================================================================
-# [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)
-# [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors en 3D)
-# [ ] Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
-# ===============================================================================
 
 class Fabrik_3D:
     """
@@ -63,7 +63,9 @@ class Fabrik_3D:
     
     Adaptado y traducido de GDScript a Python con Matplotlib para visualización 3D.
     """
-    
+    # Índices para el almacenamiento de las extremidades: Longitud ; Ángulo mínimo ; Ángulo máximo.
+    LIMB_LEN = 0; LIMB_MIN = 1; LIMB_MAX = 2 # (restricción esférica)
+
     # CONSTRUCTOR Y CONFIGURACIÓN INICIAL
     
     def __init__(self):
@@ -75,13 +77,11 @@ class Fabrik_3D:
         """
         
         self.name = "FABRIK_3D" # Nombre del sistema FABRIK 3D por defecto
-        # Índices para el almacenamiento de las extremidades: Longitud ; Ángulo mínimo ; Ángulo máximo.
-        self.LIMB_LEN = 0 ; self.LIMB_MIN = 1 ; self.LIMB_MAX = 2 # (restricción esférica)
         
         # Usado para calcular cuánto falla el IK en alcanzar el objetivo
-        self.BIAS = 3.0         # Tolerancia de error para considerar el objetivo alcanzado
+        self.BIAS = 3.0             # Tolerancia de error para considerar el objetivo alcanzado
         self.MAX_ITERATIONS = 48    # Número máximo de iteraciones del algoritmo
-        self.iteration = 0      # Contador de iteraciones para el algoritmo FABRIK
+        self.iteration = 0          # Contador de iteraciones para el algoritmo FABRIK
         self.base_point = np.array([0.0, 0.0, 0.0]) # Punto base fijo del robot en 3D
         
         # Longitudes de cada extremidad y restricciones angulares esféricas
@@ -93,11 +93,8 @@ class Fabrik_3D:
         ]
         
         self.info_joint_constraints = []
-        self.joints = [] # Los puntos con los que trabajamos (articulaciones del robot) en 3D
         self.limbs_size = len(self.limbs) # Para no llamar a len(limbs) cada vez
-        self.limbs_len = 0.0 # Usado para calcular el sobrepaso del objetivo desde el rango posible
         self.lerp_amount = 0.5 # Cantidad de interpolación (lerp) de las articulaciones antiguas a las nuevas
-        self.target = np.array([0.0, 0.0, 0.0]) # Posición objetivo del efector final en 3D
 
         # Parámetros para Algorithm 3 - Target Constraint Application
         self.workspace_constraints_enabled = True
@@ -111,7 +108,254 @@ class Fabrik_3D:
         # Sistema de grabación avanzado (delegado al módulo de grabación)
         self.recorder = RecordingSystem(fps=20, dpi=300, max_buffer_seconds=10)
 
-        self._ready()
+        # Inicialización mínima necesaria para FABRIK
+        self.limbs_len = sum(limb[self.LIMB_LEN] for limb in self.limbs)  # Longitud total
+        self.joints = [np.zeros(3, dtype=float) for _ in range(self.limbs_size + 1)]  # Posiciones de las articulaciones
+
+        # Target inicial: posición actual del efector final
+        self.initial_target = self.joints[-1].copy()  # Guardar posición inicial para reset
+        self.target = self.initial_target.copy()  # Posición del efector final
+
+
+    # MÉTODOS DE CARGA Y CONFIGURACIÓN DESDE YAML
+
+    @classmethod
+    def from_robot_yaml(cls, robot: Robot, **kwargs):
+        """
+        Carga un robot desde un archivo YAML y convierte al formato FABRIK.
+        
+        Este método actúa como puente entre el TAD Robot/Link del proyecto
+        y el sistema FABRIK, convirtiendo coordenadas relativas a absolutas
+        y transformando restricciones de articulaciones a formato FABRIK.
+        
+        Args:
+            yaml_file_path (str): Ruta al archivo YAML del robot
+            **kwargs: Argumentos adicionales para el constructor de Fabrik_3D
+                     (max_iterations, tolerance, etc.)
+        
+        Returns:
+            Fabrik_3D: Instancia configurada desde el robot YAML
+            
+        Raises:
+            ImportError: Si no se pueden importar las clases Robot/Link
+            FileNotFoundError: Si el archivo YAML no existe
+            ValueError: Si el robot YAML no tiene estructura válida
+        
+        Ejemplo:
+            robot_fabrik = Fabrik_3D.from_robot_yaml(robot)
+            resultado, exito = robot_fabrik.solve_ik([0.3, 0.2, 0.4])
+        """
+        if robot is None:
+            raise ImportError("No se pueden cargar las clases Robot/Link. Verifica la instalación del módulo core.class_robot_structure")
+        
+        # Convertir coordenadas relativas del TAD a absolutas para FABRIK
+        joints_pos = []
+        current_pos = np.array([0.0, 0.0, 0.0])  # Base en origen
+        joints_pos.append(current_pos.copy())
+        
+        # Calcular posiciones absolutas de las articulaciones
+        for i, link in enumerate(robot.links):
+            if hasattr(link, 'joint_coords') and link.joint_coords is not None:
+                # Las coordenadas del joint están en el sistema local del link
+                joint_offset = np.array(link.joint_coords)
+            else:
+                # Si no hay coordenadas específicas, usar la longitud del link
+                if hasattr(link, 'length') and link.length is not None:
+                    joint_offset = np.array([link.length, 0.0, 0.0])
+                else:
+                    # Longitud por defecto
+                    joint_offset = np.array([1.0, 0.0, 0.0])
+            
+            current_pos = current_pos + joint_offset
+            joints_pos.append(current_pos.copy())
+        
+        # Convertir restricciones de articulaciones del TAD a restricciones FABRIK
+        joint_constraints = []
+        for i, link in enumerate(robot.links):
+            constraint_info = {
+                'type': 'conic',
+                'center_direction': [1.0, 0.0, 0.0],  # Dirección por defecto
+                'max_angle': np.pi/4  # 45 grados por defecto
+            }
+            
+            # NUEVA DETECCIÓN: Añadir información del tipo de articulación
+            joint_type = 'spherical'  # Por defecto esférica
+            joint_axis = None
+            max_tilt_angle = None
+            
+            # Detectar tipo de articulación desde el YAML
+            if hasattr(link, 'type'):
+                yaml_joint_type = str(link.type).lower()
+                if yaml_joint_type == 'revolute':
+                    joint_type = 'revolute'
+            
+            # Obtener eje de rotación si está disponible
+            if hasattr(link, 'joint_axis') and link.joint_axis is not None:
+                joint_axis = np.array(link.joint_axis)
+                joint_axis_norm = np.linalg.norm(joint_axis)
+                if joint_axis_norm > 1e-8:
+                    joint_axis = (joint_axis / joint_axis_norm).tolist()
+            
+            if hasattr(link, 'joint_limits') and link.joint_limits is not None:
+                limits = link.joint_limits
+                if isinstance(limits, (tuple, list)) and len(limits) == 2:
+                    # Límites como tupla/lista (min, max) del YAML
+                    min_limit, max_limit = limits
+                    
+                    # NUEVA ESTRATEGIA: Detectar tipo según el rango
+                    range_radians = abs(max_limit - min_limit)
+                    center_angle = (max_limit + min_limit) / 2.0  # Posición neutral real
+                    
+                    # DETECCIÓN AUTOMÁTICA: Si el rango es muy amplio, probablemente es revolute
+                    if range_radians > np.deg2rad(300) and joint_type != 'revolute':
+                        joint_type = 'revolute'
+                        print(f"\033[93m\tDetectada articulación revolute automáticamente (J{i+1}): rango {np.rad2deg(range_radians):.1f}°\033[0m")
+                    
+                    # Para articulaciones revolute, configurar límite de inclinación
+                    if joint_type == 'revolute':
+                        # Permitir rotación libre pero limitar inclinación
+                        if i == 0:  # Base más rígida
+                            max_tilt_angle = np.deg2rad(25)  # 25° de inclinación máxima
+                        else:  # Otras articulaciones más flexibles
+                            max_tilt_angle = np.deg2rad(45)  # 45° de inclinación máxima
+                        
+                        # Para revolute, no usar restricciones cónicas tradicionales
+                        constraint_info['max_angle'] = np.pi  # Sin restricción cónica
+                        constraint_info['min_angle'] = 0.0
+                    else:
+                        # El radio del cono es la mitad del rango total (máxima desviación desde neutral)
+                        # Esto es matemáticamente correcto: si el rango es [-175°, +175°], 
+                        # entonces podemos desviarnos ±175° desde neutral (0°)
+                        constraint_info['max_angle'] = min(range_radians / 2.0, np.pi)  # Máximo 180°
+                        constraint_info['min_angle'] = 0.0  # Sin restricción hacia el centro del cono
+                    
+                    # CLAVE: Guardar la orientación neutral para reorientar la cónica
+                    constraint_info['neutral_angle'] = center_angle
+                    constraint_info['range_type'] = 'symmetric_from_neutral'
+                    constraint_info['original_limits'] = (min_limit, max_limit)  # Preservar originales
+                    
+                    # AÑADIR METADATOS DEL TIPO DE ARTICULACIÓN
+                    constraint_info['joint_type'] = joint_type
+                    if joint_axis is not None:
+                        constraint_info['joint_axis'] = joint_axis
+                    if max_tilt_angle is not None:
+                        constraint_info['max_tilt_angle'] = max_tilt_angle
+                elif isinstance(limits, dict):
+                    # Extraer límites en diferentes ejes y convertir a restricción cónica
+                    angles = []
+                    for key in ['min_theta', 'max_theta', 'min_phi', 'max_phi', 'min_angle', 'max_angle']:
+                        if key in limits:
+                            angles.append(abs(limits[key]))
+                    
+                    if angles:
+                        max_angle = max(angles)
+                        constraint_info['max_angle'] = min(max_angle, np.pi/2)  # Limitar a 90 grados máximo
+                elif isinstance(limits, (int, float)):
+                    # Límite escalar
+                    constraint_info['max_angle'] = min(abs(limits), np.pi/2)
+            
+            # Calcular dirección del link para la restricción cónica
+            if i > 0 and len(joints_pos) > i:
+                direction = joints_pos[i] - joints_pos[i-1]
+                if np.linalg.norm(direction) > 1e-6:
+                    direction = direction / np.linalg.norm(direction)
+                    constraint_info['center_direction'] = direction.tolist()
+            
+            joint_constraints.append(constraint_info)
+            
+        print(f"\033[92m\tRobot cargado a Fabrik_3D: {len(joints_pos)} articulaciones, {len(joint_constraints)} restricciones\033[0m")
+        
+        # Crear instancia FABRIK básica
+        instance = cls()
+        instance.name = robot.name
+        info = instance.info_joint_constraints
+        
+        # Construir información de restricciones de articulaciones para la representación
+        for i, constraint in enumerate(joint_constraints):
+            center_direction = constraint.get('center_direction', [1.0, 0.0, 0.0])
+            min_angle = constraint.get('min_angle', 0.0)
+            max_angle = constraint.get('max_angle', np.pi/4)
+            neutral_angle = constraint.get('neutral_angle', 0.0)
+            range_type = constraint.get('range_type', 'default')
+            original_limits = constraint.get('original_limits', (None, None))
+            
+            info.append(f"Articulación ({i+1}):")
+            info.append(f"  ├─ Tipo articulación: {constraint.get('joint_type', 'spherical')}") 
+            info.append(f"  ├─ Tipo restricción: {constraint.get('type', '\033[31mDesconocido\033[0m')}")
+            info.append(f"  ├─ Dirección central: [{center_direction[0]:.3f}, {center_direction[1]:.3f}, {center_direction[2]:.3f}]")
+            info.append(f"  ├─ Ángulo (mínimo, máximo): ({np.rad2deg(min_angle):.1f}°, {np.rad2deg(max_angle):.1f}°)")
+            info.append(f"  ├─ Ángulo neutral: {np.rad2deg(neutral_angle):.1f}°")
+            
+            # Mostrar información específica según el tipo
+            if constraint.get('joint_type') == 'revolute':
+                joint_axis = constraint.get('joint_axis', [0, 0, 1])
+                max_tilt = constraint.get('max_tilt_angle', 0.0)
+                info.append(f"  ├─ Eje de rotación: [{joint_axis[0]:.3f}, {joint_axis[1]:.3f}, {joint_axis[2]:.3f}]")
+                info.append(f"  ├─ Inclinación máxima: {np.rad2deg(max_tilt):.1f}°")
+            
+            info.append(f"  ├─ Tipo de rango: {range_type}")
+            if original_limits[0] is not None and original_limits[1] is not None:
+                info.append(f"  └─ Límites originales: ({np.rad2deg(original_limits[0]):.1f}°, {np.rad2deg(original_limits[1]):.1f}°)")
+            else:
+                info.append(f"  └─ Límites originales: No especificados")
+
+        # Configurar las posiciones de articulaciones desde el YAML
+        instance.joints = [np.array(pos, dtype=float) for pos in joints_pos]
+        instance.limbs_size = len(joints_pos) - 1
+        
+        # Configurar las restricciones desde el YAML
+        instance.limbs = []
+        for i, constraint in enumerate(joint_constraints):
+            if i < len(joints_pos) - 1:
+                # Calcular longitud del link en metros, convertir a unidades de visualización
+                link_length_meters = np.linalg.norm(joints_pos[i+1] - joints_pos[i])
+                link_length_viz = link_length_meters * 1000  # Convertir metros a milímetros para visualización
+                max_angle = constraint.get('max_angle', np.pi/4)
+                min_angle = constraint.get('min_angle', 0.0)  # Usar el ángulo mínimo real
+                
+                # NUEVA IMPLEMENTACIÓN: Incluir metadatos completos de restricción del robot
+                limb_entry = [
+                    link_length_viz,  # [0] Longitud escalada
+                    min_angle,        # [1] Ángulo mínimo real
+                    max_angle         # [2] Ángulo máximo real
+                ]
+                
+                # Agregar metadatos completos como cuarto elemento
+                robot_metadata = {
+                    'neutral_angle': constraint.get('neutral_angle', 0.0),
+                    'range_type': constraint.get('range_type', 'default'),
+                    'original_limits': constraint.get('original_limits', None),
+                    'joint_type': constraint.get('joint_type', 'spherical'),  # NUEVO
+                    'joint_axis': constraint.get('joint_axis', None),         # NUEVO
+                    'max_tilt_angle': constraint.get('max_tilt_angle', None)  # NUEVO
+                }
+                limb_entry.append(robot_metadata)  # [3] Metadatos completos del robot
+                
+                instance.limbs.append(limb_entry)
+        
+        # Recalcular longitud total
+        instance.limbs_len = sum(limb[instance.LIMB_LEN] for limb in instance.limbs)
+        
+        # Reconfigurar las articulaciones con las longitudes correctas para visualización
+        instance.joints = [np.zeros(3) for _ in range(len(joints_pos))]
+        instance.joints[0] = instance.base_point.copy()
+        
+        for i in range(len(instance.limbs)):
+            # Usar las direcciones originales pero con longitudes escaladas
+            if i < len(joints_pos) - 1:
+                direction = joints_pos[i+1] - joints_pos[i]
+                direction_norm = np.linalg.norm(direction)
+                if direction_norm > 0:
+                    direction = direction / direction_norm
+                    # Aplicar la longitud escalada
+                    instance.joints[i + 1] = instance.joints[i] + direction * instance.limbs[i][instance.LIMB_LEN]
+        
+        # Actualizar target a la posición del efector final (elimina números mágicos)
+        instance.target = instance.joints[-1].copy()
+        instance.initial_target = instance.target.copy()  # Para reset
+        
+        return instance
+    
 
     # MÉTODOS DE REPRESENTACIÓN Y DEPURACIÓN
 
@@ -137,7 +381,6 @@ class Fabrik_3D:
         
         info.append("\nESTADO DEL TARGET:")
         info.append(f" - Posición objetivo: [{self.target[0]:.3f}, {self.target[1]:.3f}, {self.target[2]:.3f}]")
-        info.append(f" - Paso de movimiento: {self.target_step:.3f}")
         
         info.append("\nESTRUCTURA DEL ROBOT:")
         info.append(f" - Punto base: [{self.base_point[0]:.3f}, {self.base_point[1]:.3f}, {self.base_point[2]:.3f}]")
@@ -175,9 +418,17 @@ class Fabrik_3D:
             info.append(f" - Alcanzabilidad del objetivo: {reachability:.1f}% del alcance máximo")
             info.append(f" - ¿Objetivo alcanzable?: {'SÍ' if distance_to_target <= self.limbs_len else 'NO'}")
         
-        info.append("\n" + "=" * 80)
+        info.append("\n" + "=" * 60)
         
         return "\n".join(info)
+
+    def enable_lerp(self) -> None:
+        """ Habilita la interpolación suave (lerp) para las articulaciones. """
+        self.lerp_amount = 0.5
+    
+    def disable_lerp(self) -> None:
+        """ Deshabilita la interpolación suave (lerp) para las articulaciones. """
+        self.lerp_amount = 1.0
 
     # ALGORITMOS PRINCIPALES DE FABRIK 3D
 
@@ -690,104 +941,6 @@ class Fabrik_3D:
         # Para otros tipos de cónicas, implementar algoritmos específicos
         return point
 
-    # INICIALIZACIÓN Y CONFIGURACIÓN
-
-    def _ready(self):
-        """
-        Inicializa la estructura de articulaciones del robot en 3D.
-        
-        Configura las posiciones iniciales de las articulaciones en una línea recta
-        desde el punto base, calcula la longitud total del robot y prepara
-        los arrays de datos para el procesamiento en espacio 3D.
-        
-        Returns:
-            None
-        """
-        # El tamaño de las articulaciones es el tamaño de las extremidades + 1
-        self.joints = [np.zeros(3) for _ in range(self.limbs_size + 1)]
-        
-        # Configuración inicial: línea recta desde el base_point en dirección X positiva
-        self.joints[0] = self.base_point.copy()
-        for i in range(self.limbs_size):
-            self.limbs_len += self.limbs[i][self.LIMB_LEN]
-            # Inicializar en línea recta a lo largo del eje X
-            self.joints[i + 1] = self.joints[i] + np.array([self.limbs[i][self.LIMB_LEN], 0, 0])
-        
-        # Convertir a arrays de float para operaciones numéricas
-        self.joints = [np.array(j, dtype=float) for j in self.joints]
-
-    # SISTEMA DE GRABACIÓN Y ANIMACIÓN (delegado al módulo de grabación)
-
-    def start_recording(self):
-        """Inicia la grabación de la animación."""
-        self.recorder.start_recording()
-    
-    def pause_recording(self):
-        """Pausa o reanuda la grabación."""
-        self.recorder.pause_recording()
-    
-    def stop_recording(self):
-        """Detiene la grabación y guarda el archivo."""
-        # Configurar límites de plot antes de guardar
-        if hasattr(self, 'ax'):
-            ax_limits = {
-                'x': self.ax.get_xlim(),
-                'y': self.ax.get_ylim(), 
-                'z': self.ax.get_zlim()
-            }
-        else:
-            ax_limits = None
-        
-        # Temporal monkey patch para pasar contexto
-        original_save_recorded = self.recorder._save_recorded_frames
-        original_save_buffer = self.recorder._save_buffer_frames
-        
-        def patched_save_recorded(prefix, robot_name, base_point=None, limits=None):
-            return original_save_recorded(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
-        
-        def patched_save_buffer(prefix, robot_name, base_point=None, limits=None):
-            return original_save_buffer(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
-        
-        self.recorder._save_recorded_frames = patched_save_recorded
-        self.recorder._save_buffer_frames = patched_save_buffer
-        
-        self.recorder.stop_recording(self.name)
-        
-        # Restaurar métodos originales
-        self.recorder._save_recorded_frames = original_save_recorded
-        self.recorder._save_buffer_frames = original_save_buffer
-    
-    def capture_recap(self):
-        """Captura los últimos 10 segundos del buffer."""
-        # Configurar límites de plot antes de guardar
-        if hasattr(self, 'ax'):
-            ax_limits = {
-                'x': self.ax.get_xlim(),
-                'y': self.ax.get_ylim(),
-                'z': self.ax.get_zlim()
-            }
-        else:
-            ax_limits = None
-        
-        # Temporal monkey patch para pasar contexto
-        original_save_recorded = self.recorder._save_recorded_frames
-        original_save_buffer = self.recorder._save_buffer_frames
-        
-        def patched_save_recorded(prefix, robot_name, base_point=None, limits=None):
-            return original_save_recorded(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
-        
-        def patched_save_buffer(prefix, robot_name, base_point=None, limits=None):
-            return original_save_buffer(prefix, robot_name, base_point or self.base_point, limits or ax_limits)
-        
-        self.recorder._save_recorded_frames = patched_save_recorded
-        self.recorder._save_buffer_frames = patched_save_buffer
-        
-        self.recorder.capture_recap(self.name)
-        
-        # Restaurar métodos originales
-        self.recorder._save_recorded_frames = original_save_recorded
-        self.recorder._save_buffer_frames = original_save_buffer
-
     # INTERFAZ GRÁFICA Y VISUALIZACIÓN
 
     def setup_plot(self):
@@ -868,8 +1021,8 @@ class Fabrik_3D:
             # Hacer que la figura sea focuseable
             self.fig.canvas.manager.set_window_title("FABRIK 3D - Presiona H para ayuda")
             
-            # Inicializar target en una posición visible proporcional al robot
-            self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2])
+            # Target ya inicializado en __init__ en la posición del efector final
+            # No es necesario reinicializarlo aquí
             
             # Variables para controlar la velocidad de movimiento (proporcional al robot)
             self.target_step = self.limbs_len * 0.05  # 5% de la longitud total del robot
@@ -894,29 +1047,24 @@ class Fabrik_3D:
             case 'u' | 'q':      self.target[2] += self.target_step # Z+
             case 'j' | 'e':      self.target[2] -= self.target_step # Z-
             # === CONTROLES ESPECIALES ===
-            case 'r':       self.target = np.array([self.limbs_len * 0.6, self.limbs_len * 0.3, self.limbs_len * 0.2]) # Reset posición
+            case 'r':       self.target = self.initial_target.copy() # Reset a posición inicial del efector final
             case '+' | '=': self._adjust_speed(1.5)     # Aumentar velocidad
             case '-':       self._adjust_speed(1/1.5)   # Disminuir velocidad  
             case 'h':       self.print_help()           # Ayuda
             # === SISTEMA DE GRABACIÓN ===
-            case 'g': self.start_recording()    # Iniciar
-            case 'p': self.pause_recording()    # Pausar/Reanudar
-            case 'x': self.stop_recording()     # Parar y guardar
-            case 'c': self.capture_recap()      # Recap
+            case 'g': self.recorder.start_recording()    # Iniciar
+            case 'p': self.recorder.pause_recording()    # Pausar/Reanudar
+            case 'x': self.recorder.stop_recording(self.name, self.base_point, self.ax)     # Parar y guardar
+            case 'c': self.recorder.capture_recap(self.name, self.base_point, self.ax)      # Recap
             
         # Limitar el target dentro del área visible
         plot_range = self.limbs_len * 1.2
         self.target = np.clip(self.target, -plot_range, plot_range)
-
+    
     def _adjust_speed(self, factor: float):
         """Ajusta la velocidad de movimiento."""
-        self.target_step = np.clip(
-            self.target_step * factor,
-            self.limbs_len * 0.01,
-            self.limbs_len * 0.2
-        )
-        # Sobrescribir la línea anterior en lugar de crear nueva
-        print(f"\rVelocidad {'aumentada:' if factor > 1 else 'reducida: '} {self.target_step:6.1f}", end='', flush=True)
+        self.target_step = np.clip(self.target_step * factor, self.limbs_len * 0.01, self.limbs_len * 0.2)
+        print(f"\rVelocidad {'aumentada:' if factor > 1 else 'reducida: '} {self.target_step:6.1f}", end='', flush=True)  # Sobrescribe la línea
 
     def print_help(self):
         """
@@ -1042,7 +1190,7 @@ class Fabrik_3D:
                     self.constraint_lines.extend([l_min, l_max])
 
         # Actualizar información del target y estado de grabación
-        target_info = f"Target: [{self.target[0]:.1f}, {self.target[1]:.1f}, {self.target[2]:.1f}] | Stress: {self.iteration/self.MAX_ITERATIONS*100:5.2f}%"
+        target_info = f"Target: [{self.target[0]:6.1f}, {self.target[1]:6.1f}, {self.target[2]:6.1f}] | Stress: {self.iteration/self.MAX_ITERATIONS*100:6.2f}%"
         
         # Agregar indicador de estado de grabación usando el nuevo sistema
         status = self.recorder.get_recording_status()
@@ -1055,193 +1203,6 @@ class Fabrik_3D:
 
         return [self.line, self.target_point, self.base_indicator, self.info_text] + self.constraint_lines
 
-    # MÉTODOS DE CARGA Y CONFIGURACIÓN DESDE YAML
-
-    @classmethod
-    def from_robot_yaml(cls, robot: Robot, **kwargs):
-        """
-        Carga un robot desde un archivo YAML y convierte al formato FABRIK.
-        
-        Este método actúa como puente entre el TAD Robot/Link del proyecto
-        y el sistema FABRIK, convirtiendo coordenadas relativas a absolutas
-        y transformando restricciones de articulaciones a formato FABRIK.
-        
-        Args:
-            yaml_file_path (str): Ruta al archivo YAML del robot
-            **kwargs: Argumentos adicionales para el constructor de Fabrik_3D
-                     (max_iterations, tolerance, etc.)
-        
-        Returns:
-            Fabrik_3D: Instancia configurada desde el robot YAML
-            
-        Raises:
-            ImportError: Si no se pueden importar las clases Robot/Link
-            FileNotFoundError: Si el archivo YAML no existe
-            ValueError: Si el robot YAML no tiene estructura válida
-        
-        Ejemplo:
-            robot_fabrik = Fabrik_3D.from_robot_yaml(robot)
-            resultado, exito = robot_fabrik.solve_ik([0.3, 0.2, 0.4])
-        """
-        if robot is None:
-            raise ImportError("No se pueden cargar las clases Robot/Link. Verifica la instalación del módulo core.class_robot_structure")
-        
-        # Convertir coordenadas relativas del TAD a absolutas para FABRIK
-        joints_pos = []
-        current_pos = np.array([0.0, 0.0, 0.0])  # Base en origen
-        joints_pos.append(current_pos.copy())
-        
-        # Calcular posiciones absolutas de las articulaciones
-        for i, link in enumerate(robot.links):
-            if hasattr(link, 'joint_coords') and link.joint_coords is not None:
-                # Las coordenadas del joint están en el sistema local del link
-                joint_offset = np.array(link.joint_coords)
-            else:
-                # Si no hay coordenadas específicas, usar la longitud del link
-                if hasattr(link, 'length') and link.length is not None:
-                    joint_offset = np.array([link.length, 0.0, 0.0])
-                else:
-                    # Longitud por defecto
-                    joint_offset = np.array([1.0, 0.0, 0.0])
-            
-            current_pos = current_pos + joint_offset
-            joints_pos.append(current_pos.copy())
-        
-        # Convertir restricciones de articulaciones del TAD a restricciones FABRIK
-        joint_constraints = []
-        for i, link in enumerate(robot.links):
-            constraint_info = {
-                'type': 'conic',
-                'center_direction': [1.0, 0.0, 0.0],  # Dirección por defecto
-                'max_angle': np.pi/4  # 45 grados por defecto
-            }
-            
-            if hasattr(link, 'joint_limits') and link.joint_limits is not None:
-                limits = link.joint_limits
-                if isinstance(limits, (tuple, list)) and len(limits) == 2:
-                    # Límites como tupla/lista (min, max) del YAML
-                    min_limit, max_limit = limits
-                    
-                    # NUEVA ESTRATEGIA: Inspirada en Algorithm 3 (secciones cónicas)
-                    # En lugar de heurística arbitraria, usar matemática de restricciones cónicas
-                    range_radians = abs(max_limit - min_limit)
-                    center_angle = (max_limit + min_limit) / 2.0  # Posición neutral real
-                    
-                    # El radio del cono es la mitad del rango total (máxima desviación desde neutral)
-                    # Esto es matemáticamente correcto: si el rango es [-175°, +175°], 
-                    # entonces podemos desviarnos ±175° desde neutral (0°)
-                    constraint_info['max_angle'] = min(range_radians / 2.0, np.pi)  # Máximo 180°
-                    constraint_info['min_angle'] = 0.0  # Sin restricción hacia el centro del cono
-                    
-                    # CLAVE: Guardar la orientación neutral para reorientar la cónica
-                    constraint_info['neutral_angle'] = center_angle
-                    constraint_info['range_type'] = 'symmetric_from_neutral'
-                    constraint_info['original_limits'] = (min_limit, max_limit)  # Preservar originales
-                elif isinstance(limits, dict):
-                    # Extraer límites en diferentes ejes y convertir a restricción cónica
-                    angles = []
-                    for key in ['min_theta', 'max_theta', 'min_phi', 'max_phi', 'min_angle', 'max_angle']:
-                        if key in limits:
-                            angles.append(abs(limits[key]))
-                    
-                    if angles:
-                        max_angle = max(angles)
-                        constraint_info['max_angle'] = min(max_angle, np.pi/2)  # Limitar a 90 grados máximo
-                elif isinstance(limits, (int, float)):
-                    # Límite escalar
-                    constraint_info['max_angle'] = min(abs(limits), np.pi/2)
-            
-            # Calcular dirección del link para la restricción cónica
-            if i > 0 and len(joints_pos) > i:
-                direction = joints_pos[i] - joints_pos[i-1]
-                if np.linalg.norm(direction) > 1e-6:
-                    direction = direction / np.linalg.norm(direction)
-                    constraint_info['center_direction'] = direction.tolist()
-            
-            joint_constraints.append(constraint_info)
-            
-        print(f"\033[92mRobot cargado desde YAML: {len(joints_pos)} articulaciones, {len(joint_constraints)} restricciones\033[0m")
-        
-        # Crear instancia FABRIK básica
-        instance = cls()
-        instance.name = robot.name
-        info = instance.info_joint_constraints
-        
-        # Construir información de restricciones de articulaciones para la representación
-        for i, constraint in enumerate(joint_constraints):
-            center_direction = constraint.get('center_direction', [1.0, 0.0, 0.0])
-            min_angle = constraint.get('min_angle', 0.0)
-            max_angle = constraint.get('max_angle', np.pi/4)
-            neutral_angle = constraint.get('neutral_angle', 0.0)
-            range_type = constraint.get('range_type', 'default')
-            original_limits = constraint.get('original_limits', (None, None))
-            
-            info.append(f"Articulación ({i+1}):")
-            info.append(f"  ├─ Tipo: {constraint.get('type', 'conic')}")
-            info.append(f"  ├─ Dirección central: [{center_direction[0]:.3f}, {center_direction[1]:.3f}, {center_direction[2]:.3f}]")
-            info.append(f"  ├─ Ángulo (mínimo, máximo): ({np.rad2deg(min_angle):.1f}°, {np.rad2deg(max_angle):.1f}°)")
-            info.append(f"  ├─ Ángulo neutral: {np.rad2deg(neutral_angle):.1f}°")
-            info.append(f"  ├─ Tipo de rango: {range_type}")
-            if original_limits[0] is not None and original_limits[1] is not None:
-                info.append(f"  └─ Límites originales: ({np.rad2deg(original_limits[0]):.1f}°, {np.rad2deg(original_limits[1]):.1f}°)")
-            else:
-                info.append(f"  └─ Límites originales: No especificados")
-
-        # Configurar las posiciones de articulaciones desde el YAML
-        instance.joints = [np.array(pos, dtype=float) for pos in joints_pos]
-        instance.limbs_size = len(joints_pos) - 1
-        
-        # Configurar las restricciones desde el YAML
-        instance.limbs = []
-        for i, constraint in enumerate(joint_constraints):
-            if i < len(joints_pos) - 1:
-                # Calcular longitud del link en metros, convertir a unidades de visualización
-                link_length_meters = np.linalg.norm(joints_pos[i+1] - joints_pos[i])
-                link_length_viz = link_length_meters * 1000  # Convertir metros a milímetros para visualización
-                max_angle = constraint.get('max_angle', np.pi/4)
-                min_angle = constraint.get('min_angle', 0.0)  # Usar el ángulo mínimo real
-                
-                # NUEVA IMPLEMENTACIÓN: Incluir metadatos de restricción del robot
-                limb_entry = [
-                    link_length_viz,  # [0] Longitud escalada
-                    min_angle,        # [1] Ángulo mínimo real
-                    max_angle         # [2] Ángulo máximo real
-                ]
-                
-                # Si tenemos información de orientación neutral, agregarla como metadatos
-                if 'neutral_angle' in constraint and 'range_type' in constraint:
-                    robot_metadata = {
-                        'neutral_angle': constraint['neutral_angle'],
-                        'range_type': constraint['range_type'],
-                        'original_limits': constraint.get('original_limits', None)
-                    }
-                    limb_entry.append(robot_metadata)  # [3] Metadatos del robot
-                
-                instance.limbs.append(limb_entry)
-        
-        # Recalcular longitud total
-        instance.limbs_len = sum(limb[instance.LIMB_LEN] for limb in instance.limbs)
-        
-        # Inicializar propiedades de target y visualización
-        instance.target = np.array([instance.limbs_len * 0.6, instance.limbs_len * 0.3, instance.limbs_len * 0.2])
-        instance.target_step = instance.limbs_len * 0.05  # 5% de la longitud total del robot
-        
-        # Reconfigurar las articulaciones con las longitudes correctas para visualización
-        instance.joints = [np.zeros(3) for _ in range(len(joints_pos))]
-        instance.joints[0] = instance.base_point.copy()
-        
-        for i in range(len(instance.limbs)):
-            # Usar las direcciones originales pero con longitudes escaladas
-            if i < len(joints_pos) - 1:
-                direction = joints_pos[i+1] - joints_pos[i]
-                direction_norm = np.linalg.norm(direction)
-                if direction_norm > 0:
-                    direction = direction / direction_norm
-                    # Aplicar la longitud escalada
-                    instance.joints[i + 1] = instance.joints[i] + direction * instance.limbs[i][instance.LIMB_LEN]
-        
-        return instance
-    
     # MÉTODOS DE UTILIDAD Y API PÚBLICA
     
     def solve_ik(self, target_pos, verbose=False):
