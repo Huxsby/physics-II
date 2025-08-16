@@ -53,7 +53,7 @@ from fabrik_core.math_utils import (
 class Fabrik_3D:
     """
     Implementación del algoritmo FABRIK 3D (Forward And Backward Reaching Inverse Kinematics)
-    para cinemática inversa con restricciones angulares en 3D.
+    para cinemática inversa con restricciones esféricas en 3D.
     
     Este algoritmo utiliza un enfoque iterativo de dos fases:
     1. Fase hacia atrás (backward pass): desde el objetivo hacia la base
@@ -1005,7 +1005,7 @@ class Fabrik_3D:
                                           fontsize=10, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
             
             # Conectar eventos del teclado
-            self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+            self.fig.canvas.mpl_connect('key_press_event', lambda event: self.recorder.on_key_press(event, self))
             
             # Intentar establecer el foco en la ventana para capturar eventos de teclado
             try:
@@ -1030,77 +1030,6 @@ class Fabrik_3D:
             self.anim = FuncAnimation(self.fig, self.animate, interval=50, blit=False, cache_frame_data=False)
 
             plt.show()
-
-    def on_key_press(self, event):
-        """Manejador de eventos para las teclas presionadas."""
-        if not event.key:
-            return
-            
-        key = event.key.lower()
-        
-        match key:
-            # === MOVIMIENTO DEL TARGET ===
-            case 'up' | 'w':     self.target[1] += self.target_step # Y+
-            case 'down' | 's':   self.target[1] -= self.target_step # Y-
-            case 'left' | 'a':   self.target[0] -= self.target_step # X-
-            case 'right' | 'd':  self.target[0] += self.target_step # X+
-            case 'u' | 'q':      self.target[2] += self.target_step # Z+
-            case 'j' | 'e':      self.target[2] -= self.target_step # Z-
-            # === CONTROLES ESPECIALES ===
-            case 'r':       self.target = self.initial_target.copy() # Reset a posición inicial del efector final
-            case '+' | '=': self._adjust_speed(1.5)     # Aumentar velocidad
-            case '-':       self._adjust_speed(1/1.5)   # Disminuir velocidad  
-            case 'h':       self.print_help()           # Ayuda
-            # === SISTEMA DE GRABACIÓN ===
-            case 'g': self.recorder.start_recording()    # Iniciar
-            case 'p': self.recorder.pause_recording()    # Pausar/Reanudar
-            case 'x': self.recorder.stop_recording(self.name, self.base_point, self.ax)     # Parar y guardar
-            case 'c': self.recorder.capture_recap(self.name, self.base_point, self.ax)      # Recap
-            
-        # Limitar el target dentro del área visible
-        plot_range = self.limbs_len * 1.2
-        self.target = np.clip(self.target, -plot_range, plot_range)
-    
-    def _adjust_speed(self, factor: float):
-        """Ajusta la velocidad de movimiento."""
-        self.target_step = np.clip(self.target_step * factor, self.limbs_len * 0.01, self.limbs_len * 0.2)
-        print(f"\rVelocidad {'aumentada:' if factor > 1 else 'reducida: '} {self.target_step:6.1f}", end='', flush=True)  # Sobrescribe la línea
-
-    def print_help(self):
-        """
-        Imprime la ayuda de controles en la consola con formato mejorado.
-        """
-        print("\n" + "="*60)
-        print("CONTROLES DE LA SIMULACIÓN - FABRIK 3D")
-        print("="*60)
-
-        print("┌──────────────────────────────────────┐")
-        print("│         MOVIMIENTO DEL TARGET        │")
-        print("├──────────────────────────────────────┤")
-        print("│  WASD   │ Movimiento primario XY     │")
-        print("│  Q/E    │ Eje Z (arriba/abajo)       │")
-        print("│ Flechas │ Movimiento alternativo XY  │")
-        print("│  U/J    │ Eje Z alternativo          │")
-        print("│  Mouse  │ Rotar vista (matplotlib)   │")
-        print("│   R     │ Reset a posición inicial   │")
-        print("│  +/-    │ Velocidad de movimiento    │")
-        print("├──────────────────────────────────────┤")
-        print("│         SISTEMA DE GRABACIÓN         │")
-        print("├──────────────────────────────────────┤")
-        print("│   G     │ Iniciar grabación          │")
-        print("│   P     │ Pausar/Reanudar            │")
-        print("│   X     │ Parar y guardar            │")
-        print("│   C     │ Recap últimos 10s          │")
-        print("├──────────────────────────────────────┤")
-        print("│   H     │ Ayuda completa             │")
-        print("└──────────────────────────────────────┘")
-        
-        # Mostrar estado actual de grabación usando el nuevo sistema
-        status = self.recorder.get_recording_status()
-        if status['state'] != 'stopped':
-            estado_indicador = "[REC]" if status['state'] == 'recording' else "[PAUSADO]"
-            print(f"\n{estado_indicador} Estado: {status['state'].upper()}")
-            print(f"Frames grabados: {status['frames_recorded']} ({status['duration']:.1f}s)")
 
     def animate(self, i):
         """

@@ -273,14 +273,19 @@ if __name__ == "__main__":
         print("=" * 60)
         print("1. Demo de controles de teclado (robot-niryo.yaml)")
         print("2. Demo con trayectoria automática (robot-niryo.yaml)")
+        print("3. Demo sin restricciones (robot-niryo.yaml)")
         print("0. Salir")
         print("=" * 60)
-        opcion = input("Selecciona demo (1, 2 o 0): ").strip()
+        opcion = input("Selecciona demo: ").strip()
 
         if opcion == "1":
             demo_keyboard_controls(robot)
         elif opcion == "2":
             create_trajectory_demo(robot)
+        elif opcion == "3":
+            ik_system = Fabrik_3D().from_robot_yaml(robot)
+            ik_system.workspace_constraints_enabled = False
+            ik_system.setup_plot()
         elif opcion == "0":
             print("Saliendo...")
             break

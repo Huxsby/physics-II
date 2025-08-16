@@ -17,6 +17,7 @@ class RecordingSystem:
     
     Maneja la captura de frames, grabación en tiempo real y exportación
     de animaciones con buffer circular para recap de últimos segundos.
+    También incluye el manejo de controles de teclado para la interfaz.
     """
     
     def __init__(self, fps=20, dpi=300, max_buffer_seconds=10):
@@ -344,3 +345,93 @@ class RecordingSystem:
             print(f"Error guardando recap: {e}")
         finally:
             plt.close(temp_fig)
+
+    # MANEJO DE CONTROLES DE INTERFAZ
+
+    def on_key_press(self, event, fabrik_instance):
+        """
+        Manejador de eventos para las teclas presionadas.
+        
+        Args:
+            event: Evento de teclado de matplotlib
+            fabrik_instance: Instancia del sistema FABRIK para controlar
+        """
+        if not event.key:
+            return
+            
+        key = event.key.lower()
+        
+        match key:
+            # === MOVIMIENTO DEL TARGET ===
+            case 'up' | 'w':     fabrik_instance.target[1] += fabrik_instance.target_step # Y+
+            case 'down' | 's':   fabrik_instance.target[1] -= fabrik_instance.target_step # Y-
+            case 'left' | 'a':   fabrik_instance.target[0] -= fabrik_instance.target_step # X-
+            case 'right' | 'd':  fabrik_instance.target[0] += fabrik_instance.target_step # X+
+            case 'u' | 'q':      fabrik_instance.target[2] += fabrik_instance.target_step # Z+
+            case 'j' | 'e':      fabrik_instance.target[2] -= fabrik_instance.target_step # Z-
+            # === CONTROLES ESPECIALES ===
+            case 'r':       fabrik_instance.target = fabrik_instance.initial_target.copy() # Reset a posición inicial del efector final
+            case '+' | '=': self.adjust_speed(fabrik_instance, 1.5)     # Aumentar velocidad
+            case '-':       self.adjust_speed(fabrik_instance, 1/1.5)   # Disminuir velocidad  
+            case 'h':       self.print_help()           # Ayuda
+            # === SISTEMA DE GRABACIÓN ===
+            case 'g': self.start_recording()    # Iniciar
+            case 'p': self.pause_recording()    # Pausar/Reanudar
+            case 'x': self.stop_recording(fabrik_instance.name, fabrik_instance.base_point, fabrik_instance.ax)     # Parar y guardar
+            case 'c': self.capture_recap(fabrik_instance.name, fabrik_instance.base_point, fabrik_instance.ax)      # Recap
+            
+        # Limitar el target dentro del área visible
+        plot_range = fabrik_instance.limbs_len * 1.2
+        fabrik_instance.target = np.clip(fabrik_instance.target, -plot_range, plot_range)
+    
+    def adjust_speed(self, fabrik_instance, factor: float):
+        """
+        Ajusta la velocidad de movimiento.
+        
+        Args:
+            fabrik_instance: Instancia del sistema FABRIK
+            factor (float): Factor de multiplicación para la velocidad
+        """
+        fabrik_instance.target_step = np.clip(
+            fabrik_instance.target_step * factor, 
+            fabrik_instance.limbs_len * 0.01, 
+            fabrik_instance.limbs_len * 0.2
+        )
+        print(f"\rVelocidad {'aumentada:' if factor > 1 else 'reducida: '} {fabrik_instance.target_step:6.1f}", 
+              end='', flush=True)
+
+    def print_help(self):
+        """
+        Imprime la ayuda de controles en la consola con formato mejorado.
+        """
+        print("\n" + "="*60)
+        print("CONTROLES DE LA SIMULACIÓN - FABRIK 3D")
+        print("="*60)
+
+        print("┌──────────────────────────────────────┐")
+        print("│         MOVIMIENTO DEL TARGET        │")
+        print("├──────────────────────────────────────┤")
+        print("│  WASD   │ Movimiento primario XY     │")
+        print("│  Q/E    │ Eje Z (arriba/abajo)       │")
+        print("│ Flechas │ Movimiento alternativo XY  │")
+        print("│  U/J    │ Eje Z alternativo          │")
+        print("│  Mouse  │ Rotar vista (matplotlib)   │")
+        print("│   R     │ Reset a posición inicial   │")
+        print("│  +/-    │ Velocidad de movimiento    │")
+        print("├──────────────────────────────────────┤")
+        print("│         SISTEMA DE GRABACIÓN         │")
+        print("├──────────────────────────────────────┤")
+        print("│   G     │ Iniciar grabación          │")
+        print("│   P     │ Pausar/Reanudar            │")
+        print("│   X     │ Parar y guardar            │")
+        print("│   C     │ Recap últimos 10s          │")
+        print("├──────────────────────────────────────┤")
+        print("│   H     │ Ayuda completa             │")
+        print("└──────────────────────────────────────┘")
+        
+        # Mostrar estado actual de grabación usando el nuevo sistema
+        status = self.get_recording_status()
+        if status['state'] != 'stopped':
+            estado_indicador = "[REC]" if status['state'] == 'recording' else "[PAUSADO]"
+            print(f"\n{estado_indicador} Estado: {status['state'].upper()}")
+            print(f"Frames grabados: {status['frames_recorded']} ({status['duration']:.1f}s)")
