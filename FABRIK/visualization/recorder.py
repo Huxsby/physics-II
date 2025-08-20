@@ -18,6 +18,104 @@ class RecordingSystem:
     Maneja la captura de frames, grabación en tiempo real y exportación
     de animaciones con buffer circular para recap de últimos segundos.
     También incluye el manejo de controles de teclado para la interfaz.
+
+    ================================================================================
+                                   GUÍA DE USO COMPLETA
+    ================================================================================
+
+    CONFIGURACIÓN INICIAL:
+    =====================
+
+    Para usar este módulo correctamente, es OBLIGATORIO deshabilitar los keymaps
+    reservados de matplotlib que interfieren con los controles de grabación:
+
+        import matplotlib as mpl
+        from visualization.recorder import RecordingSystem
+
+        # CONFIGURACIÓN REQUERIDA: Deshabilitar keymaps de matplotlib
+        with mpl.rc_context({
+            'keymap.save': [],        # Deshabilitar 's' para save
+            'keymap.quit': [],        # Deshabilitar 'q' para quit
+            'keymap.pan': [],         # Deshabilitar 'p' para pan
+            'keymap.zoom': [],        # Deshabilitar 'o' para zoom
+            'keymap.home': [],        # Deshabilitar 'h' y 'r' para home/reset vista
+            'keymap.back': [],        # Deshabilitar navegación
+            'keymap.forward': [],     # Deshabilitar navegación
+            'keymap.grid': [],        # Deshabilitar 'g' para grid
+            'keymap.yscale': [],      # Deshabilitar 'l' para log scale
+            'keymap.xscale': [],      # Deshabilitar 'k' para log scale
+        }):
+            # Tu código de visualización aquí
+            sistema_grabacion = RecordingSystem(fps=30, dpi=300)
+            # ... resto del código
+
+
+    USO DENTRO DE UNA CLASE:
+    ========================
+
+    class MiSistemaVisualizacion:
+        def __init__(self):
+            # Inicializar el sistema de grabación
+            self.recorder = RecordingSystem(
+                fps=20,                    # Frames por segundo
+                dpi=300,                   # Calidad de exportación
+                max_buffer_seconds=10      # Buffer circular de 10 segundos
+            )
+            
+            # Configurar matplotlib
+            self.setup_matplotlib()
+        
+        def setup_matplotlib(self):
+            '''Configuración obligatoria de matplotlib'''
+            with mpl.rc_context({
+                'keymap.save': [],        
+                'keymap.quit': [],        
+                'keymap.pan': [],         
+                'keymap.zoom': [],        
+                'keymap.home': [],        
+                'keymap.back': [],        
+                'keymap.forward': [],     
+                'keymap.grid': [],        
+                'keymap.yscale': [],      
+                'keymap.xscale': [],      
+            }):
+                self.fig, self.ax = plt.subplots(subplot_kw={'projection': '3d'})
+                
+                # IMPORTANTE: Conectar eventos de teclado
+                self.fig.canvas.mpl_connect('key_press_event', lambda event: self.recorder.on_key_press(event, self))
+        
+        def animate(self, frame):
+            '''Función de animación que captura frames'''
+            # Tu lógica de animación aquí
+            self.update_robot_state()
+            
+            # IMPORTANTE: Capturar frame para grabación/buffer
+            self.recorder.capture_frame(
+                joints=self.robot_joints,     # Lista de posiciones
+                target=self.target_position,  # Posición objetivo
+                timestamp=frame               # Timestamp del frame
+            )
+            
+            # Actualizar visualización
+            return self.update_plot()
+
+
+    CONTROLES DE GRABACIÓN:
+    ======================
+
+    Teclas disponibles durante la animación:
+        G - Iniciar grabación
+        P - Pausar/Reanudar grabación  
+        X - Parar y guardar grabación
+        C - Capturar recap de últimos 10 segundos
+        H - Mostrar ayuda completa
+
+    El sistema incluye:
+        - Buffer circular automático de últimos N segundos
+        - Grabación en tiempo real con pause/resume
+        - Exportación automática con nombres únicos
+        - Indicadores visuales del estado de grabación
+    
     """
     
     def __init__(self, fps=20, dpi=300, max_buffer_seconds=10):
