@@ -1,0 +1,11 @@
+numpy
+matplotlib
+scipy
+pyyaml
+imageio-ffmpeg
+sympy
+pandas
+
+[dev]
+pytest
+pytest-cov

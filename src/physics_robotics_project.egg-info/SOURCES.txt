@@ -1,5 +1,9 @@
 README.md
 pyproject.toml
+src/animation/__init__.py
+src/animation/class_robot_plotter.py
+src/animation/class_robot_plotter_gpu.py
+src/animation/visualize_fabrik.py
 src/calculations/__init__.py
 src/calculations/class_helicoidales.py
 src/calculations/class_jacobian.py
@@ -10,6 +14,5 @@ src/core/class_robot_structure.py
 src/physics_robotics_project.egg-info/PKG-INFO
 src/physics_robotics_project.egg-info/SOURCES.txt
 src/physics_robotics_project.egg-info/dependency_links.txt
+src/physics_robotics_project.egg-info/requires.txt
 src/physics_robotics_project.egg-info/top_level.txt
-src/simulation/__init__.py
-src/simulation/class_robot_plotter.py

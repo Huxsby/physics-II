@@ -16,6 +16,21 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "pyyaml",
+    "imageio-ffmpeg",
+    "sympy",
+    "pandas"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

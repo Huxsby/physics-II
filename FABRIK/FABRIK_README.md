@@ -26,14 +26,21 @@ FABRIK/
 ├── demo_refactored_system.py           # [ ] Demostración
 └── fabrik_paper_constrained_3d.py      # [ ] Código principal
 ```
+
 ## Changelog
 
+## Refactorizar
+
+- [ ] Estudiar y implementar rasgos de la estructura .yaml seguida por NVIDIA Isaac™ Lab.
+- [ ] Modular clase Fabrik como un modulo para probar algoritmos genericos y reimplementar el módelo básico de Fabrik.
+
 ### Core
+
 - [ ] Mejorar la clase TAD Robot
-  - [ ] Estudiar implementación directa de quartiones en el TAD robot
   - [ ] Mejorar TAD Link -> TAD Joint
 
-### Fabrik_3D
-- [ ] Implementar otros tipos de secciones cónicas según sea necesario
 ### Fabrik_3D y Fabrik-R
-- [ ] Bug entre la primera articulación y la base, las restricciones no se aplican de forma correcta. Permitiendo al vector entre la base y la primera articulación inclinarse y moverse de forma libre. 
+
+- [ ] Bug entre la primera articulación y la base, las restricciones no se aplican de forma correcta. Permitiendo al vector entre la base y la primera articulación inclinarse y moverse de forma libre.
+
+Necisides Fabrik-R:
