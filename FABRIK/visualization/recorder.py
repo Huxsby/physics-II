@@ -349,7 +349,7 @@ class RecordingSystem:
                                  interval=50, blit=False, cache_frame_data=False, repeat=False)
         
         # Guardar
-        filename = f'FABRIK/fabrik_3d_{prefix}_{robot_name}'
+        filename = f'FABRIK/fabrik_solver_{prefix}_{robot_name}'
         try:
             print(f"Guardando {filename.split('/')[-1]}...")
             guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)
@@ -435,7 +435,7 @@ class RecordingSystem:
                                  interval=50, blit=False, cache_frame_data=False, repeat=False)
         
         # Guardar
-        filename = f'FABRIK/fabrik_3d_{prefix}_{robot_name}'
+        filename = f'FABRIK/fabrik_solver_{prefix}_{robot_name}'
         try:
             print(f"Guardando {filename.split('/')[-1]}...")
             guardar_animacion(temp_anim, filename, fps=self.recording_fps, dpi=self.recording_dpi)

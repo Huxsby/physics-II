@@ -7,7 +7,7 @@ restricciones de articulacion (Algorithms 1, 2 y 3 segun Aristidou & Lasenby, 20
 Este modulo es independiente del robot concreto. Para usarlo con un robot cargado
 desde YAML, usar el metodo de clase `FabrikSerialSolver.from_robot()`.
 
-Diferencias respecto a fabrik_paper_constrained_3d.py:
+Reemplaza a fabrik_paper_constrained_3d.py (LEGACY, ver FABRIK_README.md):
   - Algorithm 2: restricciones correctas por tipo (BALL y HINGE).
     El eje de referencia se mantiene actualizado entre passes.
   - Algorithm 3: geometria correcta con q1-q4 por cuadrante y
