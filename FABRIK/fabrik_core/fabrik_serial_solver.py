@@ -86,6 +86,10 @@ class JointDescriptor:
     workspace_angles: np.ndarray = field(
         default_factory=lambda: np.full(4, math.pi / 4)
     )
+    # Direccion natural del segmento (normalize(joint_coords) del YAML).
+    # Solo se usa para juntas de twist (eje de rotacion paralelo al segmento),
+    # donde la posicion del joint distal es fija independientemente del angulo.
+    segment_direction: Optional[np.ndarray] = None
 
 
 # ---------------------------------------------------------------------------
@@ -211,24 +215,41 @@ class FabrikSerialSolver:
         for link in robot.links:
             jtype, ball_max, hinge_axis, hinge_ref, cw, acw = _parse_link_constraints(link)
 
-            # Longitud del segmento: modulo de joint_coords
-            seg_length = float(np.linalg.norm(link.joint_coords))
-            if seg_length < 1e-8:
-                seg_length = float(link.length)
+            # Longitud y direccion del segmento desde joint_coords
+            jc        = np.asarray(link.joint_coords, dtype=float)
+            jc_norm   = float(np.linalg.norm(jc))
+            seg_length = jc_norm if jc_norm > 1e-8 else float(link.length)
+            seg_dir    = (jc / jc_norm) if jc_norm > 1e-8 else np.array([0.0, 0.0, 1.0])
+
+            # Detectar junta de twist: el eje de rotacion es paralelo a la
+            # direccion del segmento (ej: base del Niryo One, J1 gira en Z y
+            # joint_coords = [0,0,0.103] tambien apunta en Z).
+            # En ese caso la posicion del joint distal es fija en el espacio
+            # (la rotacion solo cambia el frame de los eslabones siguientes,
+            # no mueve ninguna posicion), por lo que ball_max_angle = 0.
+            ja      = np.asarray(link.joint_axis, dtype=float)
+            ja_norm = float(np.linalg.norm(ja))
+            is_twist = (
+                ja_norm > 1e-8
+                and abs(float(np.dot(ja / ja_norm, seg_dir))) > 0.99
+            )
+            if is_twist:
+                ball_max = 0.0
 
             # Angulos de workspace por defecto: usar ball_max para los 4 cuadrantes
             ws_angles = np.full(4, min(ball_max, math.pi / 2))
 
             desc = JointDescriptor(
-                joint_type      = jtype,
-                length          = seg_length,
-                ball_max_angle  = ball_max,
-                hinge_axis      = hinge_axis,
-                hinge_ref_axis  = hinge_ref,
-                hinge_cw_deg    = cw,
-                hinge_acw_deg   = acw,
-                twist_max_rad   = cls.DEFAULT_TWIST_LIMIT,
-                workspace_angles = ws_angles,
+                joint_type        = jtype,
+                length            = seg_length,
+                ball_max_angle    = ball_max,
+                hinge_axis        = hinge_axis,
+                hinge_ref_axis    = hinge_ref,
+                hinge_cw_deg      = cw,
+                hinge_acw_deg     = acw,
+                twist_max_rad     = cls.DEFAULT_TWIST_LIMIT,
+                workspace_angles  = ws_angles,
+                segment_direction = seg_dir if is_twist else None,
             )
             descriptors.append(desc)
 
@@ -374,8 +395,16 @@ class FabrikSerialSolver:
             self.joints[i + 1] = (1.0 - ki) * self.joints[i] + ki * self.joints[i + 1]
             self._update_orientation(i + 1)
 
-            # Algorithm 2: aplicar restriccion en el forward pass
-            if i > 0:
+            if i == 0 and self.descriptors[0].segment_direction is not None:
+                # Junta de twist en la base: la posicion del joint 1 es fija.
+                # La rotacion de J1 no traslada ningun joint; solo cambia el
+                # frame de los eslabones siguientes. Fijar joints[1] a su
+                # posicion cinematicamente correcta evita que la base se incline.
+                sd = self.descriptors[0].segment_direction
+                self.joints[1] = self.joints[0] + sd * seg_len
+                self._update_orientation(1)
+            elif i > 0:
+                # Algorithm 2: aplicar restriccion en el forward pass
                 self._apply_joint_constraint(i, pass_direction="forward")
 
     # ------------------------------------------------------------------
@@ -605,6 +634,12 @@ class FabrikSerialSolver:
         3.9  Verificar si el target esta dentro; si no, proyectarlo al borde.
         """
         base = self.base_position
+
+        # Si el primer segmento es una junta de twist (eje de rotacion paralelo al
+        # segmento, como la base del Niryo One), Algorithm 3 no aplica: la junta no
+        # impone restriccion angular sobre el workspace del brazo.
+        if self.descriptors[0].segment_direction is not None:
+            return target
 
         # 3.1 Direccion de L1: eje del primer segmento (base -> joint[1])
         if np.linalg.norm(self.joints[1] - self.joints[0]) > 1e-8:

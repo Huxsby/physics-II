@@ -165,7 +165,7 @@ def run_chained_battery(robot, solver: FabrikSerialSolver, n: int) -> list:
 def _draw_chain(ax, joint_positions, color="steelblue"):
     pts = np.array(joint_positions)
     ax.plot(pts[:, 0], pts[:, 1], pts[:, 2], "o-", color=color,
-            linewidth=2, markersize=5, markerfacecolor="white")
+            linewidth=1.5, markersize=3, markerfacecolor="white")
 
 
 def _set_equal_axes(ax, points):
@@ -193,9 +193,24 @@ def plot_fk_battery(solver, casos):
         res = caso["result"]
 
         _draw_chain(ax, res.joint_positions)
-        ax.scatter(*caso["target"],       color="green", s=60, zorder=5)
-        ax.scatter(*solver.base_position, color="black", s=40, zorder=5)
-        ax.scatter(*res.end_effector,     color="red",   s=40, zorder=5)
+
+        ax.scatter(*solver.base_position, color="black", s=15, zorder=5,
+                   label="base")
+
+        if res.converged:
+            # Efector alcanza el target: marcador estrella con relleno verde
+            # y borde rojo para indicar que ambos puntos coinciden.
+            ax.scatter(*caso["target"],
+                       color="limegreen", edgecolors="crimson", linewidths=1.5,
+                       s=55, zorder=6, marker="*",
+                       label="target = efector (conv)")
+        else:
+            ax.scatter(*caso["target"],
+                       color="green", s=18, zorder=5, marker="o",
+                       label="target")
+            ax.scatter(*res.end_effector,
+                       color="crimson", s=18, zorder=5, marker="x",
+                       linewidths=1.5, label="efector final")
 
         all_pts = list(res.joint_positions) + [caso["target"]]
         _set_equal_axes(ax, all_pts)
@@ -207,6 +222,7 @@ def plot_fk_battery(solver, casos):
             f"iter={res.iterations}  err={res.final_error:.4f} m",
             fontsize=8,
         )
+        ax.legend(fontsize=6, loc="upper left", markerscale=1.2)
 
     plt.tight_layout()
     plt.show()
@@ -229,10 +245,25 @@ def plot_chained_battery(solver, casos):
         res = caso["result"]
 
         _draw_chain(ax, res.joint_positions)
-        ax.scatter(*caso["target"],       color="green",  s=60, zorder=5, label="target")
-        ax.scatter(*caso["desde"],        color="orange", s=50, zorder=5, label="desde")
-        ax.scatter(*solver.base_position, color="black",  s=40, zorder=5)
-        ax.scatter(*res.end_effector,     color="red",    s=40, zorder=5)
+
+        ax.scatter(*solver.base_position, color="black",  s=15, zorder=5,
+                   label="base")
+        ax.scatter(*caso["desde"],        color="orange", s=18, zorder=5,
+                   marker="^", label="efector anterior")
+
+        if res.converged:
+            # Efector alcanza el target: estrella verde/rojo combinada
+            ax.scatter(*caso["target"],
+                       color="limegreen", edgecolors="crimson", linewidths=1.5,
+                       s=55, zorder=6, marker="*",
+                       label="target = efector (conv)")
+        else:
+            ax.scatter(*caso["target"],
+                       color="green", s=18, zorder=5, marker="o",
+                       label="target")
+            ax.scatter(*res.end_effector,
+                       color="crimson", s=18, zorder=5, marker="x",
+                       linewidths=1.5, label="efector final")
 
         all_pts = list(res.joint_positions) + [caso["target"], caso["desde"]]
         _set_equal_axes(ax, all_pts)
@@ -244,6 +275,7 @@ def plot_chained_battery(solver, casos):
             f"iter={res.iterations}  err={res.final_error:.4f} m",
             fontsize=8,
         )
+        ax.legend(fontsize=6, loc="upper left", markerscale=1.2)
 
     plt.tight_layout()
     plt.show()
