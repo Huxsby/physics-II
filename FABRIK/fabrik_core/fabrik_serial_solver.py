@@ -321,6 +321,185 @@ class FabrikSerialSolver:
             final_error     = final_err,
         )
 
+    def solve_with_orientation(
+        self,
+        target: np.ndarray,
+        target_orientation: np.ndarray,
+        use_workspace_constraints: bool = True,
+    ) -> SolverResult:
+        """
+        Algorithm 6: FABRIK con control de orientacion del efector final.
+
+        Extiende solve() fijando la direccion del ultimo segmento segun la
+        orientacion objetivo. El eje Z del frame objetivo determina la
+        direccion del ultimo segmento:
+            desired_dir = quat_rotate(target_orientation, [0, 0, 1])
+
+        Internamente crea anchor = target - desired_dir * last_seg_len y fuerza
+        joints[n-1] = anchor en cada backward pass antes de propagar hacia la base.
+
+        Args:
+            target                    : Posicion objetivo [x, y, z] en metros.
+            target_orientation        : Cuaternion [w, x, y, z] con la orientacion
+                                        deseada del frame del efector.
+            use_workspace_constraints : Activar Algorithm 3.
+
+        Returns:
+            SolverResult con las posiciones finales. La orientacion del ultimo
+            segmento coincide con desired_dir dentro de la tolerancia del solver.
+        """
+        target = np.asarray(target, dtype=float)
+        if use_workspace_constraints:
+            target = self._apply_workspace_constraints(target)
+
+        # Direccion deseada del eje Z del efector
+        desired_dir = _normalize(
+            quat_rotate_vector(
+                np.asarray(target_orientation, dtype=float),
+                np.array([0.0, 0.0, 1.0]),
+            )
+        )
+        last_len = self.descriptors[-1].length
+        # Posicion deseada de joints[n-1] para garantizar la orientacion
+        anchor = target - desired_dir * last_len
+
+        base = self.base_position.copy()
+        dif  = np.linalg.norm(self.joints[self.n] - target)
+        iters = 0
+
+        while dif > self.tolerance and iters < self.max_iterations:
+            self._backward_pass_oriented(target, anchor)
+            self._forward_pass(base)
+            # Re-aplicar la orientacion al final del forward pass
+            self.joints[self.n] = self.joints[self.n - 1] + desired_dir * last_len
+            self._update_orientation(self.n)
+            dif   = np.linalg.norm(self.joints[self.n] - target)
+            iters += 1
+
+        final_err = float(np.linalg.norm(self.joints[self.n] - target))
+        return SolverResult(
+            joint_positions = [j.copy() for j in self.joints],
+            end_effector    = self.joints[self.n].copy(),
+            iterations      = iters,
+            converged       = final_err <= self.tolerance,
+            final_error     = final_err,
+        )
+
+    def joint_angles(self, robot) -> List[float]:
+        """
+        Algorithm 4: convierte las posiciones actuales de las articulaciones
+        (resultado del ultimo solve()) a angulos de articulacion.
+
+        Usa los ejes helicoidales del robot (frame base, configuracion cero) para
+        calcular el angulo firmado theta_i que cada articulacion revoluta necesita
+        para producir las posiciones de joints obtenidas por FABRIK.
+
+        En el Space form, la articulacion i (eje S_i) controla la direccion del
+        SEGMENTO i+1 (de joints[i+1] a joints[i+2]). La relacion utilizada es:
+            d_ref  = R_acc @ normalize(links[i+1].joint_coords)  [segmento i+1 en cero]
+            d_curr = normalize(joints[i+2] - joints[i+1])         [segmento i+1 FABRIK]
+            theta_i = signed_angle(project(d_ref, omega_i), project(d_curr, omega_i), omega_i)
+
+        Limitaciones:
+          - Articulaciones de twist (eje paralelo al segmento): angulo indeterminado,
+            se devuelve 0.0.
+          - Articulaciones prismaticas: FABRIK no modela desplazamiento, se devuelve 0.0.
+
+        Args:
+            robot: instancia de Robot con .links (lista de Link) y
+                   .get_ejes_helicoidales() que retorna lista de Si = [omega, v] 6D
+                   en el frame base a configuracion cero.
+
+        Returns:
+            List[float]: lista de n angulos theta_i en radianes, uno por articulacion.
+        """
+        screw_axes        = robot.get_ejes_helicoidales()
+        T_acc: np.ndarray = np.eye(4)
+        thetas: List[float] = []
+
+        # Posiciones de los joints en configuracion cero (frame base)
+        p_home: List[np.ndarray] = []
+        cumsum = np.zeros(3)
+        p_home.append(cumsum.copy())
+        for lk in robot.links:
+            cumsum = cumsum + np.asarray(lk.joint_coords, dtype=float)
+            p_home.append(cumsum.copy())
+
+        n_links = len(robot.links)
+
+        for i, (link, Si) in enumerate(zip(robot.links, screw_axes)):
+            omega      = Si[:3].copy()
+            omega_norm = float(np.linalg.norm(omega))
+
+            # El ultimo joint no controla ningun segmento adicional
+            if i + 2 > n_links:
+                thetas.append(0.0)
+                T_acc = T_acc @ _exp_screw(Si, 0.0)
+                continue
+
+            if link.tipo == "prismatic" or omega_norm < 1e-8:
+                # Prismatica: angulo indeterminado desde posiciones; twist: 0.0
+                thetas.append(0.0)
+                T_acc = T_acc @ _exp_screw(Si, 0.0)
+                continue
+
+            omega = omega / omega_norm
+
+            # El eje Si (Space form, fijo en frame base) actua sobre los segmentos
+            # i+1, i+2, ... El segmento mas cercano que refleja directamente theta_i
+            # es el segmento i+1: de joints[i+1] a joints[i+2].
+            #
+            # Para aislar theta_i se deshacen las rotaciones de joints 0..i-1
+            # (T_acc) sobre las posiciones FABRIK actuales, reduciendo el problema
+            # a comparar la direccion del segmento i+1 en el frame 'residual'
+            # contra su direccion de referencia en config cero.
+
+            T_inv = np.linalg.inv(T_acc)
+            R_inv = T_inv[:3, :3]
+            t_inv = T_inv[:3, 3]
+
+            # Segmento i+1 en el frame residual (deshaciendo joints 0..i-1)
+            ji1_local = R_inv @ self.joints[i + 1] + t_inv
+            ji2_local = R_inv @ self.joints[i + 2] + t_inv
+            d_curr    = ji2_local - ji1_local
+            d_curr_n  = float(np.linalg.norm(d_curr))
+
+            if d_curr_n < 1e-10:
+                thetas.append(0.0)
+                T_acc = T_acc @ _exp_screw(Si, 0.0)
+                continue
+            d_curr = d_curr / d_curr_n
+
+            # Direccion de referencia del segmento i+1 en config cero
+            d_ref   = p_home[i + 2] - p_home[i + 1]
+            d_ref_n = float(np.linalg.norm(d_ref))
+            if d_ref_n < 1e-10:
+                d_ref = np.array([0.0, 0.0, 1.0])
+            else:
+                d_ref = d_ref / d_ref_n
+
+            # Proyectar sobre el plano perpendicular al eje omega_i
+            d_ref_proj  = _project_on_plane(d_ref,  omega)
+            d_curr_proj = _project_on_plane(d_curr, omega)
+            n_ref  = float(np.linalg.norm(d_ref_proj))
+            n_curr = float(np.linalg.norm(d_curr_proj))
+
+            if n_ref < 1e-6 or n_curr < 1e-6:
+                # Eje de twist paralelo al segmento: angulo indeterminado
+                thetas.append(0.0)
+                T_acc = T_acc @ _exp_screw(Si, 0.0)
+                continue
+
+            theta_i = _signed_angle(
+                _normalize(d_ref_proj),
+                _normalize(d_curr_proj),
+                omega,
+            )
+            thetas.append(theta_i)
+            T_acc = T_acc @ _exp_screw(Si, theta_i)
+
+        return thetas
+
     def reset_to_initial(self):
         """Reinicia las posiciones de articulaciones a la configuracion estirada inicial."""
         self.joints = self._build_initial_joints()
@@ -371,6 +550,37 @@ class FabrikSerialSolver:
             # Algorithm 2: aplicar restriccion segun el tipo de articulacion
             # En el backward pass el joint i+1 es el "outer" (mas cercano al efector)
             if i < self.n - 1:
+                self._apply_joint_constraint(i + 1, pass_direction="backward")
+
+    def _backward_pass_oriented(self, target: np.ndarray, anchor: np.ndarray) -> None:
+        """
+        Algorithm 6: backward pass con restriccion de orientacion del efector.
+
+        Igual que _backward_pass pero fuerza joints[n-1] = anchor (posicion
+        que garantiza la orientacion deseada del ultimo segmento) antes de
+        propagar el resto de la cadena hacia la base.
+
+        Args:
+            target : Posicion objetivo del efector final.
+            anchor : Posicion deseada de joints[n-1] = target - desired_dir * last_len.
+        """
+        # Fijar los dos ultimos joints segun la orientacion deseada
+        self.joints[self.n] = target.copy()
+        self._update_orientation(self.n)
+
+        self.joints[self.n - 1] = anchor.copy()
+        self._update_orientation(self.n - 1)
+
+        # Propagar hacia la base desde joints[n-2] (ultimo segmento ya esta fijo)
+        for i in range(self.n - 2, -1, -1):
+            seg_len = self.descriptors[i].length
+            ri = np.linalg.norm(self.joints[i + 1] - self.joints[i])
+            if ri < 1e-10:
+                continue
+            ki = seg_len / ri
+            self.joints[i] = (1.0 - ki) * self.joints[i + 1] + ki * self.joints[i]
+            self._update_orientation(i)
+            if i < self.n - 2:
                 self._apply_joint_constraint(i + 1, pass_direction="backward")
 
     def _forward_pass(self, base: np.ndarray) -> None:
@@ -1001,3 +1211,58 @@ def _parse_link_constraints(
     acw_deg = math.degrees(max(hi,  0.0))  # conservado para posible uso como HINGE
 
     return JointType.BALL, half, joint_axis, hinge_ref, cw_deg, acw_deg
+
+
+# ---------------------------------------------------------------------------
+# Algebra de ejes helicoidales (para Algorithm 4)
+# ---------------------------------------------------------------------------
+
+def _exp_screw(S6: np.ndarray, theta: float) -> np.ndarray:
+    """
+    Exponencial de la matriz helicoidal e^{[S]theta} en SE(3).
+
+    Implementa la formula de Rodrigues para la parte de rotacion y la formula
+    cerrada para la traslacion del eje helicoidal (ver Modern Robotics, cap. 3).
+
+    Equivalente a calcular_exp_Stheta de src/calculations/class_helicoidales.py
+    pero sin dependencias externas al modulo FABRIK.
+
+    Args:
+        S6    : Eje helicoidal [omega(3), v(3)]. Si ||omega|| != 1 se normaliza.
+        theta : Angulo en radianes (revoluta) o distancia en metros (prismatica).
+
+    Returns:
+        np.ndarray: Matriz homogenea 4x4 en SE(3).
+    """
+    omega      = S6[:3].copy()
+    v          = S6[3:].copy()
+    omega_norm = float(np.linalg.norm(omega))
+    T          = np.eye(4)
+
+    if omega_norm < 1e-8:
+        # Traslacion pura (junta prismatica con omega = 0)
+        T[:3, 3] = v * theta
+        return T
+
+    # Normalizar omega y escalar theta para la formula
+    omega = omega / omega_norm
+    theta = theta * omega_norm
+
+    wx, wy, wz = omega
+    omega_hat  = np.array([
+        [ 0.0, -wz,  wy],
+        [ wz,  0.0, -wx],
+        [-wy,  wx,  0.0],
+    ])
+    c   = math.cos(theta)
+    s   = math.sin(theta)
+    oh2 = omega_hat @ omega_hat
+
+    # R = I + sin(t)*[w] + (1-cos(t))*[w]^2  (Rodrigues)
+    R = np.eye(3) + s * omega_hat + (1.0 - c) * oh2
+    # G = I*t + (1-cos(t))*[w] + (t-sin(t))*[w]^2
+    G = np.eye(3) * theta + (1.0 - c) * omega_hat + (theta - s) * oh2
+
+    T[:3, :3] = R
+    T[:3,  3] = G @ v
+    return T

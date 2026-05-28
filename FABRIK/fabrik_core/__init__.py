@@ -52,6 +52,7 @@ from .fabrik_serial_solver import (
     JointDescriptor,
     JointType,
     SolverResult,
+    _exp_screw as exp_screw_matrix,  # util publica para FK checks (Algorithm 4)
 )
 
 # Metadatos del paquete

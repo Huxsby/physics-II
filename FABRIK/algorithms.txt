@@ -14,11 +14,16 @@
 % ✅ Algorithm 1: FABRIK básico con direcciones unitarias (3D)
 % ✅ Algorithm 2: Joint Constraints como post-procesamiento (restricciones esféricas/cónicas)
 % ✨ Algorithm 3: Target Constraint Application (workspace limits con secciones cónicas) - Actualizado para ajustarse a restriccines asimétricas
+% ✅ Algorithm 4: Position to Joint Angles Conversion (3D con ejes helicoidales Space form)
+%    Limitación: joints de tipo twist (eje paralelo al segmento) no son determinables → devuelven 0.0
+%    Implementado en: FabrikSerialSolver.joint_angles(robot)
+%    Probado en: FABRIK/tests/test_alg4_alg6.py — 8/8 trials OK con 0.00 mm de error FK
 % 
 % ALGORITMOS PENDIENTES:
-% [ ] Algorithm 4: Position to Joint Angles Conversion (3D con quaternions)
 % [ ] Algorithm 5: Multi-Target FABRIK (multiple end effectors en 3D)
-% [ ] Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
+% ✅ Algorithm 6: FABRIK with Orientation Control (3D con quaternions)
+%    Implementado en: FabrikSerialSolver.solve_with_orientation(target, quat)
+%    Probado en: FABRIK/tests/test_alg4_alg6.py — 5/5 orientaciones OK con 0.00° de error
 %
 % EXPANSIÓN A 3D COMPLETADA (2025-07-30):
 % ===============================================================================

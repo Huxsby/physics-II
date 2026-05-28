@@ -23,6 +23,14 @@ Requires-Dist: pytest-cov; extra == "dev"
 
 Este repositorio contén materiais e recursos relacionados coa materia **Física II** do Grao en Robótica da Universidade de Santiago de Compostela (USC). A asignatura aborda conceptos fundamentais de cinemática, dinámica e estática aplicados a sistemas robóticos.
 
+## Setup
+
+Para instalar as dependencias do proxecto en modo de desenvolvemento, executa o seguinte comando:
+
+```bash
+pip install -e .
+```
+
 ## Contidos
 
 1. **Introdución**
@@ -90,5 +98,3 @@ O sistema de avaliación baséase na ponderación entre un exame final, a realiz
 ## Información oficial
 
 Para máis información sobre a materia, podes consultar a [páxina oficial da USC](https://www.usc.gal/gl/estudos/graos/enxenaria-arquitectura/grao-robotica-2a-edicion/20242025/fisica-ii-19943-19039-11-105693).
-
- 
