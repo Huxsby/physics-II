@@ -1,7 +1,3 @@
-No puedo leer directamente el contenido de archivos PDF. Sin embargo, puedo proporcionarte un resumen del pseudocódigo y las explicaciones del algoritmo FABRIK-R basándome en mi conocimiento general sobre el tema. Ten en cuenta que los detalles pueden variar con respecto al documento específico que has adjuntado.
-
-Aquí tienes una descripción detallada del algoritmo FABRIK-R, que puedes guardar en FABRIK-F.txt.
-
 FABRIK-R: Una extensión de FABRIK para manipuladores robóticos
 FABRIK-R (FABRIK for Robotics) es una adaptación del algoritmo FABRIK diseñada para abordar las cinemáticas inversas de manipuladores en serie, teniendo en cuenta las restricciones de rotación de las articulaciones.
 
