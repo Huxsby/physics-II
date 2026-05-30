@@ -139,8 +139,8 @@ class FabrikSerialSolver:
         print(result.end_effector, result.converged)
     """
 
-    DEFAULT_TOLERANCE    = 1e-4   # metros
-    DEFAULT_MAX_ITER     = 64
+    DEFAULT_TOLERANCE    = 1e-8   # metros
+    DEFAULT_MAX_ITER     = 128
     DEFAULT_TWIST_LIMIT  = math.radians(166.0)  # ~mismo que referencia chain_3d
 
     def __init__(
@@ -149,6 +149,7 @@ class FabrikSerialSolver:
         base_position: Optional[np.ndarray] = None,
         tolerance: float = DEFAULT_TOLERANCE,
         max_iterations: int = DEFAULT_MAX_ITER,
+        constraint_policy: str = "transitional",
     ):
         """
         Inicializa el solver con una lista de descriptores de articulaciones.
@@ -158,6 +159,7 @@ class FabrikSerialSolver:
             base_position     : Posicion de la base en el frame global (default origen).
             tolerance         : Distancia minima al target para considerar convergencia.
             max_iterations    : Limite de iteraciones del bucle principal.
+            constraint_policy : Politica de constraints usada para crear descriptores.
         """
         if not joint_descriptors:
             raise ValueError("Se requiere al menos un descriptor de articulacion.")
@@ -166,17 +168,73 @@ class FabrikSerialSolver:
         self.n             = len(joint_descriptors)   # numero de segmentos
         self.tolerance     = tolerance
         self.max_iterations = max_iterations
+        self.constraint_policy = constraint_policy
         self.base_position = np.array(base_position if base_position is not None
                                       else [0.0, 0.0, 0.0], dtype=float)
 
         # Longitud total del brazo
         self.total_length = sum(d.length for d in self.descriptors)
 
+        # Angulo de yaw de J0 calculado analiticamante en el ultimo solve().
+        # Usado por joint_angles() para devolver el angulo real de J0 (twist).
+        self._last_theta0: float = 0.0
+
         # Inicializar posiciones en configuracion estirada a lo largo de +Z
         self.joints = self._build_initial_joints()
 
         # Inicializar orientaciones como identidad por articulacion
         self.orientations = [quat_identity() for _ in range(self.n + 1)]
+
+        # Instrumentacion opcional: saturaciones de limites CW/ACW en HINGE_LOCAL.
+        # Solo registra eventos cuando enforce_angular_limits=True (backward pass).
+        self._hinge_debug_enabled: bool = False
+        self._hinge_debug_max_events: int = 500
+        self._debug_iter: int = 0
+        self._curr_hinge_sat_counts: dict = {}
+        self._curr_hinge_debug_counts: dict = {}
+        self._curr_hinge_debug_events: list = []
+        self._last_hinge_debug: dict = {"counts": {}, "events": []}
+
+    def enable_hinge_debug(self, enabled: bool = True, max_events: int = 500) -> None:
+        """Activa/desactiva instrumentacion de saturaciones HINGE_LOCAL."""
+        self._hinge_debug_enabled = bool(enabled)
+        self._hinge_debug_max_events = max(1, int(max_events))
+
+    def get_last_hinge_debug(self) -> dict:
+        """Devuelve el resumen de saturaciones del ultimo solve()."""
+        counts_copy = dict(self._last_hinge_debug.get("counts", {}))
+        events_copy = [dict(ev) for ev in self._last_hinge_debug.get("events", [])]
+        return {"counts": counts_copy, "events": events_copy}
+
+    def _reset_hinge_debug_cycle(self) -> None:
+        self._debug_iter = 0
+        self._curr_hinge_sat_counts = {}
+        self._curr_hinge_debug_counts = {}
+        self._curr_hinge_debug_events = []
+
+    def _finalize_hinge_debug_cycle(self) -> None:
+        self._last_hinge_debug = {
+            "counts": dict(self._curr_hinge_debug_counts),
+            "events": [dict(ev) for ev in self._curr_hinge_debug_events],
+        }
+
+    def _is_normative_hinge_deadlock(self) -> bool:
+        """
+        Detecta estancamiento por saturacion repetida de limites HINGE_LOCAL
+        durante backward pass.
+
+        No altera constraints; solo decide si vale la pena un reintento con
+        inicializacion alternativa para escapar de un minimo local.
+        """
+        if self.constraint_policy != "normative":
+            return False
+        if not self._curr_hinge_sat_counts:
+            return False
+
+        thr_joint = max(32, self.max_iterations // 2)
+        hot = [c for c in self._curr_hinge_sat_counts.values() if c >= thr_joint]
+        peak = max(self._curr_hinge_sat_counts.values())
+        return len(hot) >= 2 and peak >= max(64, int(0.8 * self.max_iterations))
 
     # ------------------------------------------------------------------
     # Construccion desde Robot YAML
@@ -188,16 +246,18 @@ class FabrikSerialSolver:
         robot,
         tolerance: float = DEFAULT_TOLERANCE,
         max_iterations: int = DEFAULT_MAX_ITER,
+        constraint_policy: str = "transitional",
     ) -> "FabrikSerialSolver":
         """
         Construye el solver a partir de una instancia de Robot (class_robot_structure).
 
         Mapeo de parametros YAML -> JointDescriptor:
-          - type == 'revolute' con joint_axis == [0,0,1] y rango < 360 -> HINGE_GLOBAL
-          - type == 'revolute' con rango >= 2*pi (libre) -> BALL con max_angle = pi
-          - type == 'revolute' general -> BALL con max_angle = rango/2
-          - type == 'prismatic' -> FREE (FABRIK no modela juntas prismaticas con
-            restricciones angulares, se tratan como segmentos libres).
+          - prismatic                                   -> FREE
+          - revoluta, rango >= 2*pi                     -> BALL sin restriccion
+          - revoluta, eje paralelo al segmento (twist)  -> BALL con max_angle=0 (no dobla)
+                    - revoluta, eje perpendicular al segmento     -> LOCAL_HINGE (modo normative)
+                                                                                                                     BALL (modo transitional)
+          - revoluta, eje oblicuo                       -> BALL con max_angle=rango/2
 
         El eje de la bisagra HINGE se toma de link.joint_axis en el frame global
         de configuracion cero.
@@ -206,14 +266,27 @@ class FabrikSerialSolver:
             robot          : Instancia de Robot con atributo .links (lista de Link).
             tolerance      : Tolerancia de convergencia en metros.
             max_iterations : Limite de iteraciones.
+            constraint_policy: Politica de mapeo de restricciones.
+                - "transitional" : fallback orientado a convergencia (default actual).
+                - "normative"    : prioriza semantica del paper/referencia.
 
         Returns:
             FabrikSerialSolver: Solver configurado.
         """
+        if constraint_policy not in ("normative", "transitional"):
+            raise ValueError(
+                "constraint_policy debe ser 'normative' o 'transitional'."
+            )
+
+        use_normative_hinges = (constraint_policy == "normative")
+
         descriptors = []
 
         for link in robot.links:
-            jtype, ball_max, hinge_axis, hinge_ref, cw, acw = _parse_link_constraints(link)
+            jtype, ball_max, hinge_axis, hinge_ref, cw, acw = _parse_link_constraints(
+                link,
+                use_normative_hinges=use_normative_hinges,
+            )
 
             # Longitud y direccion del segmento desde joint_coords
             jc        = np.asarray(link.joint_coords, dtype=float)
@@ -257,6 +330,7 @@ class FabrikSerialSolver:
             joint_descriptors = descriptors,
             tolerance         = tolerance,
             max_iterations    = max_iterations,
+            constraint_policy = constraint_policy,
         )
 
     # ------------------------------------------------------------------
@@ -281,18 +355,29 @@ class FabrikSerialSolver:
             SolverResult con las posiciones finales y metricas de convergencia.
         """
         target = np.asarray(target, dtype=float)
+        self._reset_hinge_debug_cycle()
 
         # Algorithm 3: ajustar target a workspace alcanzable
         if use_workspace_constraints:
             target = self._apply_workspace_constraints(target)
 
-        dist_to_target = np.linalg.norm(self.joints[self.n] - target)
+        # Pre-procesar target para junta pivot/yaw en J0 (ej: Niryo One base).
+        # Rota el target al plano del brazo y devuelve el angulo de yaw theta0.
+        target_local, theta0 = self._yaw_preprocess(target)
+
+        # La condicion de alcance se mide desde la BASE, no desde el efector actual.
+        # Comparar |efector - target| contra total_len es incorrecto: cuando el efector
+        # esta lejos del target la distancia supera total_len aunque el target sea
+        # perfectamente alcanzable desde la base.
+        dist_from_base = np.linalg.norm(target_local - self.base_position)
         total_len      = self.total_length
 
         # Caso: target fuera de alcance -> estirar la cadena
-        if dist_to_target > total_len:
-            self._stretch_toward(target)
+        if dist_from_base > total_len:
+            self._stretch_toward(target_local)
+            self._yaw_postprocess(theta0)
             final_err = float(np.linalg.norm(self.joints[self.n] - target))
+            self._finalize_hinge_debug_cycle()
             return SolverResult(
                 joint_positions = [j.copy() for j in self.joints],
                 end_effector    = self.joints[self.n].copy(),
@@ -302,17 +387,98 @@ class FabrikSerialSolver:
             )
 
         # Caso: target alcanzable -> bucle FABRIK
-        base = self.base_position.copy()
-        dif  = np.linalg.norm(self.joints[self.n] - target)
+        base  = self.base_position.copy()
+        dif   = np.linalg.norm(self.joints[self.n] - target_local)
         iters = 0
 
         while dif > self.tolerance and iters < self.max_iterations:
-            self._backward_pass(target)
+            self._debug_iter = iters + 1
+            self._backward_pass(target_local)
             self._forward_pass(base)
-            dif   = np.linalg.norm(self.joints[self.n] - target)
+            dif   = np.linalg.norm(self.joints[self.n] - target_local)
             iters += 1
 
+        # Retry: si no convergio, reiniciar con la cadena estirada hacia el target.
+        # Esto da una configuracion inicial alineada con el target que puede superar
+        # los ciclos de limite en configuraciones extremas (arm muy doblado).
+        if dif > self.tolerance:
+            self._stretch_toward(target_local)
+            dif         = np.linalg.norm(self.joints[self.n] - target_local)
+            retry_iters = 0
+            while dif > self.tolerance and retry_iters < self.max_iterations:
+                self._debug_iter = iters + retry_iters + 1
+                self._backward_pass(target_local)
+                self._forward_pass(base)
+                dif         = np.linalg.norm(self.joints[self.n] - target_local)
+                retry_iters += 1
+            iters += retry_iters
+
+        # Escape de deadlock (solo modo normative):
+        # si hay saturacion persistente de HINGE_LOCAL en backward, probar una
+        # inicializacion espejada para escapar de una rama local sin relajar
+        # la semantica de constraints.
+        if dif > self.tolerance and self._is_normative_hinge_deadlock():
+            prev_joints = [j.copy() for j in self.joints]
+            prev_orients = [q.copy() for q in self.orientations]
+            prev_dif = dif
+            best_state: Optional[Tuple[float, int, List[np.ndarray], List[np.ndarray]]] = None
+
+            for tilt_sign in (1.0, -1.0):
+                self.joints = self._build_initial_joints(tilt_sign=tilt_sign)
+                self.orientations = [quat_identity() for _ in range(self.n + 1)]
+
+                esc_dif = np.linalg.norm(self.joints[self.n] - target_local)
+                esc_iters = 0
+                while esc_dif > self.tolerance and esc_iters < self.max_iterations:
+                    self._debug_iter = iters + esc_iters + 1
+                    self._backward_pass(target_local)
+                    self._forward_pass(base)
+                    esc_dif = np.linalg.norm(self.joints[self.n] - target_local)
+                    esc_iters += 1
+
+                if esc_dif > self.tolerance:
+                    self._stretch_toward(target_local)
+                    esc_dif = np.linalg.norm(self.joints[self.n] - target_local)
+                    retry_esc = 0
+                    while esc_dif > self.tolerance and retry_esc < self.max_iterations:
+                        self._debug_iter = iters + esc_iters + retry_esc + 1
+                        self._backward_pass(target_local)
+                        self._forward_pass(base)
+                        esc_dif = np.linalg.norm(self.joints[self.n] - target_local)
+                        retry_esc += 1
+                    esc_iters += retry_esc
+
+                if esc_dif < prev_dif and (
+                    best_state is None or esc_dif < best_state[0]
+                ):
+                    best_state = (
+                        float(esc_dif),
+                        esc_iters,
+                        [j.copy() for j in self.joints],
+                        [q.copy() for q in self.orientations],
+                    )
+
+                if esc_dif <= self.tolerance:
+                    break
+
+            if best_state is not None:
+                dif, best_extra_iters, best_joints, best_orients = best_state
+                self.joints = best_joints
+                self.orientations = best_orients
+                iters += best_extra_iters
+            else:
+                self.joints = prev_joints
+                self.orientations = prev_orients
+                dif = prev_dif
+
+        # Guardar theta0 para que joint_angles() pueda recuperar el angulo de J0
+        self._last_theta0 = theta0
+
+        # Post-procesar: rotar joints de vuelta al frame global
+        self._yaw_postprocess(theta0)
+
         final_err = float(np.linalg.norm(self.joints[self.n] - target))
+        self._finalize_hinge_debug_cycle()
         return SolverResult(
             joint_positions = [j.copy() for j in self.joints],
             end_effector    = self.joints[self.n].copy(),
@@ -349,34 +515,54 @@ class FabrikSerialSolver:
             segmento coincide con desired_dir dentro de la tolerancia del solver.
         """
         target = np.asarray(target, dtype=float)
+        self._reset_hinge_debug_cycle()
         if use_workspace_constraints:
             target = self._apply_workspace_constraints(target)
 
-        # Direccion deseada del eje Z del efector
+        # Pre-procesar target para junta pivot/yaw en J0
+        target_local, theta0 = self._yaw_preprocess(target)
+
+        # Direccion deseada del eje Z del efector (en frame global)
         desired_dir = _normalize(
             quat_rotate_vector(
                 np.asarray(target_orientation, dtype=float),
                 np.array([0.0, 0.0, 1.0]),
             )
         )
+
+        # Rotar desired_dir al frame local del brazo
+        if abs(theta0) > 1e-10 and self.descriptors[0].segment_direction is not None:
+            yaw_ax = _normalize(self.descriptors[0].segment_direction)
+            desired_dir_local = _rodrigues(desired_dir, yaw_ax, -theta0)
+        else:
+            desired_dir_local = desired_dir
+
         last_len = self.descriptors[-1].length
-        # Posicion deseada de joints[n-1] para garantizar la orientacion
-        anchor = target - desired_dir * last_len
+        # Posicion deseada de joints[n-1] para garantizar la orientacion (frame local)
+        anchor = target_local - desired_dir_local * last_len
 
         base = self.base_position.copy()
-        dif  = np.linalg.norm(self.joints[self.n] - target)
+        dif  = np.linalg.norm(self.joints[self.n] - target_local)
         iters = 0
 
         while dif > self.tolerance and iters < self.max_iterations:
-            self._backward_pass_oriented(target, anchor)
+            self._debug_iter = iters + 1
+            self._backward_pass_oriented(target_local, anchor)
             self._forward_pass(base)
             # Re-aplicar la orientacion al final del forward pass
-            self.joints[self.n] = self.joints[self.n - 1] + desired_dir * last_len
+            self.joints[self.n] = self.joints[self.n - 1] + desired_dir_local * last_len
             self._update_orientation(self.n)
-            dif   = np.linalg.norm(self.joints[self.n] - target)
+            dif   = np.linalg.norm(self.joints[self.n] - target_local)
             iters += 1
 
+        # Guardar theta0 para que joint_angles() pueda recuperar el angulo de J0
+        self._last_theta0 = theta0
+
+        # Post-procesar: rotar joints de vuelta al frame global
+        self._yaw_postprocess(theta0)
+
         final_err = float(np.linalg.norm(self.joints[self.n] - target))
+        self._finalize_hinge_debug_cycle()
         return SolverResult(
             joint_positions = [j.copy() for j in self.joints],
             end_effector    = self.joints[self.n].copy(),
@@ -485,9 +671,24 @@ class FabrikSerialSolver:
             n_curr = float(np.linalg.norm(d_curr_proj))
 
             if n_ref < 1e-6 or n_curr < 1e-6:
-                # Eje de twist paralelo al segmento: angulo indeterminado
-                thetas.append(0.0)
-                T_acc = T_acc @ _exp_screw(Si, 0.0)
+                # El segmento i+1 es paralelo al eje: puede ser twist puro (J0)
+                # o que la geometria del robot haga que d_ref || omega (ej: J3 Codo).
+
+                # Caso 1: joint pivot/yaw almacenado (J0). Usar theta0 analitico.
+                if self.descriptors[i].segment_direction is not None:
+                    theta_i = self._last_theta0
+                    thetas.append(theta_i)
+                    T_acc = T_acc @ _exp_screw(Si, theta_i)
+                    continue
+
+                # Caso 2: d_ref || omega por geometria (ej: J3 Codo: Antebrazo || eje Codo).
+                # El segmento siguiente (i+1) es paralelo al eje de la articulacion,
+                # por lo que la rotacion de esta articulacion no afecta la direccion
+                # del segmento — es geometricamente indeterminable desde posiciones FABRIK.
+                # Se devuelve 0.0 (config cero para esta articulacion).
+                theta_i = 0.0
+                thetas.append(theta_i)
+                T_acc = T_acc @ _exp_screw(Si, theta_i)
                 continue
 
             theta_i = _signed_angle(
@@ -656,7 +857,27 @@ class FabrikSerialSolver:
         elif desc.joint_type == JointType.HINGE_GLOBAL:
             self._apply_global_hinge_constraint(idx_prev, idx_curr, idx_next, desc)
         elif desc.joint_type == JointType.HINGE_LOCAL:
-            self._apply_local_hinge_constraint(idx_prev, idx_curr, idx_next, desc)
+            # En HINGE_LOCAL el frame local se construye a partir del segmento
+            # *anterior* en la cadena (inner→outer, base→efector).
+            # - forward pass: idx_prev < idx_curr → prev_dir = curr - prev = base→ef ✓
+            # - backward pass: idx_prev > idx_curr → prev_dir = curr - prev apunta
+            #   hacia la base (invertido). Usar idx_next como ancla de frame:
+            #   frame_dir = normalize(curr - next) = base→ef del segmento ya calculado.
+            if pass_direction == "backward":
+                frame_dir = _normalize(self.joints[idx_curr] - self.joints[idx_next])
+            else:
+                frame_dir = _normalize(self.joints[idx_curr] - self.joints[idx_prev])
+            # Referencia CALIKO: en forward pass solo proyeccion al plano;
+            # en backward pass proyeccion + limites CW/ACW.
+            self._apply_local_hinge_constraint(
+                idx_prev,
+                idx_curr,
+                idx_next,
+                desc,
+                frame_dir=frame_dir,
+                enforce_angular_limits=(pass_direction == "backward"),
+                pass_direction=pass_direction,
+            )
         # JointType.FREE: no aplica restriccion
 
         # Twist limit via cuaterniones (aplica a todos los tipos)
@@ -757,19 +978,34 @@ class FabrikSerialSolver:
         idx_curr: int,
         idx_next: int,
         desc: JointDescriptor,
+        frame_dir: Optional[np.ndarray] = None,
+        enforce_angular_limits: bool = True,
+        pass_direction: str = "unknown",
     ) -> None:
         """
         Restriccion HINGE_LOCAL: el eje de la bisagra esta definido relativo al
         segmento anterior (frame local).
 
         El eje local se transforma al frame global usando la matriz de rotacion
-        construida a partir del vector del segmento previo (igual que en FABRIK_chain_3D).
+        construida a partir del vector del segmento previo (inner→outer, base→ef).
+
+        frame_dir : Direccion base→efector del segmento previo en el frame global.
+                    Si es None se calcula como normalize(p_curr - p_prev).
+                    En el backward pass debe pasarse normalize(p_curr - p_next)
+                    para usar la direccion correcta (ya calculada).
+        enforce_angular_limits : Si True, aplica clamp CW/ACW con respecto al
+                eje de referencia. Si False, solo proyecta al plano de la
+                bisagra local.
+        pass_direction : Direccion del pass (forward/backward), para debug.
         """
-        p_prev = self.joints[idx_prev]
         p_curr = self.joints[idx_curr]
         p_next = self.joints[idx_next]
 
-        prev_dir = _normalize(p_curr - p_prev)
+        if frame_dir is None:
+            p_prev = self.joints[idx_prev]
+            prev_dir = _normalize(p_curr - p_prev)
+        else:
+            prev_dir = _normalize(frame_dir)
 
         # Construir matriz de rotacion local -> global segun prev_dir
         R = _rotation_matrix_from_direction(prev_dir)
@@ -786,15 +1022,42 @@ class FabrikSerialSolver:
 
         cw_rad  = math.radians(desc.hinge_cw_deg)
         acw_rad = math.radians(desc.hinge_acw_deg)
+        clamp_side = None
+        signed_angle = None
 
-        signed_angle = _signed_angle(global_ref, v_proj, global_hinge)
+        if enforce_angular_limits:
+            signed_angle = _signed_angle(global_ref, v_proj, global_hinge)
 
-        if signed_angle > acw_rad:
-            clamped_dir = _rodrigues(global_ref, global_hinge, acw_rad)
-        elif signed_angle < -cw_rad:
-            clamped_dir = _rodrigues(global_ref, global_hinge, -cw_rad)
+            if signed_angle > acw_rad:
+                clamped_dir = _rodrigues(global_ref, global_hinge, acw_rad)
+                clamp_side = "acw"
+            elif signed_angle < -cw_rad:
+                clamped_dir = _rodrigues(global_ref, global_hinge, -cw_rad)
+                clamp_side = "cw"
+            else:
+                clamped_dir = v_proj
         else:
             clamped_dir = v_proj
+
+        if enforce_angular_limits and clamp_side is not None:
+            self._curr_hinge_sat_counts[idx_curr] = (
+                self._curr_hinge_sat_counts.get(idx_curr, 0) + 1
+            )
+
+            if self._hinge_debug_enabled:
+                self._curr_hinge_debug_counts[idx_curr] = (
+                    self._curr_hinge_debug_counts.get(idx_curr, 0) + 1
+                )
+                if len(self._curr_hinge_debug_events) < self._hinge_debug_max_events:
+                    self._curr_hinge_debug_events.append({
+                        "iter": int(self._debug_iter),
+                        "joint": int(idx_curr),
+                        "pass": pass_direction,
+                        "side": clamp_side,
+                        "signed_angle_deg": float(math.degrees(signed_angle if signed_angle is not None else 0.0)),
+                        "cw_limit_deg": float(desc.hinge_cw_deg),
+                        "acw_limit_deg": float(desc.hinge_acw_deg),
+                    })
 
         seg_len = self.descriptors[min(idx_curr, idx_next)].length
         self.joints[idx_next] = p_curr + clamped_dir * seg_len
@@ -823,6 +1086,80 @@ class FabrikSerialSolver:
             self.orientations[joint_idx] = quat_normalize(
                 quat_multiply(rotor_clamped, q_prev)
             )
+
+    # ------------------------------------------------------------------
+    # Pre/post-procesamiento para juntas pivot/yaw (J0)
+    # ------------------------------------------------------------------
+
+    def _yaw_preprocess(self, target: np.ndarray) -> Tuple[np.ndarray, float]:
+        """
+        Pre-procesa el target cuando J0 es una junta pivot/yaw (segment_direction
+        != None, eje de rotacion paralelo al segmento, ej: base del Niryo One).
+
+        Calcula analiticamante el angulo de yaw theta0 = angulo del target en el
+        plano perpendicular al eje de yaw, y rota el target al plano del brazo
+        (componente perpendicular al eje de yaw = 0 en el frame del brazo).
+
+        Args:
+            target : Posicion objetivo en el frame global.
+
+        Returns:
+            (target_local, theta0): target en el plano del brazo y angulo de yaw
+            en radianes. Si J0 no es yaw devuelve (target, 0.0).
+        """
+        desc0 = self.descriptors[0]
+        if desc0.segment_direction is None:
+            return target, 0.0
+
+        yaw_axis = _normalize(desc0.segment_direction)
+        base     = self.base_position
+        t_rel    = target - base
+
+        # Componente del target en el plano perpendicular al eje de yaw
+        t_perp = _project_on_plane(t_rel, yaw_axis)
+        r_perp = float(np.linalg.norm(t_perp))
+
+        if r_perp < 1e-8:
+            # Target sobre el eje de yaw: cualquier theta0 es valido
+            return target, 0.0
+
+        # Eje de referencia en el plano perpendicular (proyeccion de +X global)
+        x_ref = _normalize(_project_on_plane(np.array([1.0, 0.0, 0.0]), yaw_axis))
+        if float(np.linalg.norm(x_ref)) < 1e-8:
+            x_ref = _normalize(_project_on_plane(np.array([0.0, 1.0, 0.0]), yaw_axis))
+
+        # Angulo de yaw: de x_ref a la proyeccion del target alrededor del eje de yaw
+        theta0 = _signed_angle(x_ref, _normalize(t_perp), yaw_axis)
+
+        # Rotar target por -theta0 alrededor del eje de yaw → plano del brazo
+        t_rel_local = _rodrigues(t_rel, yaw_axis, -theta0)
+        target_local = base + t_rel_local
+
+        return target_local, theta0
+
+    def _yaw_postprocess(self, theta0: float) -> None:
+        """
+        Post-procesa las posiciones de joints rotando por theta0 alrededor del
+        eje de yaw de J0. Solo aplica cuando J0 es junta pivot/yaw.
+
+        joints[0] (base) permanece fijo. joints[1..n] se rotan por +theta0.
+
+        Args:
+            theta0 : Angulo de yaw en radianes calculado por _yaw_preprocess.
+        """
+        if abs(theta0) < 1e-10:
+            return
+
+        desc0 = self.descriptors[0]
+        if desc0.segment_direction is None:
+            return
+
+        yaw_axis = _normalize(desc0.segment_direction)
+        base     = self.base_position
+
+        for k in range(1, self.n + 1):
+            rel = self.joints[k] - base
+            self.joints[k] = base + _rodrigues(rel, yaw_axis, theta0)
 
     # ------------------------------------------------------------------
     # Algorithm 3: restricciones de workspace
@@ -953,7 +1290,7 @@ class FabrikSerialSolver:
     # Inicializacion
     # ------------------------------------------------------------------
 
-    def _build_initial_joints(self) -> List[np.ndarray]:
+    def _build_initial_joints(self, tilt_sign: float = 1.0) -> List[np.ndarray]:
         """
         Construye la configuracion inicial con una pequena curvatura para evitar
         la singularidad numerica de la cadena completamente estirada.
@@ -970,7 +1307,7 @@ class FabrikSerialSolver:
         for i, desc in enumerate(self.descriptors):
             # Direccion ligeramente inclinada respecto a +Z
             angle = tilt_per_segment * (i + 1)
-            direction = np.array([math.sin(angle), 0.0, math.cos(angle)])
+            direction = np.array([tilt_sign * math.sin(angle), 0.0, math.cos(angle)])
             cursor = cursor + direction * desc.length
             joints.append(cursor.copy())
         return joints
@@ -988,6 +1325,7 @@ class FabrikSerialSolver:
             f"  Longitud total : {self.total_length:.4f} m",
             f"  Tolerancia     : {self.tolerance:.2e} m",
             f"  Max iteraciones: {self.max_iterations}",
+            f"  Policy const.  : {self.constraint_policy}",
             "",
             "  Articulaciones:",
         ]
@@ -1146,14 +1484,16 @@ def _rotation_matrix_from_direction(direction: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Matriz de rotacion 3x3.
     """
-    d = direction.copy()
-    # Evitar singularidad cuando direction apunta en +Y
-    if abs(d[1] - 1.0) < 1e-3:
-        d[1] -= 1e-3
-        d = _normalize(d)
+    d = _normalize(direction.copy())
 
-    x_dir = _normalize(np.cross(d, np.array([0.0, 1.0, 0.0])))
-    y_dir = _normalize(np.cross(x_dir, d))
+    # Base ortonormal local con Z=d. Elegimos X con un "up" global para que
+    # cuando d=[0,0,1] el frame sea identidad (sin invertir ejes en home pose).
+    up = np.array([0.0, 1.0, 0.0])
+    if abs(float(np.dot(d, up))) > 0.999:
+        up = np.array([1.0, 0.0, 0.0])
+
+    x_dir = _normalize(np.cross(up, d))
+    y_dir = _normalize(np.cross(d, x_dir))
 
     return np.column_stack([x_dir, y_dir, d])
 
@@ -1164,9 +1504,19 @@ def _rotation_matrix_from_direction(direction: np.ndarray) -> np.ndarray:
 
 def _parse_link_constraints(
     link,
+    use_normative_hinges: bool = True,
 ) -> Tuple[JointType, float, np.ndarray, np.ndarray, float, float]:
     """
     Extrae el tipo de articulacion y sus parametros de restriccion desde un objeto Link.
+
+    Clasificacion:
+      - prismatic                          -> FREE
+      - revoluta, rango completo (>=360deg)-> BALL sin restriccion
+      - revoluta, eje twist (||axis||~||seg||): detectado en from_robot, aqui BALL half
+            - revoluta, eje perpendicular al seg ->
+                * LOCAL_HINGE si use_normative_hinges=True
+                * BALL si use_normative_hinges=False
+      - revoluta, eje oblicuo (no twist ni perp) -> BALL con half=range/2 (fallback)
 
     Args:
         link : Objeto Link de class_robot_structure.
@@ -1179,8 +1529,13 @@ def _parse_link_constraints(
     if axis_norm > 1e-8:
         joint_axis = joint_axis / axis_norm
 
-    # Vector de referencia perpendicular al eje de la articulacion
-    hinge_ref = _normalize(_perpendicular(joint_axis))
+    # Direccion del segmento desde joint_coords
+    jc      = np.asarray(link.joint_coords, dtype=float)
+    jc_norm = float(np.linalg.norm(jc))
+    seg_dir = (jc / jc_norm) if jc_norm > 1e-8 else np.array([0.0, 0.0, 1.0])
+
+    # Vector de referencia perpendicular al eje de la articulacion (fallback BALL)
+    hinge_ref_fallback = _normalize(_perpendicular(joint_axis))
 
     # Limites angulares del YAML
     limits = link.joint_limits
@@ -1190,27 +1545,37 @@ def _parse_link_constraints(
         lo, hi = -math.pi, math.pi
 
     range_rad = abs(hi - lo)
+    cw_deg    = math.degrees(max(-lo, 0.0))
+    acw_deg   = math.degrees(max(hi,  0.0))
 
     if link.tipo == "prismatic":
-        return JointType.FREE, math.pi, joint_axis, hinge_ref, 180.0, 180.0
+        return JointType.FREE, math.pi, joint_axis, hinge_ref_fallback, 180.0, 180.0
 
     # Articulacion revoluta: clasificar segun rango
     if range_rad >= 2.0 * math.pi - 0.01:
-        # Rango completo: tratar como BALL sin restriccion de angulo
-        return JointType.BALL, math.pi, joint_axis, hinge_ref, 180.0, 180.0
+        # Rango completo: BALL sin restriccion de angulo
+        return JointType.BALL, math.pi, joint_axis, hinge_ref_fallback, 180.0, 180.0
 
-    # Articulacion revoluta con rango limitado.
-    # El eje de la articulacion esta definido en el frame LOCAL del joint.
-    # HINGE_GLOBAL con eje fijo en el frame global es incorrecto para cadenas seriales
-    # donde el eje efectivo rota con la configuracion del robot.
-    # Se usa BALL (cono simetrico centrado en la direccion del segmento entrante) como
-    # aproximacion correcta que funciona en cualquier configuracion.
-    # ball_max_angle = la mitad del rango total de la articulacion.
-    half    = range_rad / 2.0
-    cw_deg  = math.degrees(max(-lo, 0.0))  # conservado para posible uso como HINGE
-    acw_deg = math.degrees(max(hi,  0.0))  # conservado para posible uso como HINGE
+    half = range_rad / 2.0
 
-    return JointType.BALL, half, joint_axis, hinge_ref, cw_deg, acw_deg
+    # Clasificacion segun geometria eje <-> segmento:
+    #   |dot| > 0.99  -> twist (eje paralelo al segmento)
+    #   |dot| < 0.10  -> bisagra pura (eje perpendicular al segmento) -> HINGE_LOCAL
+    #   intermedio    -> oblicuo -> BALL (fallback)
+    dot_axis_seg = abs(float(np.dot(joint_axis, seg_dir)))
+
+    if dot_axis_seg < 0.10:
+        # Bisagra pura (eje perpendicular al segmento): usar HINGE_LOCAL en
+        # modo normativo. En modo transitorio, mantener BALL por convergencia.
+        if use_normative_hinges:
+            hinge_ref = _normalize(_project_on_plane(seg_dir, joint_axis))
+            if np.linalg.norm(hinge_ref) < 1e-8:
+                hinge_ref = hinge_ref_fallback
+            return JointType.HINGE_LOCAL, half, joint_axis, hinge_ref, cw_deg, acw_deg
+        return JointType.BALL, half, joint_axis, hinge_ref_fallback, cw_deg, acw_deg
+
+    # Twist (|dot|>0.99) o oblicuo: BALL con half del rango como radio del cono
+    return JointType.BALL, half, joint_axis, hinge_ref_fallback, cw_deg, acw_deg
 
 
 # ---------------------------------------------------------------------------

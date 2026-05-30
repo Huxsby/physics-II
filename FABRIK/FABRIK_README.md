@@ -24,6 +24,22 @@ FABRIK/
 `-- FABRIK_README.md               Este roadmap
 ```
 
+## Aviso normativo (Mayo 2026)
+
+Este roadmap queda subordinado a las fuentes normativas del proyecto:
+- AL11: FABRIK original (DOI: 10.1016/j.gmod.2011.05.003, local: docs/02.1-FABRIK.pdf)
+- ACL16: Extending FABRIK with model constraints (DOI: 10.1002/cav.1630, local: docs/01.1.2-Extending FABRIK with model constraints.pdf)
+- CALIKO JORS: implementacion de referencia practica (DOI: 10.5334/jors.116)
+
+El criterio operativo para constraints es:
+- BALL: restriccion conica (no representa una junta revolute pura)
+- GLOBAL_HINGE: bisagra con eje fijo global
+- LOCAL_HINGE: bisagra con eje en frame local del joint padre
+
+Para juntas revolute de cadenas seriales (como Niryo J1-J5), el objetivo normativo
+es LOCAL_HINGE. Si por estabilidad numerica se usa BALL de forma temporal, debe
+documentarse como desviacion conocida, no como interpretacion correcta.
+
 ## Estado actual de implementacion
 
 ### [COMPLETADO] fabrik_serial_solver.py + quaternion_utils.py
@@ -63,8 +79,8 @@ alcanzables convergiendo correctamente.
 5. Bug Algorithm 2 - HINGE_GLOBAL incorrecto para cadenas seriales: usar ejes de bisagra fijos
    en el frame global bloquea el movimiento en joints cuyo eje efectivo depende de la
    configuracion de joints previos (todos los joints del Niryo excepto la base).
-   FIX: se usan restricciones BALL que limitan la desviacion angular en el frame local del joint,
-   que es la interpretacion correcta para limites de articulacion en robots seriales.
+   FIX: usar HINGE_GLOBAL solo cuando el eje es realmente global. Para joints revolute
+   seriales, la formulacion normativa es LOCAL_HINGE (con frame local dinamico).
 
 6. Bug Algorithm 3 - O = target: la proyeccion de workspace usaba el propio target como origen
    (identidad), haciendo que la restriccion no tenga efecto.
@@ -77,11 +93,16 @@ alcanzables convergiendo correctamente.
    FIX: configuracion inicial con pequena inclinacion (0.5 deg por segmento) para romper simetria.
 
 **Notas de diseno:**
-- Restricciones BALL son la aproximacion correcta para robots seriales en FABRIK.
-  Para restricciones HINGE precisas se requiere HINGE_LOCAL con frame local dinamico
-  (a implementar si se necesita precision de limite de angulo individual).
+- BALL y HINGE no son equivalentes: BALL limita deflexion local; HINGE limita
+   rotacion en un plano respecto a un eje.
+- En joints revolute seriales, el objetivo es HINGE_LOCAL. El uso de BALL en esos
+   joints se considera estado transitorio y debe quedar justificado por tests.
 - Los ejes de articulacion del YAML estan en el frame LOCAL del joint.
   HINGE_GLOBAL con estos ejes solo es correcto para la articulacion BASE (eje=[0,0,1]).
+- El solver soporta dos politicas de constraints en `from_robot()`:
+  `transitional` (default, baseline estable) y `normative` (alineada con paper/referencia).
+  En `normative`, LOCAL_HINGE aplica proyeccion en forward y clamp CW/ACW en backward,
+  siguiendo el patron de la implementacion de referencia CALIKO.
 
 ### [PENDIENTE] Tareas futuras
 
@@ -89,15 +110,14 @@ alcanzables convergiendo correctamente.
       El eje del hombro/brazo/codo en frame global cambia con la configuracion del robot.
       Requiere propagar el frame local acumulado a traves de la cadena en cada iteracion.
 
-- [ ] Algorithm 4: Conversion de posiciones FABRIK a angulos de articulacion.
-      Actualmente el solver devuelve posiciones de joints, no angulos.
-      Para control real del robot se necesita la cinematica inversa de angulos.
+- [ ] Auditoria de Algorithm 4 (joint_angles): verificar consistencia con AL11/ACL16
+   y etiquetar formalmente como extension compatible o candidata a revision.
 
 - [ ] Algorithm 5: FABRIK Multi-Target (cadenas con bifurcaciones, full body).
       Ver referencias/FABRIK_Full_Body-master para la implementacion de referencia.
 
-- [ ] Algorithm 6: Control de orientacion del efector final.
-      Restriccion de orientacion en el efector (no solo posicion).
+- [ ] Auditoria de Algorithm 6 (orientacion): verificar si se conserva como extension
+   compatible o se reimplementa para mayor fidelidad normativa.
 
 - [ ] Visualizacion 3D del solver: mostrar la cadena cinematica durante la solucion.
       Aprovechar src/animation/class_robot_plotter.py del proyecto.
