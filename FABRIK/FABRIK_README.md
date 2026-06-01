@@ -1,52 +1,62 @@
 # FABRIK 3D - Plan de Refactorizacion y Roadmap
 
+> **AVISO (Mayo 2026):** El solver clásico `fabrik_serial_solver.py` ha sido **archivado** en
+> `legacy/`. El proyecto ha migrado al paradigma **FABRIK-R** (Santos et al., 2021/2022) para
+> articulaciones de 1-DOF. Ver [`FABRIK_R_README.md`](FABRIK_R_README.md) y el nuevo
+> `fabrik_core/fabrik_r_solver.py`.
+
 ## Objetivos
 
-Refactorizar FABRIK_3D en un sistema modular y mantenible con componentes especializados.
+Migrar el sistema al paradigma FABRIK-R: solver IK para cadenas de articulaciones revolutas
+de 1-DOF con proyección planar local y clamping de Rodrigues (Santos et al., SANTOS21/SANTOS22).
 
 ## Arquitectura
 
 ```
 FABRIK/
 |-- fabrik_core/
-|   |-- fabrik_serial_solver.py    [NUEVO] Solver FABRIK Alg 1+2+3, produccion
-|   |-- quaternion_utils.py        [NUEVO] Utilidades cuaternion [w,x,y,z]
-|   |-- math_utils.py              [X] Utilidades matematicas (existente)
-|   `-- __init__.py                [X] Exportaciones del modulo
+|   |-- fabrik_r_solver.py         [ACTIVO] Solver FABRIK-R 1-DOF, produccion
+|   |-- quaternion_utils.py        [ACTIVO] Utilidades cuaternion [w,x,y,z]
+|   |-- math_utils.py              [ACTIVO] Utilidades matematicas
+|   `-- __init__.py                [ACTIVO] Exportaciones del modulo
+|-- legacy/
+|   |-- fabrik_serial_solver.py    [ARCHIVADO] Solver FABRIK clasico (Aristidou/ACL16)
+|   |-- fabrik_paper_constrained_3d.py [ARCHIVADO] Prototipo con bugs documentados
+|   `-- algorithms.txt             [ARCHIVADO] Notas historicas
 |-- tests/
-|   `-- test_fabrik_niryo.py       [NUEVO] Bateria de pruebas contra Niryo One
+|   `-- test_fabrik_niryo.py       [ACTIVO] Bateria de pruebas contra Niryo One
 |-- visualization/
-|   |-- recorder.py                [X] Grabacion de animaciones
+|   |-- recorder.py                [ACTIVO] Grabacion de animaciones
 |   `-- __init__.py
-|-- fabrik_paper_constrained_3d.py [LEGACY] Ver notas de bugs abajo
 |-- FABRIK_2D/                     Implementaciones 2D (constrained/optimized)
 |-- referencias/                   Implementaciones de referencia externas
+|-- FABRIK_R_README.md             Especificacion tecnica FABRIK-R
 `-- FABRIK_README.md               Este roadmap
 ```
 
 ## Aviso normativo (Mayo 2026)
 
-Este roadmap queda subordinado a las fuentes normativas del proyecto:
-- AL11: FABRIK original (DOI: 10.1016/j.gmod.2011.05.003, local: docs/02.1-FABRIK.pdf)
-- ACL16: Extending FABRIK with model constraints (DOI: 10.1002/cav.1630, local: docs/01.1.2-Extending FABRIK with model constraints.pdf)
-- CALIKO JORS: implementacion de referencia practica (DOI: 10.5334/jors.116)
-
-El criterio operativo para constraints es:
-- BALL: restriccion conica (no representa una junta revolute pura)
-- GLOBAL_HINGE: bisagra con eje fijo global
-- LOCAL_HINGE: bisagra con eje en frame local del joint padre
-
-Para juntas revolute de cadenas seriales (como Niryo J1-J5), el objetivo normativo
-es LOCAL_HINGE. Si por estabilidad numerica se usa BALL de forma temporal, debe
-documentarse como desviacion conocida, no como interpretacion correcta.
+Este roadmap queda subordinado a las fuentes normativas del proyecto (orden de prioridad):
+- **SANTOS21:** Santos et al., "FABRIK-R: An Extension Developed Based on FABRIK for Robotics
+  Manipulators." *IEEE Access*, vol. 9, 2021. DOI: 10.1109/ACCESS.2021.3070693. **(NORMATIVO)**
+- **SANTOS22:** Santos et al., "Inverse kinematics of a subsea constrained manipulator based on
+  FABRIK-R." *OCEANS 2022*. DOI: 10.1109/OCEANS47191.2022.9977290. **(NORMATIVO)**
+- AL11: FABRIK original (DOI: 10.1016/j.gmod.2011.05.003) — referencia histórica del bucle base.
+- ACL16: Extending FABRIK with model constraints (DOI: 10.1002/cav.1630) — referencia histórica.
 
 ## Estado actual de implementacion
 
-### [COMPLETADO] fabrik_serial_solver.py + quaternion_utils.py
+### [ACTIVO] fabrik_r_solver.py  ← FASE 2 en progreso
+
+Implementacion de produccion del algoritmo FABRIK-R para cadenas seriales de 1-DOF
+(Santos et al., SANTOS21/SANTOS22). Proyeccion planar local con eje intrínseco por joint,
+clamping angular via formula de Rodrigues, sin dependencia del vector global al Target.
+
+### [ARCHIVADO] legacy/fabrik_serial_solver.py
 
 Implementacion de produccion del algoritmo FABRIK para cadenas seriales (Algorithm 1, 2, 3
-segun Aristidou & Lasenby, 2011). Probado contra el robot Niryo One (6 DOF) con 5/5 targets
-alcanzables convergiendo correctamente.
+segun Aristidou & Lasenby, 2011). Archivado en Mayo 2026. Ver detalle de bugs en este mismo
+documento (seccion inferior).
 
 **Clases y funciones principales:**
 - `JointType`: FREE, BALL, HINGE_GLOBAL, HINGE_LOCAL

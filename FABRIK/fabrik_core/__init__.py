@@ -47,12 +47,14 @@ from .quaternion_utils import (
     quat_from_rotation_matrix,
 )
 
-from .fabrik_serial_solver import (
-    FabrikSerialSolver,
-    JointDescriptor,
-    JointType,
+from .fabrik_r_solver import (
+    FABRIKRSolver,
+    RevoluteJoint,
     SolverResult,
-    _exp_screw as exp_screw_matrix,  # util publica para FK checks (Algorithm 4)
+    project_to_axis_plane,
+    clamp_angle_rodrigues,
+    rotate_vector_rodrigues,
+    extract_joint_angle,
 )
 
 # Metadatos del paquete

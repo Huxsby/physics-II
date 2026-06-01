@@ -1,106 +1,37 @@
-# AGENTS.md - Governance for FABRIK Subtree
+# AGENTS.md - Gobernanza del Subárbol FABRIK-R
 
-Scope: This file governs all changes under FABRIK/.
+## 1) Misión y Enfoque Directivo
+Este documento rige de forma estricta las acciones de cualquier agente autónomo o desarrollador que trabaje en el subárbol `FABRIK/`. El objetivo principal es migrar el sistema desde el paradigma clásico de FABRIK (orientado a Computer Graphics y articulaciones esféricas de 3-DOF) hacia el paradigma de **FABRIK-R** (Santos et al., 2021, 2022), diseñado específicamente para manipuladores robóticos reales compuestos por articulaciones de 1-DOF (revolutas/bisagras) bajo restricciones mecánicas estrictas.
 
-## 1) Mission
+Queda estrictamente prohibido utilizar atajos de conveniencia heurística o aproximaciones que rompan las restricciones físicas intrínsecas de los enlaces de 1-DOF. Toda modificación de código debe ser matemáticamente consistente con las formulaciones de los papers normativos.
 
-Implement and maintain FABRIK behavior aligned with primary references.
-Do not replace normative joint semantics with convenience shortcuts without explicit documentation and validation.
+## 2) Fuentes Normativas (Orden de Prioridad Estricto)
+1. **SANTOS21 (FABRIK-R Core):** Santos, M. C., et al. "FABRIK-R: An Extension Developed Based on FABRIK for Robotics Manipulators." *IEEE Access*, vol. 9, 2021. DOI: 10.1109/ACCESS.2021.3070693.
+2. **SANTOS22 (Subsea Application):** Santos, P. C., et al. "Inverse kinematics of a subsea constrained manipulator based on FABRIK-R." *OCEANS 2022, Hampton Roads*. DOI: 10.1109/OCEANS47191.2022.9977290.
+3. **AL11 (Base Histórica):** Aristidou, A., Lasenby, J. "FABRIK: A fast, iterative solver for the Inverse Kinematics problem." *Graphical Models*, 2011. (Solo como referencia del bucle fundamental Forward/Backward).
 
-## 2) Normative Sources (priority order)
+## 3) Reglas de Oro para el Agente (Líneas Rojas)
+* **No Suposiciones Globales:** Las articulaciones tipo *Hinge* de 1-DOF operan en sistemas de coordenadas locales que rotan solidariamente con los eslabones anteriores. Tratar un eje de bisagra como un vector estático global `[0, 0, 1]` será motivo de rechazo automático del código.
+* **Preservación de Longitudes:** Tras cualquier proyección geométrica sobre el plano de rotación permitido de la articulación, la distancia euclídea entre $p_i$ y $p_{i-1}$ DEBE ser re-normalizada exactamente a la longitud nominal del eslabón ($l_i$). Las distorsiones de longitud en la cadena cinemática destruyen la convergencia.
+* **Sincronización de Documentación:** No se aceptará ninguna línea de código matemático en `fabrik_r_solver.py` que no contenga un comentario explícito citando la sección o ecuación correspondiente de **SANTOS21** o **SANTOS22**.
 
-1. AL11 (primary): Aristidou, A., Lasenby, J. "FABRIK: a fast, iterative solver for the inverse kinematics problem".
-   local: docs/02.1-FABRIK.pdf
-   DOI: 10.1016/j.gmod.2011.05.003
-2. ACL16 (constraints extension): Aristidou, A., Chrysanthou, Y., Lasenby, J. "Extending FABRIK with model constraints".
-  local: docs/01.1.2-Extending FABRIK with model constraints.pdf
-   DOI: 10.1002/cav.1630
-3. CALIKO software paper (practical reference):
-   DOI: 10.5334/jors.116
-4. Local reference implementations:
-   - FABRIK/referencias/FABRIK_chain_3D-master/fabrik_chain_3d/FABRIK.py
-   - FABRIK/referencias/FABRIK_chain_3D-master/fabrik_chain_3d/Joint.py
-   - FABRIK/referencias/FABRIK_Full_Body-master/fabrik_full_body/constraints.py
+## 4) Protocolo de Limpieza y Aislamiento del Entorno
+Antes de escribir la nueva implementación de FABRIK-R, el agente debe ejecutar las siguientes acciones de ordenamiento en el espacio de trabajo:
+1. Crear un directorio llamado `FABRIK/legacy/`.
+2. Mover los archivos de la sesión anterior (`fabrik_serial_solver.py`, `fabrik_paper_constrained_3d.py`) a dicha carpeta.
+3. Actualizar `FABRIK_README.md` para reflejar el estado "Archivado" de la versión clásica y enlazar al nuevo `FABRIK_R_README.md`.
 
-If full paper text is not available in-session, use local reference implementations as executable ground truth and record the limitation in commit notes or PR notes.
+## 5) Orden de Ejecución de Tareas (Roadmap de Actualización)
+El agente procesará la refactorización siguiendo este orden secuencial inalterable:
+* **Fase 1: Aislamiento del Workspace:** Aplicar el protocolo de limpieza del punto 4.
+* **Fase 2: Implementación Matemática Base:** Programar las utilidades de proyección planar de FABRIK-R empleando matrices de rotación locales y cuaterniones.
+* **Fase 3: Bucle de Solución FABRIK-R:** Desarrollar el script de producción `fabrik_r_solver.py` con las pasadas modificadas (Forward/Backward de 1-DOF).
+* **Fase 4: Restricciones de Límites de Ángulo:** Integrar el clamping angular directo sobre el plano cinemático según las secciones de límites físicos de SANTOS22.
+* **Fase 5: Extracción de Ángulos de Articulación:** Implementar el algoritmo de lectura final de variables de junta ($	heta_i$) para su envío al hardware físico.
+* **Fase 6: Batería de Tests:** Validar contra perfiles de robots con articulaciones secuenciales ortogonales (estilo Niryo One o Schilling Titan 2).
 
-## 3) Constraint Semantics (must follow)
-
-- BALL:
-  - Cone limit between incoming and outgoing segment directions.
-  - Not equivalent to a revolute joint angle limit.
-- GLOBAL_HINGE:
-  - Rotation constrained in a plane with global fixed hinge axis.
-  - Optional signed-angle clamp around reference axis.
-- LOCAL_HINGE:
-  - Rotation constrained in a plane using hinge axis/reference defined in local frame of parent segment.
-  - Requires transforming local axes using parent-frame rotation each iteration.
-
-Rule: For serial robot revolute joints (e.g., Niryo J1-J5), target semantics are LOCAL_HINGE unless a documented exception is approved.
-
-## 4) Allowed Deviations and Required Labeling
-
-Temporary deviation is allowed only when convergence/regression is demonstrated.
-
-If deviation exists (example: mapping revolute-perpendicular to BALL), all of the following are mandatory:
-
-1. Code comment near the decision says "transitional deviation".
-2. Documentation states why it exists and what test evidence supports it.
-3. A tracked task exists to return to normative semantics.
-4. Test output baseline before/after is recorded.
-
-Do not describe temporary deviation as "correct interpretation".
-
-## 5) Source-of-Truth Files in this Repo
-
-- Core solver: FABRIK/fabrik_core/fabrik_serial_solver.py
-- Tests: FABRIK/tests/test_fabrik_niryo.py
-- Technical constraints doc: FABRIK/docs/FABRIK_joint_constraints.md
-- Niryo configuration: config/robot-niryo.yaml
-- Roadmap/history notes: FABRIK/FABRIK_README.md
-
-## 6) Change Workflow (mandatory)
-
-Before coding:
-
-1. Read relevant section in normative sources.
-2. Compare target behavior against local reference implementation.
-3. Write expected behavior in 3-5 bullets in task notes.
-
-During coding:
-
-1. Keep edits minimal and localized.
-2. Preserve existing behavior outside target scope.
-3. Mark any non-normative workaround explicitly.
-
-After coding:
-
-1. Run FABRIK/tests/test_fabrik_niryo.py.
-2. Report convergence and limits summary for both batteries.
-3. Confirm docs and code comments still match actual behavior.
-
-## 7) Niryo Context Snapshot (for quick orientation)
-
-- Joint indexing used by tests/solver:
-  - J0 Base, J1 Hombro, J2 Brazo, J3 Codo, J4 Antebrazo, J5 Muneca.
-- High-risk confusion to avoid:
-  - J3 and J4 are different physical joints and have different limits.
-  - BALL local deflection and absolute revolute angle are not the same quantity.
-
-## 8) Rejection Criteria for New Changes
-
-Reject a change if any of the following is true:
-
-- It changes constraint semantics without citing normative source behavior.
-- It introduces global-axis hinge assumptions for joints that are local-frame hinges.
-- It updates code but not the matching documentation/comments.
-- It claims "paper compliant" without evidence against references.
-
-## 9) Minimal Evidence Template for Constraint Changes
-
-Include in change summary:
-
-1. Normative rule applied (AL11/ACL16/CALIKO reference path or DOI).
-2. Files changed.
-3. Before/after convergence and limits counts.
-4. Known tradeoff or remaining deviation.
+## 6) Criterios de Rechazo de Código
+El código será rechazado de inmediato si:
+1. Sufre de "deadlocks" o bucles infinitos en configuraciones alineadas (singularidades de plano).
+2. Utiliza funciones de optimización genéricas de caja negra (como `scipy.optimize`) dentro del bucle interno de FABRIK-R para resolver las proyecciones, rompiendo la naturaleza analítica y rápida del algoritmo.
+3. No maneja la consistencia de signos ($sgn$) al proyectar vectores en orientaciones opuestas (antiparalelas).
