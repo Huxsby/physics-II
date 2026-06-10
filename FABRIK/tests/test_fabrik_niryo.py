@@ -49,7 +49,7 @@ for _p in [_PROJECT_ROOT, _FABRIK_DIR, os.path.join(_PROJECT_ROOT, "src")]:
         sys.path.insert(0, _p)
 
 from core.class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, limits
-from calculations.class_helicoidales import CinematicaDirecta
+from calculations.class_helicoidales import CinematicaDirecta, calcular_exp_Sθ
 from fabrik_core.fabrik_r_solver import (
     FABRIKRSolver,
     RevoluteJoint,
@@ -57,10 +57,6 @@ from fabrik_core.fabrik_r_solver import (
     _safe_normalize,
     EPS,
 )
-
-# _exp_screw se usa solo en _ik_newton_position (verificacion de accesibilidad)
-# Se importa desde legacy para no crear una dependencia nueva en el solver principal.
-from legacy.fabrik_serial_solver import _exp_screw
 
 # ---------------------------------------------------------------------------
 # Configuracion de la prueba
@@ -256,7 +252,7 @@ def _ik_newton_position(robot, target_xyz, thetas_init=None, tol=1e-3, max_iter=
     def _fk_pos(th_):
         T = np.eye(4)
         for Si, ti in zip(S, th_):
-            T = T @ _exp_screw(np.asarray(Si, float), ti)
+            T = T @ calcular_exp_Sθ(np.asarray(Si, float), ti)
         return (T @ M)[:3, 3]
 
     def _jac_pos(th_, eps=1e-6):

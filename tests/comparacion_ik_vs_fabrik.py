@@ -40,7 +40,7 @@ from calculations.class_jacobian import calcular_jacobiana
 from animation import guardar_animacion
 from animation.class_robot_plotter import calcular_transformaciones
 
-from fabrik_core.fabrik_serial_solver import FabrikSerialSolver
+from fabrik_core.fabrik_r_solver import FABRIKRSolver
 
 # ---------------------------------------------------------------------------
 # Parámetros de la trayectoria circular

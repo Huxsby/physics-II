@@ -41,7 +41,7 @@ for _p in [_PROJECT_ROOT, _FABRIK_DIR, os.path.join(_PROJECT_ROOT, "src")]:
 from core.class_robot_structure import cargar_robot_desde_yaml, thetas_aleatorias, thetas_limite
 from calculations.class_helicoidales import CinematicaDirecta
 from animation import exportar_trayectoria_cartesian, importar_trayectoria_cartesian
-from fabrik_core.fabrik_serial_solver import FabrikSerialSolver
+from fabrik_core.fabrik_r_solver import FABRIKRSolver
 
 # ---------------------------------------------------------------------------
 # Generacion de trayectoria suave via FK
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         print("ERROR: No se pudo cargar el robot.")
         sys.exit(1)
 
-    solver = FabrikSerialSolver.from_robot(robot)
+    solver = FABRIKRSolver.from_robot(robot)
     print(solver)
 
     while True:

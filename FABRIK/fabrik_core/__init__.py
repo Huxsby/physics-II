@@ -57,6 +57,9 @@ from .fabrik_r_solver import (
     extract_joint_angle,
 )
 
+# Compatibilidad con imports históricos
+FabrikSerialSolver = FABRIKRSolver
+
 # Metadatos del paquete
 __version__ = "1.0.0"
 __author__ = "FABRIK Physics II Project"
@@ -98,10 +101,14 @@ __all__ = [
     'quat_from_rotation_matrix',
 
     # Solver serial
+    'FABRIKRSolver',
     'FabrikSerialSolver',
-    'JointDescriptor',
-    'JointType',
+    'RevoluteJoint',
     'SolverResult',
+    'project_to_axis_plane',
+    'clamp_angle_rodrigues',
+    'rotate_vector_rodrigues',
+    'extract_joint_angle',
 
     # Metadatos
     '__version__',
