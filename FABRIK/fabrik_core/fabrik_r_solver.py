@@ -28,7 +28,7 @@ Flujo del solver (SANTOS21, Algorithm 1 + Algorithm 2):
     4. Aplica clamping angular [theta_min, theta_max] via Rodrigues.
     5. Actualiza los ejes de rotacion locales propagando cuaterniones.
 
-Trampa critica (AGENTS.md, Sec. 4):
+Trampa critica:
   Si ||v_proj|| < EPS tras la proyeccion, el vector del eslabon coincide con
   el eje de la bisagra -> singularidad. Se debe usar el vector del paso
   anterior en lugar de dividir por cero.
@@ -63,7 +63,6 @@ class RevoluteJoint:
                       (metros). Para el ultimo joint, puede ser 0 o no usarse.
         axis_local  : Eje de rotacion de la bisagra en coordenadas LOCALES del joint
                       (frame del segmento padre). DEBE ser unitario.
-                      Referencia: AGENTS.md Sec. 3 "No Suposiciones Globales".
         theta_min   : Limite inferior del angulo de junta (radianes). Negativo = CW.
         theta_max   : Limite superior del angulo de junta (radianes). Positivo = ACW.
         ref_axis_local: Vector de referencia para theta=0, en el plano ortogonal a
@@ -75,7 +74,6 @@ class RevoluteJoint:
         offset          : Desplazamiento de cero mecanico (radianes).
                           theta_hw = theta_calculado - offset.
                           Compensa la diferencia entre el cero cinematico y el cero
-                          del encoder/hardware del actuador. AGENTS.md Sec. 5.
     """
     length:           float      = 1.0
     axis_local:       np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 1.0]))
@@ -129,7 +127,6 @@ class SolverResult:
                                              observada tras estancamiento;
                                              error > soft_tolerance.
                           'max_iterations' - se agotaron las iteraciones.
-                          Referencia: AGENTS.md Sec. 5 (Fase 6 Optimizacion).
     """
     joint_positions: List[np.ndarray]
     end_effector:    np.ndarray
@@ -148,8 +145,8 @@ def _safe_normalize(v: np.ndarray, fallback: Optional[np.ndarray] = None) -> np.
     Normaliza el vector v. Si ||v|| < EPS (singularidad), devuelve `fallback`
     (o [0,0,1] si no se provee).
 
-    Trampa critica AGENTS.md Sec. 4: evita division por cero cuando el vector
-    del eslabon propuesto es paralelo al eje de la bisagra.
+    Trampa critica, evitar division por cero cuando el vector
+    del eslabon es paralelo al eje de la bisagra.
     """
     n = np.linalg.norm(v)
     if n < EPS:
@@ -190,7 +187,7 @@ def _rotation_matrix_from_two_vectors(
     donde K es la matriz antisimetrica de k = normalize(u x v)
     y a = arccos(u . v).
 
-    Casos especiales (AGENTS.md Sec. 4):
+    Casos especiales:
       - u ≈  v : devuelve identidad (sin rotacion).
       - u ≈ -v : rotacion de 180° alrededor de un eje perp. elegido de forma
                  numericamente estable via _find_perpendicular.
@@ -322,7 +319,7 @@ def clamp_angle_rodrigues(
                       reduciendo oscilaciones de bordes ('boundary chattering').
                       Si el rango efectivo resulta invalido (2*soft_margin > rango),
                       se ignora el margen y se usan los limites duros sin modificar.
-                      Referencia: SANTOS22 Sec. II-B; AGENTS.md Sec. 5 Fase 6.
+                      Referencia: SANTOS22 Sec. II-B.
 
     Returns:
         v_clamped : Vector unitario resultante tras el clamping, en el plano.
@@ -333,7 +330,7 @@ def clamp_angle_rodrigues(
     # Angulo actual respecto a ref_axis (SANTOS21 ec. (2) / SANTOS22 Sec. II-B)
     theta_actual = math.atan2(np.dot(v_proj, perp), np.dot(v_proj, ref_axis))
 
-    # Limites efectivos con margen de amortiguacion (Fase 6, clamping suave)
+    # Limites efectivos con margen de amortiguacion (clamping suave)
     # Si el margen es demasiado grande para el rango, caer al limite duro.
     eff_min = theta_min + soft_margin
     eff_max = theta_max - soft_margin
@@ -354,14 +351,12 @@ def rotate_vector_rodrigues(
     angle: float,
 ) -> np.ndarray:
     """
-    Rota el vector `v` un angulo `angle` (radianes) alrededor de `axis`
-    usando la formula de Rodrigues.
+    Rota el vector `v` un angulo `angle` (radianes) alrededor de `axis` usando la formula de Rodrigues.
 
     Matematica (SANTOS21, Sec. V, ec. (3)):
         v_rot = cos(angle)*v + (1-cos(angle))*(axis.v)*axis + sin(angle)*(axis x v)
 
-    Usado para propagar los ejes locales de las bisagras a lo largo de la cadena
-    tras cada iteracion (AGENTS.md Sec. 4, "Giro del Eje del Frame Anterior").
+    Usado para propagar los ejes locales de las bisagras a lo largo de la cadena tras cada iteracion.
 
     Args:
         v     : Vector a rotar (no necesita ser unitario).
@@ -444,12 +439,10 @@ class FABRIKRSolver:
                                    Reduce 'boundary chattering' en joints limitados.
                                    Valor por defecto ~0.57 deg. Use 0.0 para
                                    clamping duro sin margen.
-                                   Referencia: AGENTS.md Sec. 5 Fase 6.
             stability_tolerance  : Umbral de movimiento para early exit (m).
                                    Si el desplazamiento maximo de cualquier punto
                                    entre dos iteraciones consecutivas es menor que
                                    este valor, el solver para (punto fijo).
-                                   Referencia: AGENTS.md Sec. 5 Fase 6.
             soft_tolerance       : Umbral de convergencia practica (m).
                                    Si best_error < soft_tolerance al salir por
                                    best_state_fallback, se clasifica como
@@ -479,12 +472,10 @@ class FABRIKRSolver:
         self._rng = np.random.default_rng()
 
         # Longitudes nominales de eslabones (fijas durante toda la resolucion)
-        # AGENTS.md Sec. 3: "Preservacion de Longitudes"
         self.lengths: List[float] = [j.length for j in joints]
 
         # Ejes de bisagra en frame global, inicialmente = axis_local
         # Se actualizan al propagar rotaciones entre iteraciones.
-        # AGENTS.md Sec. 4: "Giro del Eje del Frame Anterior (Twist)"
         self._axes_global: List[np.ndarray] = [
             np.array(j.axis_local, dtype=float) for j in joints
         ]
@@ -527,7 +518,7 @@ class FABRIKRSolver:
         el eje de bisagra (singularidad de Gram-Schmidt), se usa un eje
         perpendicular calculado de forma numericamente estable.
 
-        Referencia: AGENTS.md Sec. 5; SANTOS21 Sec. II (definicion de la cadena).
+        Referencia: SANTOS21 Sec. II (definicion de la cadena).
 
         Args:
             robot          : Objeto Robot con .links (lista de Link).
@@ -551,7 +542,6 @@ class FABRIKRSolver:
 
             # Longitud = distancia real entre puntos consecutivos en config cero
             # (puede diferir de link.length para eslabones con desplazamiento lateral)
-            # AGENTS.md Sec. 3 "Preservacion de Longitudes"
             length = float(np.linalg.norm(p[i + 1] - p[i]))
             if length < EPS:
                 raise ValueError(
@@ -720,15 +710,14 @@ class FABRIKRSolver:
 
         for iteration in range(1, self.max_iterations + 1):
 
-            # Item 3 - Early Exit: instantanea de posiciones al inicio de la
+            # ---- Early Exit: instantanea de posiciones al inicio de la
             # iteracion para calcular el movimiento total de la cadena.
-            # AGENTS.md Sec. 5 Fase 6 (Optimizacion de Convergencia).
             p_prev = [pos.copy() for pos in p]
 
             # ---- Actualizar ejes globales (OBLIGATORIO antes de Backward) ---
             # Los ejes se sincronizan con la configuracion de la iteracion
             # anterior (o con la inicial en la primera iteracion) usando FK
-            # acumulativa. SANTOS21, Sec. V; AGENTS.md Sec. 4.
+            # acumulativa. SANTOS21, Sec. V.
             self._update_global_axes(p)
 
             # ---- Pasada Backward (efector -> base) ----------------------
@@ -781,13 +770,12 @@ class FABRIKRSolver:
                 # Clamping angular via Rodrigues (SANTOS21 Sec. V, ec. (3))
                 p[i + 1] = self._apply_angle_clamp(i, p, from_idx=i)
 
-            # ---- Early Exit por estabilidad (Fase 6) -------------------
+            # ---- Early Exit por estabilidad -------------------
             # Si el maximo desplazamiento de cualquier punto en esta iteracion
             # es menor que stability_tolerance, el solver alcanzo un punto fijo.
             # Esto ocurre cuando los joints estan bloqueados por sus limites y
             # no pueden acercarse mas al target. Salir antes de max_iterations
             # evita iteraciones innecesarias con movimiento nulo.
-            # Referencia: AGENTS.md Sec. 5 Fase 6; SANTOS21 Sec. V.
             chain_movement = max(
                 float(np.linalg.norm(p[k] - p_prev[k]))
                 for k in range(self.n + 1)
@@ -975,7 +963,7 @@ class FABRIKRSolver:
 
         # Clamping angular via Rodrigues con soft_margin (SANTOS21 Sec. V, ec. (3))
         # El soft_margin reduce 'boundary chattering': en lugar de clampear al
-        # limite exacto, deja un pequeno margen interior. Fase 6 Optimizacion.
+        # limite exacto, deja un pequeno margen interior.
         v_clamped = clamp_angle_rodrigues(
             v_proj=v_unit,
             ref_axis=ref_g,
@@ -1022,9 +1010,9 @@ class FABRIKRSolver:
         Para cada joint i, el frame global se obtiene componiendo las rotaciones
         de los eslabones 0..i en orden, desde la base hacia el efector. Esto
         garantiza que el eje de cada bisagra rota solidariamente con todos los
-        eslabones previos (AGENTS.md Sec. 3 'No Suposiciones Globales').
+        eslabones previos.
 
-        Algoritmo (SANTOS21, Sec. V; AGENTS.md Sec. 4 'Twist del Frame'):
+        Algoritmo (SANTOS21, Sec. V; Sec. 4 'Twist del Frame'):
           R_cumul = I
           Para cada eslabon k de 0 a n-1:
             d_init_k_world = R_cumul @ d_init_k        (dir. inicial ya rotada)
@@ -1174,7 +1162,7 @@ class FABRIKRSolver:
             ws = ws / np.sum(ws)
 
         primary = int(self._rng.choice(idxs, p=ws))
-        # Reseed escalonado (Fase 7): primeros 2 intentos perturban 1 joint
+        # Reseed escalonado: primeros 2 intentos perturban 1 joint
         # (menor ruido, favorece precision); 3er intento en adelante activa
         # 2 joints para romper deadlocks profundos donde 1 solo no basta.
         secondary = None
@@ -1217,7 +1205,7 @@ class FABRIKRSolver:
         del padre se obtiene acumulando las rotaciones de los eslabones 0..(i-1)
         via FK directa con matrices de Rodrigues.
 
-        Algoritmo (SANTOS21 Sec. V; AGENTS.md Sec. 5):
+        Algoritmo (SANTOS21 Sec. V):
           R_cumul = I  (frame del mundo)
           Para cada joint i de 0 a n-1:
             ref_global[i]  = R_cumul @ ref_axis_local[i]   <- frame del PADRE
@@ -1265,7 +1253,7 @@ class FABRIKRSolver:
         Extrae los angulos de junta desde la configuracion actual (self.positions).
 
         Atajo sobre extract_joint_angles(self.positions).
-        Referencia: SANTOS21 Sec. V; AGENTS.md Sec. 5.
+        Referencia: SANTOS21 Sec. V.
 
         Returns:
             Lista de n angulos en radianes.
@@ -1286,8 +1274,6 @@ class FABRIKRSolver:
         ref_axis_local en la configuracion de reposo) y el cero del encoder
         fisico del motor. Definir offset=0 si no hay compensacion necesaria.
 
-        Referencia: AGENTS.md Sec. 5 (Extraccion de Angulos para Hardware).
-
         Returns:
             Lista de n floats (radianes) para enviar a los controladores.
         """
@@ -1299,9 +1285,9 @@ class FABRIKRSolver:
         Imprime y devuelve el estado interno de los frames globales.
 
         Util para verificar que la propagacion del twist (_update_global_axes)
-        es correcta antes de ejecutar la bateria de pruebas unitarias (Fase 6).
+        es correcta antes de ejecutar la bateria de pruebas unitarias.
         Comprueba ortogonalidad axis/ref y que las longitudes de eslabon no se
-        hayan distorsionado (AGENTS.md Sec. 3 'Preservacion de Longitudes').
+        hayan distorsionado.
 
         Returns:
             dict con:
